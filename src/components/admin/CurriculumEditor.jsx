@@ -9,6 +9,7 @@ import {
   X,
   Link2,
   ListChecks,
+  Eye,
 } from "lucide-react";
 import {
   getCourse,
@@ -22,16 +23,24 @@ import {
   reorderLessons,
 } from "../../lib/courses";
 import { getQuestionSets } from "../../lib/quiz";
-import { lessonTypeLabels } from "../../lib/lessonTypes";
+import { lessonTypeLabels, publishStatusLabels } from "../../lib/lessonTypes";
 import LessonIcon from "../ui/LessonIcon";
 
 const LESSON_TYPES = Object.keys(lessonTypeLabels);
+const PUBLISH_STATUSES = Object.keys(publishStatusLabels);
+const URL_TYPES = ["meet", "recording", "form"];
 
 const typeTint = {
   materi: "bg-zinc-100 text-zinc-500",
   soal: "bg-amber-50 text-amber-600",
   meet: "bg-sky-50 text-sky-600",
   recording: "bg-teal-50 text-teal-600",
+  form: "bg-violet-50 text-violet-600",
+};
+
+const publishPill = {
+  none: "bg-zinc-100 text-zinc-500",
+  admin: "bg-sky-50 text-sky-600",
 };
 
 const cell =
@@ -255,6 +264,7 @@ export default function CurriculumEditor({ courseId }) {
         duration: lesson.duration,
         url: lesson.url ?? null,
         question_set_id: lesson.question_set_id ?? null,
+        publish_status: lesson.publish_status ?? "none",
       }),
     );
 
@@ -374,6 +384,19 @@ export default function CurriculumEditor({ courseId }) {
                       <span className="min-w-0 flex-1 truncate text-sm text-zinc-700">
                         {lesson.title}
                       </span>
+                      {lesson.publish_status &&
+                        lesson.publish_status !== "all" && (
+                          <span
+                            className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold ${
+                              publishPill[lesson.publish_status] ??
+                              "bg-zinc-100 text-zinc-500"
+                            }`}
+                          >
+                            {lesson.publish_status === "admin"
+                              ? "Admin"
+                              : "Draft"}
+                          </span>
+                        )}
                       <span className="shrink-0 text-xs text-zinc-400">
                         {lessonTypeLabels[lesson.type]}
                         {lesson.duration ? ` · ${lesson.duration}` : ""}
@@ -427,8 +450,7 @@ export default function CurriculumEditor({ courseId }) {
                 )}
 
                 {editing.items.map((lesson, li) => {
-                  const hasUrl =
-                    lesson.type === "meet" || lesson.type === "recording";
+                  const hasUrl = URL_TYPES.includes(lesson.type);
                   return (
                     <div
                       key={lesson.id}
@@ -508,6 +530,29 @@ export default function CurriculumEditor({ courseId }) {
                         </button>
                       </div>
 
+                      <div className="mt-1.5 flex items-center gap-1.5 pl-9">
+                        <Eye size={12} className="shrink-0 text-zinc-400" />
+                        <select
+                          value={lesson.publish_status ?? "none"}
+                          onChange={(e) => {
+                            patchLessonLocal(editing.id, lesson.id, {
+                              publish_status: e.target.value,
+                            });
+                            saveLesson({
+                              ...lesson,
+                              publish_status: e.target.value,
+                            });
+                          }}
+                          className={`${cell} flex-1 text-xs`}
+                        >
+                          {PUBLISH_STATUSES.map((s) => (
+                            <option key={s} value={s}>
+                              {publishStatusLabels[s]}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
                       {hasUrl && (
                         <div className="mt-1.5 flex items-center gap-1.5 pl-9">
                           <Link2 size={12} className="shrink-0 text-zinc-400" />
@@ -526,7 +571,9 @@ export default function CurriculumEditor({ courseId }) {
                             placeholder={
                               lesson.type === "meet"
                                 ? "https://meet.google.com/…"
-                                : "Link video (Drive / YouTube / …)"
+                                : lesson.type === "form"
+                                  ? "https://forms.gle/…"
+                                  : "Link video (Drive / YouTube / …)"
                             }
                             className={`${cell} flex-1 text-xs`}
                           />

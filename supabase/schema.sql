@@ -24,10 +24,12 @@ create table if not exists public.coaching_lessons (
   id         text primary key,
   section_id text not null references public.coaching_course_sections (id) on delete cascade,
   type       text not null default 'materi'
-             check (type in ('materi', 'soal', 'meet', 'recording')),
+             check (type in ('materi', 'soal', 'meet', 'recording', 'form')),
   title      text not null,
   duration   text,
   url        text,
+  publish_status text not null default 'all'
+             check (publish_status in ('none', 'admin', 'all')),
   position   int  not null default 0
 );
 create index if not exists coaching_lessons_section_idx
@@ -35,6 +37,18 @@ create index if not exists coaching_lessons_section_idx
 
 -- Kolom url ditambahkan belakangan (link meet / recording) — aman diulang.
 alter table public.coaching_lessons add column if not exists url text;
+
+-- Status publikasi per materi (ditambahkan belakangan). Aman diulang.
+--   none  = draft, cuma kelihatan di editor kurikulum (admin)
+--   admin = tampil di halaman course hanya buat admin (preview sebelum rilis)
+--   all   = tampil buat semua murid yang enroll
+-- Gate baca-nya ada di admin.sql (policy "coaching_lessons read").
+alter table public.coaching_lessons
+  add column if not exists publish_status text not null default 'all';
+alter table public.coaching_lessons drop constraint if exists coaching_lessons_publish_status_check;
+alter table public.coaching_lessons
+  add constraint coaching_lessons_publish_status_check
+    check (publish_status in ('none', 'admin', 'all'));
 
 -- Migrasi tipe lesson lama -> baru. Aman dijalankan ulang (idempotent):
 -- kalau tabel sudah terisi tipe lama, jalankan blok ini di project yang ada.
@@ -49,7 +63,7 @@ end;
 alter table public.coaching_lessons
   alter column type set default 'materi',
   add constraint coaching_lessons_type_check
-    check (type in ('materi', 'soal', 'meet', 'recording'));
+    check (type in ('materi', 'soal', 'meet', 'recording', 'form'));
 
 -- Progress per user. Dipakai nanti setelah ada Auth/login.
 create table if not exists public.coaching_lesson_progress (
@@ -89,6 +103,8 @@ drop policy if exists "coaching_course_sections read" on public.coaching_course_
 create policy "coaching_course_sections read"
   on public.coaching_course_sections for select using (true);
 
+-- Baca lesson: permissif di sini; admin.sql menimpanya jadi
+-- "publish_status = 'all' OR is_admin()" setelah is_admin() ada.
 drop policy if exists "coaching_lessons read" on public.coaching_lessons;
 create policy "coaching_lessons read"
   on public.coaching_lessons for select using (true);
