@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { ChevronDown, ExternalLink, Play } from "lucide-react";
+import { ChevronDown, ExternalLink, Play, ChevronRight } from "lucide-react";
 import LessonIcon from "../ui/LessonIcon";
 import { lessonTypeLabels } from "../../lib/lessonTypes";
 
@@ -22,13 +22,16 @@ function LessonBody({ item }) {
           <span>
             {lessonTypeLabels[item.type]}
             {item.duration ? ` · ${item.duration}` : ""}
-            {item.type === "soal" && " · segera"}
+            {item.type === "soal" && !item.question_set_id && " · segera"}
           </span>
           {item.type === "meet" && item.url && (
             <ExternalLink size={12} className="text-brand-500" />
           )}
           {item.type === "recording" && item.url && (
             <Play size={12} className="text-brand-500" />
+          )}
+          {item.type === "soal" && item.question_set_id && (
+            <ChevronRight size={13} className="text-brand-500" />
           )}
         </span>
       </div>
@@ -68,6 +71,7 @@ export default function CourseSection({ section, courseId }) {
           {section.items.map((item) => {
             const external = item.type === "meet" && item.url;
             const recording = item.type === "recording" && item.url;
+            const quiz = item.type === "soal" && item.question_set_id;
 
             let row;
             if (external) {
@@ -85,6 +89,15 @@ export default function CourseSection({ section, courseId }) {
               row = (
                 <Link
                   to={`/course/${courseId}/recording/${item.id}`}
+                  className={rowCls}
+                >
+                  <LessonBody item={item} />
+                </Link>
+              );
+            } else if (quiz) {
+              row = (
+                <Link
+                  to={`/course/${courseId}/soal/${item.id}`}
                   className={rowCls}
                 >
                   <LessonBody item={item} />

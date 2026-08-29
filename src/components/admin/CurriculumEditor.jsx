@@ -8,6 +8,7 @@ import {
   Pencil,
   X,
   Link2,
+  ListChecks,
 } from "lucide-react";
 import {
   getCourse,
@@ -20,6 +21,7 @@ import {
   deleteLesson,
   reorderLessons,
 } from "../../lib/courses";
+import { getQuestionSets } from "../../lib/quiz";
 import { lessonTypeLabels } from "../../lib/lessonTypes";
 import LessonIcon from "../ui/LessonIcon";
 
@@ -116,8 +118,19 @@ export default function CurriculumEditor({ courseId }) {
   const [status, setStatus] = useState("loading"); // loading | error | ready
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  const [questionSets, setQuestionSets] = useState([]);
 
   const closeModal = useCallback(() => setEditingId(null), []);
+
+  useEffect(() => {
+    let alive = true;
+    getQuestionSets()
+      .then((d) => alive && setQuestionSets(d))
+      .catch((err) => console.error("[admin] gagal memuat set soal:", err));
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const load = () => {
     setStatus("loading");
@@ -241,6 +254,7 @@ export default function CurriculumEditor({ courseId }) {
         title: lesson.title.trim() || "Tanpa judul",
         duration: lesson.duration,
         url: lesson.url ?? null,
+        question_set_id: lesson.question_set_id ?? null,
       }),
     );
 
@@ -516,6 +530,33 @@ export default function CurriculumEditor({ courseId }) {
                             }
                             className={`${cell} flex-1 text-xs`}
                           />
+                        </div>
+                      )}
+
+                      {lesson.type === "soal" && (
+                        <div className="mt-1.5 flex items-center gap-1.5 pl-9">
+                          <ListChecks
+                            size={12}
+                            className="shrink-0 text-zinc-400"
+                          />
+                          <select
+                            value={lesson.question_set_id ?? ""}
+                            onChange={(e) => {
+                              const v = e.target.value || null;
+                              patchLessonLocal(editing.id, lesson.id, {
+                                question_set_id: v,
+                              });
+                              saveLesson({ ...lesson, question_set_id: v });
+                            }}
+                            className={`${cell} flex-1 text-xs`}
+                          >
+                            <option value="">— pilih set soal —</option>
+                            {questionSets.map((qs) => (
+                              <option key={qs.id} value={qs.id}>
+                                {qs.title}
+                              </option>
+                            ))}
+                          </select>
                         </div>
                       )}
                     </div>

@@ -5,6 +5,7 @@ import { signOut } from "../../lib/auth";
 
 const tabs = [
   { to: "/admin", label: "Course", end: true },
+  { to: "/admin/set-soal", label: "Set Soal", end: false },
   { to: "/admin/users", label: "Pengguna", end: false },
 ];
 

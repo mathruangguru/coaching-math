@@ -3,7 +3,10 @@
 
 project_id = "coaching-math"
 
-# admin-users dipanggil dari browser -> preflight CORS OPTIONS nggak bawa
-# JWT, jadi verifikasinya dimatikan di sini (function cek admin sendiri).
+# Dipanggil dari browser -> preflight CORS OPTIONS nggak bawa JWT, jadi
+# verify_jwt dimatikan (tiap function cek auth-nya sendiri).
 [functions.admin-users]
+verify_jwt = false
+
+[functions.quiz-submit]
 verify_jwt = false
