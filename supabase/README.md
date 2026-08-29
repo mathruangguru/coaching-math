@@ -49,9 +49,10 @@ Katalog tetap bisa dibaca `anon` di level DB, tapi UI-nya di balik login.
 ### Setup sekali
 
 1. **SQL Editor** → jalankan `admin.sql` (setelah `schema.sql`). Bikin:
-   - `coaching_profiles` (`role`: `student` | `admin`) + trigger auto-buat
-     profile tiap ada user baru
-   - `is_admin()` + policy: admin bisa baca/ubah semua profile, dan
+   - `coaching_profiles` (`role`: `student` | `admin` | `super_admin`) +
+     trigger auto-buat profile tiap ada user baru
+   - `is_admin()` (admin/super_admin) + `is_super_admin()` + policy:
+     admin baca semua profile, super_admin ubah profile orang lain,
      write admin-only untuk `coaching_courses` / `_sections` / `_lessons`
 2. **Deploy Edge Function `admin-users`** (lihat bagian bawah) — dipakai
    buat create / set-password / delete user.
@@ -60,25 +61,32 @@ Katalog tetap bisa dibaca `anon` di level DB, tapi UI-nya di balik login.
    - "Allow new users to sign up" boleh **OFF** — bikin user lewat Admin
      API di Edge Function, bukan `signUp` publik.
 4. **Authentication → Users → Add user** → email + password, centang
-   **Auto Confirm User**. Ini calon admin pertama.
-4. **SQL Editor**, jalankan (ganti email):
+   **Auto Confirm User**. Ini calon super admin pertama.
+5. **SQL Editor**, jalankan (ganti email):
    ```sql
-   update public.coaching_profiles set role = 'admin'
+   update public.coaching_profiles set role = 'super_admin'
      where email = 'kamu@contoh.com';
    ```
-5. Buka `/login`, masuk. Admin lihat menu **Admin** di sidebar.
+6. Buka `/login`, masuk. Admin/super_admin lihat menu **Admin** di sidebar.
 
 ### Kelola user — `/admin/users`
 
-- **Buat user**: nama depan/belakang, email, password, role. Lewat Admin
-  API di Edge Function `admin-users` → **nggak kirim email** (nggak kena
-  rate limit), sesi admin nggak keganti.
-- **Ganti role** dari daftar. Admin nggak bisa nurunin role sendiri.
-- **Set password** user (kasus lupa) → tombol di tiap baris.
-- **Hapus user** → tombol di tiap baris. Profile & progress ikut kehapus
-  (cascade). Nggak bisa hapus akun sendiri.
+Role: `student` < `admin` < `super_admin`.
 
-Tiga yang terakhir butuh Edge Function `admin-users` ke-deploy.
+| Aksi | admin | super_admin |
+| --- | :-: | :-: |
+| Buat user (role dipaksa `student`) | ✅ | — |
+| Buat user role apa pun | — | ✅ |
+| Ganti role user | — | ✅ |
+| Set password user (kasus lupa) | — | ✅ |
+| Hapus user (cascade profile & progress; nggak bisa diri sendiri) | — | ✅ |
+
+- **Buat user** lewat Admin API di Edge Function `admin-users` → **nggak
+  kirim email** (nggak kena rate limit), sesi admin nggak keganti.
+- Admin biasa lihat daftar user tapi cuma sebagai badge role — tanpa
+  tombol aksi. Gate-nya di `is_super_admin()` (policy + trigger
+  `guard_profile_role`) dan di Edge Function.
+- Aksi selain "buat user" butuh Edge Function `admin-users` ke-deploy.
 
 ### Profil (semua user) — `/profile`
 

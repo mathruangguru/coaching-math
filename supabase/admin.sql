@@ -9,9 +9,15 @@ create table if not exists public.coaching_profiles (
   first_name text,
   last_name  text,
   role       text not null default 'student'
-             check (role in ('student', 'admin')),
+             check (role in ('student', 'admin', 'super_admin')),
   created_at timestamptz not null default now()
 );
+
+-- Role 'super_admin' ditambahkan belakangan — longgarkan CHECK-nya. Aman diulang.
+alter table public.coaching_profiles drop constraint if exists coaching_profiles_role_check;
+alter table public.coaching_profiles
+  add constraint coaching_profiles_role_check
+    check (role in ('student', 'admin', 'super_admin'));
 
 -- Kolom nama ditambahkan belakangan — aman di-run ulang.
 alter table public.coaching_profiles
@@ -44,11 +50,28 @@ stable
 as $$
   select exists (
     select 1 from public.coaching_profiles
-    where id = auth.uid() and role = 'admin'
+    where id = auth.uid() and role in ('admin', 'super_admin')
   );
 $$;
 
 grant execute on function public.is_admin() to anon, authenticated;
+
+-- Super admin = admin yang boleh kelola user (hapus / ganti role / set
+-- password). Admin biasa cuma boleh nambah user.
+create or replace function public.is_super_admin()
+returns boolean
+language sql
+security definer
+set search_path = public, pg_temp
+stable
+as $$
+  select exists (
+    select 1 from public.coaching_profiles
+    where id = auth.uid() and role = 'super_admin'
+  );
+$$;
+
+grant execute on function public.is_super_admin() to anon, authenticated;
 
 -- ── RLS coaching_profiles ──────────────────────────────────────────
 -- Tiap user boleh baca profil sendiri...
@@ -64,18 +87,21 @@ create policy "coaching_profiles update own"
   on public.coaching_profiles for update
   using (auth.uid() = id) with check (auth.uid() = id);
 
--- Admin boleh baca & ubah semua profile (halaman /admin/users).
+-- Admin (& super admin) boleh baca semua profile (halaman /admin/users).
 drop policy if exists "coaching_profiles select admin" on public.coaching_profiles;
 create policy "coaching_profiles select admin"
   on public.coaching_profiles for select
   using (public.is_admin());
 
+-- ...tapi cuma super admin yang boleh ubah baris profile orang lain
+-- (ganti role dsb). Admin biasa nambah user lewat Edge Function.
 drop policy if exists "coaching_profiles update admin" on public.coaching_profiles;
 create policy "coaching_profiles update admin"
   on public.coaching_profiles for update
-  using (public.is_admin()) with check (public.is_admin());
+  using (public.is_super_admin()) with check (public.is_super_admin());
 
--- Cegah non-admin mengubah kolom role miliknya sendiri.
+-- Kolom role cuma boleh diubah super admin. auth.uid() IS NULL = update
+-- lewat SQL Editor / service_role (bootstrap admin pertama) — dibiarkan.
 create or replace function public.guard_profile_role()
 returns trigger
 language plpgsql
@@ -83,7 +109,9 @@ security definer
 set search_path = public, pg_temp
 as $$
 begin
-  if new.role is distinct from old.role and not public.is_admin() then
+  if new.role is distinct from old.role
+     and auth.uid() is not null
+     and not public.is_super_admin() then
     new.role := old.role;
   end if;
   return new;
@@ -148,15 +176,19 @@ create policy "coaching_lessons write admin"
   on public.coaching_lessons for all
   using (public.is_admin()) with check (public.is_admin());
 
--- ── Bikin admin pertama ────────────────────────────────────────────
+-- ── Bikin super admin pertama ──────────────────────────────────────
 -- 1) Bikin user di dashboard: Authentication -> Users -> Add user
 --    (centang "Auto Confirm User" biar bisa langsung login).
 -- 2) Uncomment baris ini, ganti email-nya, lalu Run:
 --
--- update public.coaching_profiles set role = 'admin'
+-- update public.coaching_profiles set role = 'super_admin'
 --   where email = 'kamu@contoh.com';
 --
--- Setelah punya 1 admin, user berikutnya dibuat dari halaman /admin/users
+-- (guard_profile_role membiarkan update ini karena auth.uid() NULL di
+--  SQL Editor.) Role: 'student' < 'admin' < 'super_admin'.
+--   admin       = akses /admin, edit course, TAMBAH user aja.
+--   super_admin = admin + hapus user / ganti role / set password user.
+-- Setelah punya 1 super admin, user berikutnya dibuat dari /admin/users
 -- (lewat Edge Function admin-users). Syarat di Supabase:
 --   Authentication -> Providers -> Email -> "Confirm email" OFF.
 --   "Allow new users to sign up" boleh OFF.

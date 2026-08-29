@@ -1,7 +1,8 @@
 // Edge Function: operasi user yang butuh service_role (nggak boleh di frontend).
 //   action "create"        -> { email, password, firstName, lastName, role }
-//   action "set_password"  -> { userId, password }
-//   action "delete"        -> { userId }
+//                             admin biasa: role dipaksa "student".
+//   action "set_password"  -> { userId, password }   (super_admin only)
+//   action "delete"        -> { userId }             (super_admin only)
 //
 // createUser lewat Admin API = TIDAK kirim email -> nggak kena email rate
 // limit, dan "Allow new users to sign up" boleh OFF.
@@ -58,22 +59,24 @@ Deno.serve(async (req) => {
     .eq("id", user.id)
     .maybeSingle();
   if (profileErr) return json({ error: profileErr.message }, 400);
-  if (profile?.role !== "admin") return json({ error: "Bukan admin" }, 403);
+  const callerRole = profile?.role;
+  const isAdmin = callerRole === "admin" || callerRole === "super_admin";
+  const isSuperAdmin = callerRole === "super_admin";
+  if (!isAdmin) return json({ error: "Bukan admin" }, 403);
 
   const body = await req.json().catch(() => ({}));
   const admin = createClient(url, serviceKey);
+  const ROLES = ["student", "admin", "super_admin"];
 
   if (body.action === "create") {
-    const {
-      email,
-      password,
-      firstName = "",
-      lastName = "",
-      role = "student",
-    } = body;
+    const { email, password, firstName = "", lastName = "" } = body;
     if (!email || typeof password !== "string" || password.length < 6) {
       return json({ error: "email & password (min 6 karakter) wajib" }, 400);
     }
+    // Admin biasa cuma boleh bikin murid. Cuma super admin yang boleh
+    // menetapkan role admin / super_admin.
+    let role = ROLES.includes(body.role) ? body.role : "student";
+    if (!isSuperAdmin) role = "student";
 
     const { data, error } = await admin.auth.admin.createUser({
       email: String(email).trim(),
@@ -89,7 +92,7 @@ Deno.serve(async (req) => {
         first_name: firstName || null,
         last_name: lastName || null,
       };
-      if (role === "admin") patch.role = "admin";
+      if (role !== "student") patch.role = role;
       const { error: patchErr } = await admin
         .from("coaching_profiles")
         .update(patch)
@@ -99,7 +102,9 @@ Deno.serve(async (req) => {
     return json({ ok: true, id });
   }
 
+  // set_password & delete = super admin only.
   if (body.action === "set_password") {
+    if (!isSuperAdmin) return json({ error: "Perlu super admin" }, 403);
     const { userId, password } = body;
     if (!userId || typeof password !== "string" || password.length < 6) {
       return json({ error: "userId & password (min 6 karakter) wajib" }, 400);
@@ -110,6 +115,7 @@ Deno.serve(async (req) => {
   }
 
   if (body.action === "delete") {
+    if (!isSuperAdmin) return json({ error: "Perlu super admin" }, 403);
     const { userId } = body;
     if (!userId) return json({ error: "userId wajib" }, 400);
     if (userId === user.id) {

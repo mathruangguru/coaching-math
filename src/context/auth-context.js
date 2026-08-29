@@ -1,7 +1,8 @@
 import { createContext, useContext } from "react";
 
 /**
- * { session, profile, loading, isAdmin }
+ * { session, profile, loading, isAdmin, isSuperAdmin, refreshProfile }
+ * isAdmin = role admin ATAU super_admin. isSuperAdmin = super_admin doang.
  * Di-provide oleh <AuthProvider> (src/context/AuthProvider.jsx).
  */
 export const AuthContext = createContext(null);
