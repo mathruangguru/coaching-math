@@ -5,6 +5,7 @@ import LoginPage from "./pages/LoginPage";
 import DashboardPage from "./pages/DashboardPage";
 import CoursePage from "./pages/CoursePage";
 import CourseDetailPage from "./pages/CourseDetailPage";
+import ProfilePage from "./pages/ProfilePage";
 import RequireAdmin from "./components/admin/RequireAdmin";
 import AdminLayout from "./components/admin/AdminLayout";
 import AdminCoursesPage from "./pages/admin/AdminCoursesPage";
@@ -24,6 +25,7 @@ export default function App() {
           <Route index element={<DashboardPage />} />
           <Route path="course" element={<CoursePage />} />
           <Route path="course/:courseId" element={<CourseDetailPage />} />
+          <Route path="profile" element={<ProfilePage />} />
         </Route>
       </Route>
 

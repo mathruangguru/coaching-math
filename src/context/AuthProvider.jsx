@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supabase, hasSupabase } from "../lib/supabase";
 import { AuthContext } from "./auth-context";
 
@@ -33,16 +33,23 @@ export function AuthProvider({ children }) {
     };
   }, []);
 
-  // Ambil profile (buat tahu role) tiap kali user berganti.
   const userId = session?.user?.id ?? null;
+
+  // Panggil refreshProfile() buat re-fetch (mis. setelah edit nama sendiri).
+  const [refreshTick, setRefreshTick] = useState(0);
+  const refreshProfile = useCallback(
+    () => setRefreshTick((n) => n + 1),
+    []
+  );
+
+  // Ambil profile tiap kali user berganti / diminta refresh.
   useEffect(() => {
     if (!hasSupabase || !userId) return;
 
     let alive = true;
-
     supabase
       .from("coaching_profiles")
-      .select("id, email, role")
+      .select("id, email, first_name, last_name, role")
       .eq("id", userId)
       .maybeSingle()
       .then(({ data, error }) => {
@@ -55,7 +62,7 @@ export function AuthProvider({ children }) {
     return () => {
       alive = false;
     };
-  }, [userId]);
+  }, [userId, refreshTick]);
 
   // Profile-nya sudah nyambung sama user yang sekarang?
   const profileReady = userId !== null && profileUserId === userId;
@@ -66,6 +73,7 @@ export function AuthProvider({ children }) {
     loading:
       hasSupabase && (!sessionChecked || (userId !== null && !profileReady)),
     isAdmin: profileReady && profile?.role === "admin",
+    refreshProfile,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
