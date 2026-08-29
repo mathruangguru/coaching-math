@@ -6,10 +6,17 @@
 create table if not exists public.coaching_profiles (
   id         uuid primary key references auth.users (id) on delete cascade,
   email      text,
+  first_name text,
+  last_name  text,
   role       text not null default 'student'
              check (role in ('student', 'admin')),
   created_at timestamptz not null default now()
 );
+
+-- Kolom nama ditambahkan belakangan — aman di-run ulang.
+alter table public.coaching_profiles
+  add column if not exists first_name text,
+  add column if not exists last_name  text;
 
 alter table public.coaching_profiles enable row level security;
 
@@ -42,7 +49,14 @@ create policy "coaching_profiles select own"
   on public.coaching_profiles for select
   using (auth.uid() = id);
 
--- ...admin boleh baca & ubah role semua profile (buat halaman /admin/users).
+-- ...dan ubah nama sendiri (halaman /profile). Perubahan role dijaga trigger
+-- di bawah, jadi user biasa nggak bisa naikin dirinya jadi admin.
+drop policy if exists "coaching_profiles update own" on public.coaching_profiles;
+create policy "coaching_profiles update own"
+  on public.coaching_profiles for update
+  using (auth.uid() = id) with check (auth.uid() = id);
+
+-- Admin boleh baca & ubah semua profile (halaman /admin/users).
 drop policy if exists "coaching_profiles select admin" on public.coaching_profiles;
 create policy "coaching_profiles select admin"
   on public.coaching_profiles for select
@@ -53,6 +67,26 @@ create policy "coaching_profiles update admin"
   on public.coaching_profiles for update
   using (public.is_admin()) with check (public.is_admin());
 
+-- Cegah non-admin mengubah kolom role miliknya sendiri.
+create or replace function public.guard_profile_role()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  if new.role is distinct from old.role and not public.is_admin() then
+    new.role := old.role;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists coaching_profiles_guard_role on public.coaching_profiles;
+create trigger coaching_profiles_guard_role
+  before update on public.coaching_profiles
+  for each row execute function public.guard_profile_role();
+
 -- ── Auto-buat profile saat user baru daftar ─────────────────────────
 
 create or replace function public.handle_new_user()
@@ -62,8 +96,13 @@ security definer
 set search_path = public, pg_temp
 as $$
 begin
-  insert into public.coaching_profiles (id, email)
-  values (new.id, new.email)
+  insert into public.coaching_profiles (id, email, first_name, last_name)
+  values (
+    new.id,
+    new.email,
+    nullif(new.raw_user_meta_data ->> 'first_name', ''),
+    nullif(new.raw_user_meta_data ->> 'last_name', '')
+  )
   on conflict (id) do nothing;
   return new;
 end;
