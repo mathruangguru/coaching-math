@@ -22,29 +22,30 @@ function CardInner({ item, clickable }) {
         <LessonIcon type={item.type} size={16} />
       </span>
 
-      <p className="mt-2.5 flex-1 text-sm font-semibold leading-snug text-zinc-900 group-hover:text-brand-700">
-        {item.title}
-      </p>
-
-      <span className="mt-1.5 flex items-center gap-1 text-xs text-zinc-400">
-        <span>
-          {lessonTypeLabels[item.type]}
-          {item.duration ? ` · ${item.duration}` : ""}
-          {item.type === "soal" && !item.question_set_id && " · segera"}
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-semibold leading-snug text-zinc-900 group-hover:text-brand-700">
+          {item.title}
+        </p>
+        <span className="mt-1 flex items-center gap-1 text-xs text-zinc-400">
+          <span>
+            {lessonTypeLabels[item.type]}
+            {item.duration ? ` · ${item.duration}` : ""}
+            {item.type === "soal" && !item.question_set_id && " · segera"}
+          </span>
+          {clickable === "external" && (
+            <ExternalLink size={12} className="text-brand-500" />
+          )}
+          {clickable === "internal" && (
+            <ArrowUpRight size={13} className="text-brand-500" />
+          )}
         </span>
-        {clickable === "external" && (
-          <ExternalLink size={12} className="text-brand-500" />
-        )}
-        {clickable === "internal" && (
-          <ArrowUpRight size={13} className="text-brand-500" />
-        )}
-      </span>
+      </div>
     </>
   );
 }
 
 const cardCls =
-  "group flex flex-col rounded-xl border border-zinc-200/80 bg-white p-3.5 transition";
+  "group flex items-start gap-3 rounded-xl border border-zinc-200/80 bg-white p-3.5 transition";
 const clickableCls = " hover:border-zinc-300 hover:shadow-sm";
 
 export default function CourseSection({ section, courseId }) {
