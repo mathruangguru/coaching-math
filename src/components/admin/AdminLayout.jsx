@@ -1,7 +1,21 @@
-import { Link, Outlet, useNavigate } from "react-router-dom";
+import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import { ArrowLeft, LogOut } from "lucide-react";
 import { useAuth } from "../../context/auth-context";
 import { signOut } from "../../lib/auth";
+
+const tabs = [
+  { to: "/admin", label: "Course", end: true },
+  { to: "/admin/users", label: "Pengguna", end: false },
+];
+
+function tabClass({ isActive }) {
+  return [
+    "border-b-2 px-1 pb-2 text-sm font-medium transition-colors",
+    isActive
+      ? "border-brand-500 text-zinc-900"
+      : "border-transparent text-zinc-500 hover:text-zinc-800",
+  ].join(" ");
+}
 
 export default function AdminLayout() {
   const { profile } = useAuth();
@@ -11,7 +25,7 @@ export default function AdminLayout() {
     try {
       await signOut();
     } finally {
-      navigate("/admin/login", { replace: true });
+      navigate("/login", { replace: true });
     }
   };
 
@@ -45,6 +59,16 @@ export default function AdminLayout() {
           </button>
         </div>
       </header>
+
+      <div className="mx-auto max-w-[900px] px-6">
+        <nav className="flex gap-5 border-b border-zinc-200 pt-4">
+          {tabs.map((t) => (
+            <NavLink key={t.to} to={t.to} end={t.end} className={tabClass}>
+              {t.label}
+            </NavLink>
+          ))}
+        </nav>
+      </div>
 
       <main className="mx-auto max-w-[900px] px-6 py-8">
         <Outlet />

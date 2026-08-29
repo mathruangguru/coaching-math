@@ -1,10 +1,10 @@
 import { createClient } from "@supabase/supabase-js";
 
-const url = import.meta.env.VITE_SUPABASE_URL;
-const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+export const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+export const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 // `hasSupabase` false = env belum diisi -> app fallback ke data mock.
-export const hasSupabase = Boolean(url && anonKey);
+export const hasSupabase = Boolean(supabaseUrl && supabaseAnonKey);
 
 if (!hasSupabase && import.meta.env.DEV) {
   console.warn(
@@ -13,4 +13,6 @@ if (!hasSupabase && import.meta.env.DEV) {
   );
 }
 
-export const supabase = hasSupabase ? createClient(url, anonKey) : null;
+export const supabase = hasSupabase
+  ? createClient(supabaseUrl, supabaseAnonKey)
+  : null;

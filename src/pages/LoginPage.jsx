@@ -1,25 +1,31 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { hasSupabase } from "../../lib/supabase";
-import { signIn } from "../../lib/auth";
-import { useAuth } from "../../context/auth-context";
+import { useLocation, useNavigate } from "react-router-dom";
+import { hasSupabase } from "../lib/supabase";
+import { signIn } from "../lib/auth";
+import { useAuth } from "../context/auth-context";
+import ruangguruLogo from "../assets/ruangguru.png";
 
 const inputCls =
   "mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none transition-colors focus:border-brand-500";
 
-export default function AdminLoginPage() {
+export default function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { session, loading } = useAuth();
+
+  const dest = location.state?.from && location.state.from !== "/login"
+    ? location.state.from
+    : "/";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  // Sudah login -> langsung ke /admin.
+  // Sudah login -> keluar dari halaman login.
   useEffect(() => {
-    if (!loading && session) navigate("/admin", { replace: true });
-  }, [loading, session, navigate]);
+    if (!loading && session) navigate(dest, { replace: true });
+  }, [loading, session, dest, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -27,7 +33,7 @@ export default function AdminLoginPage() {
     setError("");
     try {
       await signIn(email, password);
-      navigate("/admin", { replace: true });
+      navigate(dest, { replace: true });
     } catch (err) {
       setError(err?.message ?? "Gagal masuk.");
       setBusy(false);
@@ -35,15 +41,18 @@ export default function AdminLoginPage() {
   };
 
   return (
-    <div className="grid min-h-screen place-items-center bg-[#fafafa] px-6">
+    <div className="grid min-h-screen place-items-center bg-[#f4f4f5] px-6">
       <form
         onSubmit={handleSubmit}
         className="w-full max-w-sm rounded-2xl border border-zinc-200 bg-white p-6"
       >
-        <h1 className="text-lg font-bold tracking-tight text-zinc-900">
-          Masuk Admin
+        <img src={ruangguruLogo} alt="Ruangguru" className="h-7 w-auto" />
+        <h1 className="mt-4 text-lg font-bold tracking-tight text-zinc-900">
+          Masuk
         </h1>
-        <p className="mt-1 text-xs text-zinc-500">Khusus pengelola course.</p>
+        <p className="mt-1 text-xs text-zinc-500">
+          Coaching Matematika — masuk dengan akun yang diberikan pengelola.
+        </p>
 
         {!hasSupabase && (
           <p className="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">

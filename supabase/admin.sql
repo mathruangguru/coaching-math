@@ -13,14 +13,45 @@ create table if not exists public.coaching_profiles (
 
 alter table public.coaching_profiles enable row level security;
 
-grant select on public.coaching_profiles to authenticated;
+grant select, update on public.coaching_profiles to authenticated;
 
--- Tiap user cuma boleh baca profil sendiri.
--- Ganti role lewat SQL/dashboard (lihat baris paling bawah), bukan dari app.
+-- ── Helper: apakah caller seorang admin ─────────────────────────────
+-- Didefinisikan sebelum policy yang memakainya. SECURITY DEFINER -> query
+-- di dalamnya bypass RLS, jadi aman dipakai di policy coaching_profiles
+-- sendiri (nggak rekursif).
+
+create or replace function public.is_admin()
+returns boolean
+language sql
+security definer
+set search_path = public, pg_temp
+stable
+as $$
+  select exists (
+    select 1 from public.coaching_profiles
+    where id = auth.uid() and role = 'admin'
+  );
+$$;
+
+grant execute on function public.is_admin() to anon, authenticated;
+
+-- ── RLS coaching_profiles ──────────────────────────────────────────
+-- Tiap user boleh baca profil sendiri...
 drop policy if exists "coaching_profiles select own" on public.coaching_profiles;
 create policy "coaching_profiles select own"
   on public.coaching_profiles for select
   using (auth.uid() = id);
+
+-- ...admin boleh baca & ubah role semua profile (buat halaman /admin/users).
+drop policy if exists "coaching_profiles select admin" on public.coaching_profiles;
+create policy "coaching_profiles select admin"
+  on public.coaching_profiles for select
+  using (public.is_admin());
+
+drop policy if exists "coaching_profiles update admin" on public.coaching_profiles;
+create policy "coaching_profiles update admin"
+  on public.coaching_profiles for update
+  using (public.is_admin()) with check (public.is_admin());
 
 -- ── Auto-buat profile saat user baru daftar ─────────────────────────
 
@@ -48,23 +79,6 @@ insert into public.coaching_profiles (id, email)
 select id, email from auth.users
 on conflict (id) do nothing;
 
--- ── Helper: apakah caller seorang admin ─────────────────────────────
-
-create or replace function public.is_admin()
-returns boolean
-language sql
-security definer
-set search_path = public, pg_temp
-stable
-as $$
-  select exists (
-    select 1 from public.coaching_profiles
-    where id = auth.uid() and role = 'admin'
-  );
-$$;
-
-grant execute on function public.is_admin() to anon, authenticated;
-
 -- ── Write access ke katalog: admin only ────────────────────────────
 -- Policy select "read (true)" dari schema.sql tetap jalan buat publik.
 
@@ -87,10 +101,14 @@ create policy "coaching_lessons write admin"
   on public.coaching_lessons for all
   using (public.is_admin()) with check (public.is_admin());
 
--- ── Jadikan diri sendiri admin ─────────────────────────────────────
+-- ── Bikin admin pertama ────────────────────────────────────────────
 -- 1) Bikin user di dashboard: Authentication -> Users -> Add user
 --    (centang "Auto Confirm User" biar bisa langsung login).
 -- 2) Uncomment baris ini, ganti email-nya, lalu Run:
 --
 -- update public.coaching_profiles set role = 'admin'
 --   where email = 'kamu@contoh.com';
+--
+-- Setelah punya 1 admin, user berikutnya dibuat dari halaman /admin/users.
+-- Syarat di Supabase: Authentication -> Providers -> Email ->
+-- "Confirm email" OFF, dan sign-up di-allow.
