@@ -22,6 +22,14 @@ alter table public.coaching_profiles enable row level security;
 
 grant select, update on public.coaching_profiles to authenticated;
 
+-- service_role (dipakai Edge Function admin-users) — project ini nggak
+-- auto-grant, jadi eksplisit. Bypass RLS + butuh privilege tabel.
+grant all on public.coaching_profiles         to service_role;
+grant all on public.coaching_courses          to service_role;
+grant all on public.coaching_course_sections  to service_role;
+grant all on public.coaching_lessons          to service_role;
+grant all on public.coaching_lesson_progress  to service_role;
+
 -- ── Helper: apakah caller seorang admin ─────────────────────────────
 -- Didefinisikan sebelum policy yang memakainya. SECURITY DEFINER -> query
 -- di dalamnya bypass RLS, jadi aman dipakai di policy coaching_profiles
