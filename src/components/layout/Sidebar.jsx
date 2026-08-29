@@ -37,7 +37,7 @@ export default function Sidebar() {
             className="h-12 w-auto shrink-0"
           />
         </div>
-        <p className="text-xs font-bold uppercase tracking-wider text-zinc-800">
+        <p className="text-base font-extrabold uppercase tracking-wide text-zinc-900">
           Coaching Matematika
         </p>
       </div>
