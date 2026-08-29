@@ -33,7 +33,7 @@ export async function getCourse(id) {
       `id, title, description, icon,
        sections:coaching_course_sections (
          id, title, position,
-         items:coaching_lessons ( id, type, title, duration, position )
+         items:coaching_lessons ( id, type, title, duration, url, position )
        )`
     )
     .eq("id", id)
@@ -153,7 +153,10 @@ export async function reorderSections(orderedIds) {
   );
 }
 
-export async function createLesson(sectionId, { type, title, duration, position }) {
+export async function createLesson(
+  sectionId,
+  { type, title, duration, url, position }
+) {
   ensureSupabase();
   const { data, error } = await supabase
     .from("coaching_lessons")
@@ -163,9 +166,10 @@ export async function createLesson(sectionId, { type, title, duration, position 
       type,
       title,
       duration: duration || null,
+      url: url || null,
       position,
     })
-    .select("id, type, title, duration")
+    .select("id, type, title, duration, url")
     .single();
   if (error) throw error;
   return data;
@@ -175,6 +179,7 @@ export async function updateLesson(id, patch) {
   ensureSupabase();
   const clean = { ...patch };
   if ("duration" in clean) clean.duration = clean.duration || null;
+  if ("url" in clean) clean.url = clean.url?.trim() || null;
   const { error } = await supabase
     .from("coaching_lessons")
     .update(clean)

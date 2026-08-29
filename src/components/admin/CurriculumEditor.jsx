@@ -7,6 +7,7 @@ import {
   Layers,
   Pencil,
   X,
+  Link2,
 } from "lucide-react";
 import {
   getCourse,
@@ -239,6 +240,7 @@ export default function CurriculumEditor({ courseId }) {
         type: lesson.type,
         title: lesson.title.trim() || "Tanpa judul",
         duration: lesson.duration,
+        url: lesson.url ?? null,
       }),
     );
 
@@ -410,84 +412,115 @@ export default function CurriculumEditor({ courseId }) {
                   </p>
                 )}
 
-                {editing.items.map((lesson, li) => (
-                  <div
-                    key={lesson.id}
-                    className="flex items-center gap-2 border-b border-zinc-100 px-2.5 py-2 last:border-b-0"
-                  >
-                    <ReorderBtns
-                      label="materi"
-                      first={li === 0}
-                      last={li === editing.items.length - 1}
-                      onUp={() => moveLesson(editing, li, -1)}
-                      onDown={() => moveLesson(editing, li, 1)}
-                    />
-                    <span
-                      className={`grid h-7 w-7 shrink-0 place-items-center rounded-md ${
-                        typeTint[lesson.type] ?? "bg-zinc-100 text-zinc-500"
-                      }`}
+                {editing.items.map((lesson, li) => {
+                  const hasUrl =
+                    lesson.type === "meet" || lesson.type === "recording";
+                  return (
+                    <div
+                      key={lesson.id}
+                      className="border-b border-zinc-100 px-2.5 py-2 last:border-b-0"
                     >
-                      <LessonIcon type={lesson.type} size={14} />
-                    </span>
+                      <div className="flex items-center gap-2">
+                        <ReorderBtns
+                          label="materi"
+                          first={li === 0}
+                          last={li === editing.items.length - 1}
+                          onUp={() => moveLesson(editing, li, -1)}
+                          onDown={() => moveLesson(editing, li, 1)}
+                        />
+                        <span
+                          className={`grid h-7 w-7 shrink-0 place-items-center rounded-md ${
+                            typeTint[lesson.type] ?? "bg-zinc-100 text-zinc-500"
+                          }`}
+                        >
+                          <LessonIcon type={lesson.type} size={14} />
+                        </span>
 
-                    <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 sm:flex-nowrap">
-                      <select
-                        value={lesson.type}
-                        onChange={(e) => {
-                          const next = { ...lesson, type: e.target.value };
-                          patchLessonLocal(editing.id, lesson.id, {
-                            type: e.target.value,
-                          });
-                          saveLesson(next);
-                        }}
-                        className="shrink-0 rounded-md border border-zinc-200 bg-white px-1.5 py-1 text-xs text-zinc-600 outline-none focus:border-brand-500"
-                      >
-                        {LESSON_TYPES.map((t) => (
-                          <option key={t} value={t}>
-                            {lessonTypeLabels[t]}
-                          </option>
-                        ))}
-                      </select>
-                      <input
-                        value={lesson.duration ?? ""}
-                        onChange={(e) =>
-                          patchLessonLocal(editing.id, lesson.id, {
-                            duration: e.target.value,
-                          })
-                        }
-                        onBlur={() => saveLesson(lesson)}
-                        onKeyDown={(e) =>
-                          e.key === "Enter" && e.currentTarget.blur()
-                        }
-                        placeholder="durasi"
-                        className={`${cell} w-[46%] shrink-0 text-right text-xs text-zinc-500 sm:order-last sm:w-[84px]`}
-                      />
-                      <input
-                        value={lesson.title}
-                        onChange={(e) =>
-                          patchLessonLocal(editing.id, lesson.id, {
-                            title: e.target.value,
-                          })
-                        }
-                        onBlur={() => saveLesson(lesson)}
-                        onKeyDown={(e) =>
-                          e.key === "Enter" && e.currentTarget.blur()
-                        }
-                        placeholder="Judul materi"
-                        className={`${cell} order-last w-full font-medium sm:order-none sm:w-auto sm:flex-1`}
-                      />
+                        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 sm:flex-nowrap">
+                          <select
+                            value={lesson.type}
+                            onChange={(e) => {
+                              const next = { ...lesson, type: e.target.value };
+                              patchLessonLocal(editing.id, lesson.id, {
+                                type: e.target.value,
+                              });
+                              saveLesson(next);
+                            }}
+                            className="shrink-0 rounded-md border border-zinc-200 bg-white px-1.5 py-1 text-xs text-zinc-600 outline-none focus:border-brand-500"
+                          >
+                            {LESSON_TYPES.map((t) => (
+                              <option key={t} value={t}>
+                                {lessonTypeLabels[t]}
+                              </option>
+                            ))}
+                          </select>
+                          <input
+                            value={lesson.duration ?? ""}
+                            onChange={(e) =>
+                              patchLessonLocal(editing.id, lesson.id, {
+                                duration: e.target.value,
+                              })
+                            }
+                            onBlur={() => saveLesson(lesson)}
+                            onKeyDown={(e) =>
+                              e.key === "Enter" && e.currentTarget.blur()
+                            }
+                            placeholder="durasi"
+                            className={`${cell} w-[46%] shrink-0 text-right text-xs text-zinc-500 sm:order-last sm:w-[84px]`}
+                          />
+                          <input
+                            value={lesson.title}
+                            onChange={(e) =>
+                              patchLessonLocal(editing.id, lesson.id, {
+                                title: e.target.value,
+                              })
+                            }
+                            onBlur={() => saveLesson(lesson)}
+                            onKeyDown={(e) =>
+                              e.key === "Enter" && e.currentTarget.blur()
+                            }
+                            placeholder="Judul materi"
+                            className={`${cell} order-last w-full font-medium sm:order-none sm:w-auto sm:flex-1`}
+                          />
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => removeLesson(editing, lesson)}
+                          aria-label="Hapus materi"
+                          className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-zinc-300 transition-colors hover:bg-rose-50 hover:text-rose-500"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+
+                      {hasUrl && (
+                        <div className="mt-1.5 flex items-center gap-1.5 pl-9">
+                          <Link2 size={12} className="shrink-0 text-zinc-400" />
+                          <input
+                            type="url"
+                            value={lesson.url ?? ""}
+                            onChange={(e) =>
+                              patchLessonLocal(editing.id, lesson.id, {
+                                url: e.target.value,
+                              })
+                            }
+                            onBlur={() => saveLesson(lesson)}
+                            onKeyDown={(e) =>
+                              e.key === "Enter" && e.currentTarget.blur()
+                            }
+                            placeholder={
+                              lesson.type === "meet"
+                                ? "https://meet.google.com/…"
+                                : "Link video (Drive / YouTube / …)"
+                            }
+                            className={`${cell} flex-1 text-xs`}
+                          />
+                        </div>
+                      )}
                     </div>
-
-                    <button
-                      type="button"
-                      onClick={() => removeLesson(editing, lesson)}
-                      aria-label="Hapus materi"
-                      className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-zinc-300 transition-colors hover:bg-rose-50 hover:text-rose-500"
-                    >
-                      <Trash2 size={13} />
-                    </button>
-                  </div>
-                ))}
+                  );
+                })}
 
                 <button
                   type="button"

@@ -41,7 +41,7 @@ export const courseSections = {
       id: "p1",
       title: "Pertemuan 1 — Bilangan & Operasi Dasar",
       items: [
-        { id: "p1-1", type: "recording", title: "Sistem bilangan real & garis bilangan", duration: "12 mnt" },
+        { id: "p1-1", type: "recording", title: "Sistem bilangan real & garis bilangan", duration: "12 mnt", url: "https://www.youtube.com/watch?v=aqz-KE-bpKQ" },
         { id: "p1-2", type: "materi", title: "Rangkuman: sifat operasi & urutan pengerjaan", duration: "5 mnt baca" },
         { id: "p1-3", type: "soal", title: "Latihan: operasi campuran, KPK & FPB", duration: "10 soal" },
         { id: "p1-4", type: "soal", title: "Kuis Pertemuan 1", duration: "8 soal" },
@@ -51,8 +51,8 @@ export const courseSections = {
       id: "p2",
       title: "Pertemuan 2 — Aljabar: Bentuk & Persamaan Linear",
       items: [
-        { id: "p2-1", type: "recording", title: "Bentuk aljabar: suku, variabel, dan koefisien", duration: "15 mnt" },
-        { id: "p2-2", type: "recording", title: "Menyelesaikan persamaan linear satu variabel", duration: "18 mnt" },
+        { id: "p2-1", type: "recording", title: "Bentuk aljabar: suku, variabel, dan koefisien", duration: "15 mnt", url: "https://www.youtube.com/watch?v=aqz-KE-bpKQ" },
+        { id: "p2-2", type: "recording", title: "Menyelesaikan persamaan linear satu variabel", duration: "18 mnt", url: "https://www.youtube.com/watch?v=aqz-KE-bpKQ" },
         { id: "p2-3", type: "materi", title: "Contoh soal cerita persamaan linear", duration: "6 mnt baca" },
         { id: "p2-4", type: "soal", title: "Latihan: persamaan & pertidaksamaan linear", duration: "12 soal" },
         { id: "p2-5", type: "soal", title: "Kuis Pertemuan 2", duration: "10 soal" },
@@ -62,7 +62,7 @@ export const courseSections = {
       id: "p3",
       title: "Pertemuan 3 — Perbandingan & Aritmetika Sosial",
       items: [
-        { id: "p3-1", type: "recording", title: "Perbandingan senilai & berbalik nilai", duration: "14 mnt" },
+        { id: "p3-1", type: "recording", title: "Perbandingan senilai & berbalik nilai", duration: "14 mnt", url: "https://www.youtube.com/watch?v=aqz-KE-bpKQ" },
         { id: "p3-2", type: "materi", title: "Untung, rugi, diskon, bruto–neto–tara", duration: "7 mnt baca" },
         { id: "p3-3", type: "soal", title: "Latihan: skala, perbandingan & aritmetika sosial", duration: "10 soal" },
         { id: "p3-4", type: "soal", title: "Kuis Pertemuan 3", duration: "10 soal" },
