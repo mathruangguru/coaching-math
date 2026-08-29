@@ -27,10 +27,14 @@ create table if not exists public.coaching_lessons (
              check (type in ('materi', 'soal', 'meet', 'recording')),
   title      text not null,
   duration   text,
+  url        text,
   position   int  not null default 0
 );
 create index if not exists coaching_lessons_section_idx
   on public.coaching_lessons (section_id, position);
+
+-- Kolom url ditambahkan belakangan (link meet / recording) — aman diulang.
+alter table public.coaching_lessons add column if not exists url text;
 
 -- Migrasi tipe lesson lama -> baru. Aman dijalankan ulang (idempotent):
 -- kalau tabel sudah terisi tipe lama, jalankan blok ini di project yang ada.
