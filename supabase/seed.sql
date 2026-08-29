@@ -13,17 +13,17 @@ insert into public.coaching_course_sections (id, course_id, title, position) val
 on conflict (id) do nothing;
 
 insert into public.coaching_lessons (id, section_id, type, title, duration, position) values
-  ('p1-1', 'p1', 'video',    'Sistem bilangan real & garis bilangan',            '12 mnt',     1),
-  ('p1-2', 'p1', 'reading',  'Rangkuman: sifat operasi & urutan pengerjaan',     '5 mnt baca', 2),
-  ('p1-3', 'p1', 'exercise', 'Latihan: operasi campuran, KPK & FPB',             '10 soal',    3),
-  ('p1-4', 'p1', 'quiz',     'Kuis Pertemuan 1',                                 '8 soal',     4),
-  ('p2-1', 'p2', 'video',    'Bentuk aljabar: suku, variabel, dan koefisien',    '15 mnt',     1),
-  ('p2-2', 'p2', 'video',    'Menyelesaikan persamaan linear satu variabel',     '18 mnt',     2),
-  ('p2-3', 'p2', 'reading',  'Contoh soal cerita persamaan linear',              '6 mnt baca', 3),
-  ('p2-4', 'p2', 'exercise', 'Latihan: persamaan & pertidaksamaan linear',       '12 soal',    4),
-  ('p2-5', 'p2', 'quiz',     'Kuis Pertemuan 2',                                 '10 soal',    5),
-  ('p3-1', 'p3', 'video',    'Perbandingan senilai & berbalik nilai',            '14 mnt',     1),
-  ('p3-2', 'p3', 'reading',  'Untung, rugi, diskon, bruto–neto–tara',            '7 mnt baca', 2),
-  ('p3-3', 'p3', 'exercise', 'Latihan: skala, perbandingan & aritmetika sosial', '10 soal',    3),
-  ('p3-4', 'p3', 'quiz',     'Kuis Pertemuan 3',                                 '10 soal',    4)
+  ('p1-1', 'p1', 'recording', 'Sistem bilangan real & garis bilangan',            '12 mnt',     1),
+  ('p1-2', 'p1', 'materi',   'Rangkuman: sifat operasi & urutan pengerjaan',     '5 mnt baca', 2),
+  ('p1-3', 'p1', 'soal',     'Latihan: operasi campuran, KPK & FPB',             '10 soal',    3),
+  ('p1-4', 'p1', 'soal',     'Kuis Pertemuan 1',                                 '8 soal',     4),
+  ('p2-1', 'p2', 'recording', 'Bentuk aljabar: suku, variabel, dan koefisien',    '15 mnt',     1),
+  ('p2-2', 'p2', 'recording', 'Menyelesaikan persamaan linear satu variabel',     '18 mnt',     2),
+  ('p2-3', 'p2', 'materi',   'Contoh soal cerita persamaan linear',              '6 mnt baca', 3),
+  ('p2-4', 'p2', 'soal',     'Latihan: persamaan & pertidaksamaan linear',       '12 soal',    4),
+  ('p2-5', 'p2', 'soal',     'Kuis Pertemuan 2',                                 '10 soal',    5),
+  ('p3-1', 'p3', 'recording', 'Perbandingan senilai & berbalik nilai',            '14 mnt',     1),
+  ('p3-2', 'p3', 'materi',   'Untung, rugi, diskon, bruto–neto–tara',            '7 mnt baca', 2),
+  ('p3-3', 'p3', 'soal',     'Latihan: skala, perbandingan & aritmetika sosial', '10 soal',    3),
+  ('p3-4', 'p3', 'soal',     'Kuis Pertemuan 3',                                 '10 soal',    4)
 on conflict (id) do nothing;

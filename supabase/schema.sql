@@ -23,14 +23,29 @@ create index if not exists coaching_course_sections_course_idx
 create table if not exists public.coaching_lessons (
   id         text primary key,
   section_id text not null references public.coaching_course_sections (id) on delete cascade,
-  type       text not null default 'video'
-             check (type in ('video', 'reading', 'exercise', 'quiz')),
+  type       text not null default 'materi'
+             check (type in ('materi', 'soal', 'meet', 'recording')),
   title      text not null,
   duration   text,
   position   int  not null default 0
 );
 create index if not exists coaching_lessons_section_idx
   on public.coaching_lessons (section_id, position);
+
+-- Migrasi tipe lesson lama -> baru. Aman dijalankan ulang (idempotent):
+-- kalau tabel sudah terisi tipe lama, jalankan blok ini di project yang ada.
+alter table public.coaching_lessons drop constraint if exists coaching_lessons_type_check;
+update public.coaching_lessons set type = case type
+  when 'video'    then 'recording'
+  when 'reading'  then 'materi'
+  when 'exercise' then 'soal'
+  when 'quiz'     then 'soal'
+  else type
+end;
+alter table public.coaching_lessons
+  alter column type set default 'materi',
+  add constraint coaching_lessons_type_check
+    check (type in ('materi', 'soal', 'meet', 'recording'));
 
 -- Progress per user. Dipakai nanti setelah ada Auth/login.
 create table if not exists public.coaching_lesson_progress (
