@@ -25,10 +25,10 @@ import LessonIcon from "../ui/LessonIcon";
 const LESSON_TYPES = Object.keys(lessonTypeLabels);
 
 const typeTint = {
-  video: "bg-sky-50 text-sky-600",
-  reading: "bg-zinc-100 text-zinc-500",
-  exercise: "bg-amber-50 text-amber-600",
-  quiz: "bg-teal-50 text-teal-600",
+  materi: "bg-zinc-100 text-zinc-500",
+  soal: "bg-amber-50 text-amber-600",
+  meet: "bg-sky-50 text-sky-600",
+  recording: "bg-teal-50 text-teal-600",
 };
 
 const cell =
@@ -221,7 +221,7 @@ export default function CurriculumEditor({ courseId }) {
   const addLesson = (section) =>
     run(async () => {
       const row = await createLesson(section.id, {
-        type: "video",
+        type: "materi",
         title: "Materi baru",
         duration: "",
         position: section.items.length,

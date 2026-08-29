@@ -34,38 +34,38 @@ export const statusMeta = {
 
 // Isi course, dikelompokkan per pertemuan.
 // `title` bebas diisi (bukan auto "Sesi 1") biar bisa dinamai sendiri.
-// type item: "video" | "reading" | "exercise" | "quiz"
+// type item: "materi" | "soal" | "meet" | "recording"
 export const courseSections = {
   "patom-mtk-2627-1": [
     {
       id: "p1",
       title: "Pertemuan 1 — Bilangan & Operasi Dasar",
       items: [
-        { id: "p1-1", type: "video", title: "Sistem bilangan real & garis bilangan", duration: "12 mnt", done: true },
-        { id: "p1-2", type: "reading", title: "Rangkuman: sifat operasi & urutan pengerjaan", duration: "5 mnt baca", done: true },
-        { id: "p1-3", type: "exercise", title: "Latihan: operasi campuran, KPK & FPB", duration: "10 soal", done: false },
-        { id: "p1-4", type: "quiz", title: "Kuis Pertemuan 1", duration: "8 soal", done: false },
+        { id: "p1-1", type: "recording", title: "Sistem bilangan real & garis bilangan", duration: "12 mnt", done: true },
+        { id: "p1-2", type: "materi", title: "Rangkuman: sifat operasi & urutan pengerjaan", duration: "5 mnt baca", done: true },
+        { id: "p1-3", type: "soal", title: "Latihan: operasi campuran, KPK & FPB", duration: "10 soal", done: false },
+        { id: "p1-4", type: "soal", title: "Kuis Pertemuan 1", duration: "8 soal", done: false },
       ],
     },
     {
       id: "p2",
       title: "Pertemuan 2 — Aljabar: Bentuk & Persamaan Linear",
       items: [
-        { id: "p2-1", type: "video", title: "Bentuk aljabar: suku, variabel, dan koefisien", duration: "15 mnt", done: false },
-        { id: "p2-2", type: "video", title: "Menyelesaikan persamaan linear satu variabel", duration: "18 mnt", done: false },
-        { id: "p2-3", type: "reading", title: "Contoh soal cerita persamaan linear", duration: "6 mnt baca", done: false },
-        { id: "p2-4", type: "exercise", title: "Latihan: persamaan & pertidaksamaan linear", duration: "12 soal", done: false },
-        { id: "p2-5", type: "quiz", title: "Kuis Pertemuan 2", duration: "10 soal", done: false },
+        { id: "p2-1", type: "recording", title: "Bentuk aljabar: suku, variabel, dan koefisien", duration: "15 mnt", done: false },
+        { id: "p2-2", type: "recording", title: "Menyelesaikan persamaan linear satu variabel", duration: "18 mnt", done: false },
+        { id: "p2-3", type: "materi", title: "Contoh soal cerita persamaan linear", duration: "6 mnt baca", done: false },
+        { id: "p2-4", type: "soal", title: "Latihan: persamaan & pertidaksamaan linear", duration: "12 soal", done: false },
+        { id: "p2-5", type: "soal", title: "Kuis Pertemuan 2", duration: "10 soal", done: false },
       ],
     },
     {
       id: "p3",
       title: "Pertemuan 3 — Perbandingan & Aritmetika Sosial",
       items: [
-        { id: "p3-1", type: "video", title: "Perbandingan senilai & berbalik nilai", duration: "14 mnt", done: false },
-        { id: "p3-2", type: "reading", title: "Untung, rugi, diskon, bruto–neto–tara", duration: "7 mnt baca", done: false },
-        { id: "p3-3", type: "exercise", title: "Latihan: skala, perbandingan & aritmetika sosial", duration: "10 soal", done: false },
-        { id: "p3-4", type: "quiz", title: "Kuis Pertemuan 3", duration: "10 soal", done: false },
+        { id: "p3-1", type: "recording", title: "Perbandingan senilai & berbalik nilai", duration: "14 mnt", done: false },
+        { id: "p3-2", type: "materi", title: "Untung, rugi, diskon, bruto–neto–tara", duration: "7 mnt baca", done: false },
+        { id: "p3-3", type: "soal", title: "Latihan: skala, perbandingan & aritmetika sosial", duration: "10 soal", done: false },
+        { id: "p3-4", type: "soal", title: "Kuis Pertemuan 3", duration: "10 soal", done: false },
       ],
     },
   ],

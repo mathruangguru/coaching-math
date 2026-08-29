@@ -1,7 +1,8 @@
 // Label tampilan untuk tiap tipe item materi.
+// Key = nilai `type` di DB (kolom coaching_lessons.type).
 export const lessonTypeLabels = {
-  video: "Video",
-  reading: "Bacaan",
-  exercise: "Latihan Soal",
-  quiz: "Kuis",
+  materi: "Materi",
+  soal: "Soal",
+  meet: "Link Meet",
+  recording: "Recording",
 };
