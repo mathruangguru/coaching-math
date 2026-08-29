@@ -41,14 +41,16 @@ export default function CourseCard({ course, enrolled, enrolling, onEnroll }) {
   return (
     <div className={cardCls}>
       <Inner course={course} />
-      <button
-        type="button"
-        onClick={() => onEnroll(course.id)}
-        disabled={enrolling}
-        className="mt-auto w-fit rounded-lg bg-brand-500 px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-brand-600 disabled:opacity-50"
-      >
-        {enrolling ? "Mendaftar…" : "Enroll"}
-      </button>
+      <div className="mt-auto pt-4">
+        <button
+          type="button"
+          onClick={() => onEnroll(course.id)}
+          disabled={enrolling}
+          className="w-fit rounded-lg bg-brand-500 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-brand-600 disabled:opacity-50"
+        >
+          {enrolling ? "Mendaftar…" : "Enroll"}
+        </button>
+      </div>
     </div>
   );
 }
