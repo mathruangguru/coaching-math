@@ -1,5 +1,7 @@
 import { NavLink } from "react-router-dom";
-import { LayoutDashboard, BookOpen, GraduationCap } from "lucide-react";
+import { LayoutDashboard, BookOpen } from "lucide-react";
+import ruangguruLogo from "../../assets/ruangguru.png";
+import brainAcademyLogo from "../../assets/brain-academy.png";
 // Diparkir sementara (bareng blok Settings / Help & Support di bawah):
 //   Settings, LifeBuoy from "lucide-react"
 
@@ -21,13 +23,23 @@ export default function Sidebar() {
   return (
     <aside className="flex w-[264px] shrink-0 flex-col border-r border-zinc-200/70 bg-white px-5 py-6">
       {/* Brand */}
-      <div className="flex items-center gap-2.5 px-2">
-        <span className="grid h-8 w-8 place-items-center rounded-lg bg-brand-500 text-white">
-          <GraduationCap size={17} strokeWidth={2.2} />
-        </span>
-        <span className="text-[15px] font-bold tracking-tight text-zinc-900">
-          Coaching Math
-        </span>
+      <div className="flex flex-col items-center gap-2.5 px-1 text-center">
+        <div className="flex items-center gap-3">
+          <img
+            src={ruangguruLogo}
+            alt="Ruangguru"
+            className="h-7 w-auto shrink-0"
+          />
+          <span className="h-10 w-px shrink-0 bg-zinc-200" />
+          <img
+            src={brainAcademyLogo}
+            alt="Brain Academy by Ruangguru"
+            className="h-12 w-auto shrink-0"
+          />
+        </div>
+        <p className="text-xs font-bold uppercase tracking-wider text-zinc-800">
+          Coaching Matematika
+        </p>
       </div>
 
       {/* Main nav */}
