@@ -1,6 +1,6 @@
 import MyCourses from "../components/dashboard/MyCourses";
 import { greeting, longDate } from "../lib/date";
-import { user } from "../data/mock";
+import { useAuth } from "../context/auth-context";
 
 // Parkir sementara — komponennya masih ada di repo, tinggal import + pasang lagi:
 //   <Topbar />        -> src/components/layout/AppLayout.jsx
@@ -10,13 +10,17 @@ import { user } from "../data/mock";
 // import { Share2, Plus } from "lucide-react";
 
 export default function DashboardPage() {
+  const { profile } = useAuth();
+  const firstName = profile?.first_name?.trim();
+
   return (
     <div className="mx-auto flex max-w-[1180px] flex-col gap-6">
       {/* Greeting */}
       <div>
         <p className="text-xs text-zinc-500">{longDate()}</p>
         <h1 className="mt-1 text-xl font-bold tracking-tight text-zinc-900">
-          {greeting()}, {user.name}! 👋
+          {greeting()}
+          {firstName ? `, ${firstName}` : ""}! 👋
         </h1>
       </div>
 

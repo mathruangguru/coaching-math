@@ -148,6 +148,7 @@ create policy "coaching_lessons write admin"
 -- update public.coaching_profiles set role = 'admin'
 --   where email = 'kamu@contoh.com';
 --
--- Setelah punya 1 admin, user berikutnya dibuat dari halaman /admin/users.
--- Syarat di Supabase: Authentication -> Providers -> Email ->
--- "Confirm email" OFF, dan sign-up di-allow.
+-- Setelah punya 1 admin, user berikutnya dibuat dari halaman /admin/users
+-- (lewat Edge Function admin-users). Syarat di Supabase:
+--   Authentication -> Providers -> Email -> "Confirm email" OFF.
+--   "Allow new users to sign up" boleh OFF.

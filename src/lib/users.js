@@ -1,29 +1,33 @@
-import { createClient } from "@supabase/supabase-js";
-import {
-  supabase,
-  hasSupabase,
-  supabaseUrl,
-  supabaseAnonKey,
-} from "./supabase";
+import { supabase, hasSupabase } from "./supabase";
 
 function assertReady() {
   if (!hasSupabase) throw new Error("Supabase belum dikonfigurasi.");
 }
 
 /**
- * Client Supabase terpisah khusus buat bikin user.
- * `persistSession: false` + storageKey sendiri -> `signUp` di sini nggak
- * menimpa sesi admin yang lagi login di client utama.
+ * Panggil Edge Function `admin-users`. Semua operasi user yang butuh
+ * service_role lewat sini (create / set_password / delete).
  */
-const signupClient = hasSupabase
-  ? createClient(supabaseUrl, supabaseAnonKey, {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-        storageKey: "sb-signup-scratch",
-      },
-    })
-  : null;
+async function callAdminUsers(body) {
+  assertReady();
+  const { data, error } = await supabase.functions.invoke("admin-users", {
+    body,
+  });
+  if (error) {
+    let detail = "";
+    try {
+      const res = await error.context?.json();
+      detail = res?.error ?? "";
+    } catch {
+      // biarin — pakai pesan default
+    }
+    throw new Error(
+      detail ||
+        "Gagal. Pastikan Edge Function 'admin-users' sudah di-deploy."
+    );
+  }
+  return data;
+}
 
 /**
  * Daftar semua user + role. Butuh caller = admin (dijaga RLS).
@@ -40,8 +44,8 @@ export async function getUsers() {
 
 /**
  * Bikin user baru. `payload`: { email, password, role, firstName, lastName }
- * Trigger DB bikin baris coaching_profiles (role 'student') dari user
- * metadata; nama & role admin ditulis ulang lewat client admin biar pasti.
+ * Lewat Admin API di Edge Function -> nggak kirim email (nggak kena rate
+ * limit), "Allow signups" boleh OFF.
  */
 export async function createUser({
   email,
@@ -50,38 +54,18 @@ export async function createUser({
   firstName = "",
   lastName = "",
 }) {
-  assertReady();
-
-  const clean = email.trim();
-  const first = firstName.trim();
-  const last = lastName.trim();
-
-  const { data, error } = await signupClient.auth.signUp({
-    email: clean,
+  return callAdminUsers({
+    action: "create",
+    email: email.trim(),
     password,
-    options: { data: { first_name: first, last_name: last } },
+    role,
+    firstName: firstName.trim(),
+    lastName: lastName.trim(),
   });
-  if (error) throw error;
-
-  // Buang sesi user baru dari scratch client.
-  await signupClient.auth.signOut().catch(() => {});
-
-  const id = data.user?.id ?? null;
-  if (id) {
-    const patch = { first_name: first || null, last_name: last || null };
-    if (role === "admin") patch.role = "admin";
-    const { error: patchErr } = await supabase
-      .from("coaching_profiles")
-      .update(patch)
-      .eq("id", id);
-    if (patchErr) throw patchErr;
-  }
-
-  return { id, email: clean, role, firstName: first, lastName: last };
 }
 
 /**
- * Ganti role user. Butuh caller = admin (dijaga RLS).
+ * Ganti role user. Update biasa — dijaga RLS "update admin".
  */
 export async function setUserRole(id, role) {
   assertReady();
@@ -93,29 +77,15 @@ export async function setUserRole(id, role) {
 }
 
 /**
- * Set password user lain (buat kasus lupa password).
- * Lewat Edge Function `admin-set-password` — butuh service_role, jadi
- * nggak bisa dari client biasa. Deploy dulu function-nya (lihat
- * supabase/functions/admin-set-password/).
+ * Set password user lain (kasus lupa password). Butuh Edge Function.
  */
 export async function setUserPassword(userId, password) {
-  assertReady();
-  const { data, error } = await supabase.functions.invoke("admin-set-password", {
-    body: { userId, password },
-  });
-  if (error) {
-    // Pesan error dari function ada di body response-nya.
-    let detail = "";
-    try {
-      const body = await error.context?.json();
-      detail = body?.error ?? "";
-    } catch {
-      // biarin — pakai pesan default di bawah
-    }
-    throw new Error(
-      detail ||
-        "Gagal set password. Pastikan Edge Function 'admin-set-password' sudah di-deploy."
-    );
-  }
-  return data;
+  return callAdminUsers({ action: "set_password", userId, password });
+}
+
+/**
+ * Hapus user (auth.users). Profile & progress ikut kehapus (cascade).
+ */
+export async function deleteUser(userId) {
+  return callAdminUsers({ action: "delete", userId });
 }

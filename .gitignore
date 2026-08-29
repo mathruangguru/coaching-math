@@ -15,6 +15,10 @@ dist-ssr
 # Local env (Supabase URL/keys) — commit .env.example instead
 .env
 
+# Supabase CLI scratch (dari `supabase link`)
+supabase/.temp/
+supabase/.branches/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
