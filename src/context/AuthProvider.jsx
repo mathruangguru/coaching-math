@@ -67,12 +67,14 @@ export function AuthProvider({ children }) {
   // Profile-nya sudah nyambung sama user yang sekarang?
   const profileReady = userId !== null && profileUserId === userId;
 
+  const role = profileReady ? profile?.role : null;
   const value = {
     session,
     profile: profileReady ? profile : null,
     loading:
       hasSupabase && (!sessionChecked || (userId !== null && !profileReady)),
-    isAdmin: profileReady && profile?.role === "admin",
+    isAdmin: role === "admin" || role === "super_admin",
+    isSuperAdmin: role === "super_admin",
     refreshProfile,
   };
 

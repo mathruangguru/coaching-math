@@ -21,12 +21,18 @@ const emptyForm = {
   role: "student",
 };
 
+const roleLabels = {
+  student: "student",
+  admin: "admin",
+  super_admin: "super admin",
+};
+
 function fullName(u) {
   return [u.first_name, u.last_name].filter(Boolean).join(" ");
 }
 
 export default function AdminUsersPage() {
-  const { session } = useAuth();
+  const { session, isSuperAdmin } = useAuth();
   const myId = session?.user?.id ?? null;
 
   const [users, setUsers] = useState([]);
@@ -85,7 +91,8 @@ export default function AdminUsersPage() {
 
     setBusy(true);
     try {
-      await createUser(form);
+      // Admin biasa cuma boleh bikin murid (Edge Function juga memaksa ini).
+      await createUser({ ...form, role: isSuperAdmin ? form.role : "student" });
       setFormOk(`User ${form.email.trim()} dibuat.`);
       setForm(emptyForm);
       await fetchUsers();
@@ -155,7 +162,9 @@ export default function AdminUsersPage() {
           Pengguna
         </h1>
         <p className="mt-1 text-xs text-zinc-400">
-          Buat akun murid / admin dan atur perannya.
+          {isSuperAdmin
+            ? "Buat akun, atur peran, set password, atau hapus."
+            : "Buat akun murid baru."}
         </p>
       </div>
 
@@ -215,12 +224,17 @@ export default function AdminUsersPage() {
           <label className="block text-xs font-medium text-zinc-600">
             Role
             <select
-              value={form.role}
+              value={isSuperAdmin ? form.role : "student"}
+              disabled={!isSuperAdmin}
               onChange={(e) => set("role", e.target.value)}
-              className={`mt-1 ${inputCls}`}
+              title={
+                isSuperAdmin ? undefined : "Cuma super admin yang bisa set role"
+              }
+              className={`mt-1 ${inputCls} disabled:bg-zinc-100 disabled:text-zinc-400`}
             >
               <option value="student">student</option>
-              <option value="admin">admin</option>
+              {isSuperAdmin && <option value="admin">admin</option>}
+              {isSuperAdmin && <option value="super_admin">super admin</option>}
             </select>
           </label>
         </div>
@@ -280,34 +294,45 @@ export default function AdminUsersPage() {
                   )}
                 </div>
 
-                <button
-                  onClick={() => handleSetPassword(user)}
-                  disabled={rowBusyId === user.id}
-                  className="inline-flex items-center gap-1 rounded-lg border border-zinc-200 px-2.5 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-50 disabled:opacity-50"
-                >
-                  <KeyRound size={12} /> Set password
-                </button>
+                {isSuperAdmin ? (
+                  <>
+                    <button
+                      onClick={() => handleSetPassword(user)}
+                      disabled={rowBusyId === user.id}
+                      className="inline-flex items-center gap-1 rounded-lg border border-zinc-200 px-2.5 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-50 disabled:opacity-50"
+                    >
+                      <KeyRound size={12} /> Set password
+                    </button>
 
-                <select
-                  value={user.role}
-                  disabled={isSelf || rowBusyId === user.id}
-                  onChange={(e) => handleRoleChange(user, e.target.value)}
-                  title={isSelf ? "Nggak bisa ganti role sendiri" : undefined}
-                  className="rounded-lg border border-zinc-300 px-2 py-1 text-xs text-zinc-700 outline-none focus:border-brand-500 disabled:bg-zinc-100 disabled:text-zinc-400"
-                >
-                  <option value="student">student</option>
-                  <option value="admin">admin</option>
-                </select>
+                    <select
+                      value={user.role}
+                      disabled={isSelf || rowBusyId === user.id}
+                      onChange={(e) => handleRoleChange(user, e.target.value)}
+                      title={
+                        isSelf ? "Nggak bisa ganti role sendiri" : undefined
+                      }
+                      className="rounded-lg border border-zinc-300 px-2 py-1 text-xs text-zinc-700 outline-none focus:border-brand-500 disabled:bg-zinc-100 disabled:text-zinc-400"
+                    >
+                      <option value="student">student</option>
+                      <option value="admin">admin</option>
+                      <option value="super_admin">super admin</option>
+                    </select>
 
-                {!isSelf && (
-                  <button
-                    onClick={() => handleDelete(user)}
-                    disabled={rowBusyId === user.id}
-                    aria-label={`Hapus ${user.email ?? name}`}
-                    className="inline-flex items-center gap-1 rounded-lg border border-rose-200 px-2.5 py-1.5 text-xs font-medium text-rose-600 transition-colors hover:bg-rose-50 disabled:opacity-50"
-                  >
-                    <Trash2 size={12} /> Hapus
-                  </button>
+                    {!isSelf && (
+                      <button
+                        onClick={() => handleDelete(user)}
+                        disabled={rowBusyId === user.id}
+                        aria-label={`Hapus ${user.email ?? name}`}
+                        className="inline-flex items-center gap-1 rounded-lg border border-rose-200 px-2.5 py-1.5 text-xs font-medium text-rose-600 transition-colors hover:bg-rose-50 disabled:opacity-50"
+                      >
+                        <Trash2 size={12} /> Hapus
+                      </button>
+                    )}
+                  </>
+                ) : (
+                  <span className="rounded-lg border border-zinc-200 px-2.5 py-1 text-xs font-medium text-zinc-500">
+                    {roleLabels[user.role] ?? user.role}
+                  </span>
                 )}
               </li>
             );
