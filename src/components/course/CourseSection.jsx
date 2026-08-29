@@ -1,37 +1,42 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { ChevronDown, ExternalLink, Play, ChevronRight } from "lucide-react";
+import { ChevronDown, ExternalLink, ArrowUpRight } from "lucide-react";
 import LessonIcon from "../ui/LessonIcon";
 import { lessonTypeLabels } from "../../lib/lessonTypes";
 
-function LessonBody({ item }) {
+const typeTint = {
+  materi: "bg-zinc-100 text-zinc-500",
+  soal: "bg-amber-50 text-amber-600",
+  meet: "bg-sky-50 text-sky-600",
+  recording: "bg-teal-50 text-teal-600",
+};
+
+function CardInner({ item, clickable }) {
   return (
     <>
-      <LessonIcon
-        type={item.type}
-        size={15}
-        className="mt-0.5 shrink-0 text-zinc-400 group-hover:text-brand-600"
-      />
+      <span
+        className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg ${
+          typeTint[item.type] ?? "bg-zinc-100 text-zinc-500"
+        }`}
+      >
+        <LessonIcon type={item.type} size={16} />
+      </span>
 
-      <div className="flex min-w-0 flex-1 flex-col gap-0.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-        <span className="text-sm text-zinc-700 group-hover:text-brand-700">
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-semibold leading-snug text-zinc-900 group-hover:text-brand-700">
           {item.title}
-        </span>
-
-        <span className="flex shrink-0 items-center gap-1 text-xs text-zinc-400">
+        </p>
+        <span className="mt-1 flex items-center gap-1 text-xs text-zinc-400">
           <span>
             {lessonTypeLabels[item.type]}
             {item.duration ? ` · ${item.duration}` : ""}
             {item.type === "soal" && !item.question_set_id && " · segera"}
           </span>
-          {item.type === "meet" && item.url && (
+          {clickable === "external" && (
             <ExternalLink size={12} className="text-brand-500" />
           )}
-          {item.type === "recording" && item.url && (
-            <Play size={12} className="text-brand-500" />
-          )}
-          {item.type === "soal" && item.question_set_id && (
-            <ChevronRight size={13} className="text-brand-500" />
+          {clickable === "internal" && (
+            <ArrowUpRight size={13} className="text-brand-500" />
           )}
         </span>
       </div>
@@ -39,18 +44,18 @@ function LessonBody({ item }) {
   );
 }
 
-const rowCls =
-  "group flex items-start gap-3 px-4 py-2.5 transition-colors hover:bg-brand-50/40";
+const cardCls =
+  "group flex items-start gap-3 rounded-xl border border-zinc-200/80 bg-white p-3.5 transition";
+const clickableCls = " hover:border-zinc-300 hover:shadow-sm";
 
 export default function CourseSection({ section, courseId }) {
   const [open, setOpen] = useState(true);
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-zinc-200/80 bg-white">
-      {/* Section header (nama pertemuan) */}
+    <section>
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-zinc-50"
+        className="flex w-full items-center gap-3 py-2 text-left"
       >
         <ChevronDown
           size={16}
@@ -67,60 +72,42 @@ export default function CourseSection({ section, courseId }) {
       </button>
 
       {open && (
-        <ul className="border-t border-zinc-100">
+        <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {section.items.map((item) => {
             const external = item.type === "meet" && item.url;
             const recording = item.type === "recording" && item.url;
             const quiz = item.type === "soal" && item.question_set_id;
 
-            let row;
             if (external) {
-              row = (
+              return (
                 <a
+                  key={item.id}
                   href={item.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className={rowCls}
+                  className={cardCls + clickableCls}
                 >
-                  <LessonBody item={item} />
+                  <CardInner item={item} clickable="external" />
                 </a>
               );
-            } else if (recording) {
-              row = (
-                <Link
-                  to={`/course/${courseId}/recording/${item.id}`}
-                  className={rowCls}
-                >
-                  <LessonBody item={item} />
+            }
+            if (recording || quiz) {
+              const to = recording
+                ? `/course/${courseId}/recording/${item.id}`
+                : `/course/${courseId}/soal/${item.id}`;
+              return (
+                <Link key={item.id} to={to} className={cardCls + clickableCls}>
+                  <CardInner item={item} clickable="internal" />
                 </Link>
-              );
-            } else if (quiz) {
-              row = (
-                <Link
-                  to={`/course/${courseId}/soal/${item.id}`}
-                  className={rowCls}
-                >
-                  <LessonBody item={item} />
-                </Link>
-              );
-            } else {
-              row = (
-                <div className="flex items-start gap-3 px-4 py-2.5">
-                  <LessonBody item={item} />
-                </div>
               );
             }
-
             return (
-              <li
-                key={item.id}
-                className="border-b border-zinc-100 last:border-b-0"
-              >
-                {row}
-              </li>
+              <div key={item.id} className={cardCls}>
+                <CardInner item={item} />
+              </div>
             );
           })}
-        </ul>
+        </div>
       )}
     </section>
   );
