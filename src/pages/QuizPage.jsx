@@ -282,7 +282,7 @@ export default function QuizPage() {
               return (
                 <label
                   key={oi}
-                  className={`flex cursor-pointer items-start gap-2.5 rounded-lg border px-3 py-2 text-sm transition-colors ${
+                  className={`flex cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2 text-sm transition-colors ${
                     picked
                       ? "border-brand-500 bg-brand-50 text-brand-800"
                       : "border-zinc-200 text-zinc-700 hover:bg-zinc-50"
