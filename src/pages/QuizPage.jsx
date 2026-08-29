@@ -222,7 +222,7 @@ export default function QuizPage() {
         {header}
 
         {/* Strip nomor soal, per 10 */}
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center justify-center gap-1.5">
           {groupStart > 0 && (
             <button
               type="button"
@@ -233,7 +233,7 @@ export default function QuizPage() {
               <ChevronLeft size={15} />
             </button>
           )}
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap justify-center gap-1.5">
             {Array.from({ length: groupEnd - groupStart }, (_, k) => {
               const idx = groupStart + k;
               const answered = answers[questions[idx].id] != null;
