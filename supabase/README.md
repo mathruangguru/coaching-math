@@ -135,7 +135,11 @@ buat/set-password/hapus di `/admin/users` akan error.
 3. Admin: `/admin/set-soal` bikin set + soal. Di editor kurikulum,
    lesson tipe **Soal** → pilih set-nya.
 4. Murid: klik lesson Soal → `/course/:courseId/soal/:lessonId`,
-   kerjakan, submit → skor + koreksi per soal.
+   kerjakan, submit → skor + koreksi per soal. Nggak wajib jawab semua
+   soal buat submit.
+5. Rekap: `/admin/quiz-results` — skor tiap attempt (per set / per murid).
+   Butuh policy `"coaching_quiz_attempts admin read"` (jalankan ulang
+   `quiz.sql`).
 
 ## Materi: tipe & status publikasi
 
