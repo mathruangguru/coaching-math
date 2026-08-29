@@ -33,7 +33,7 @@ export async function getCourse(id) {
       `id, title, description, icon,
        sections:coaching_course_sections (
          id, title, position,
-         items:coaching_lessons ( id, type, title, duration, url, position )
+         items:coaching_lessons ( id, type, title, duration, url, question_set_id, position )
        )`
     )
     .eq("id", id)
@@ -155,7 +155,7 @@ export async function reorderSections(orderedIds) {
 
 export async function createLesson(
   sectionId,
-  { type, title, duration, url, position }
+  { type, title, duration, url, questionSetId, position }
 ) {
   ensureSupabase();
   const { data, error } = await supabase
@@ -167,9 +167,10 @@ export async function createLesson(
       title,
       duration: duration || null,
       url: url || null,
+      question_set_id: questionSetId || null,
       position,
     })
-    .select("id, type, title, duration, url")
+    .select("id, type, title, duration, url, question_set_id")
     .single();
   if (error) throw error;
   return data;
@@ -180,6 +181,7 @@ export async function updateLesson(id, patch) {
   const clean = { ...patch };
   if ("duration" in clean) clean.duration = clean.duration || null;
   if ("url" in clean) clean.url = clean.url?.trim() || null;
+  if ("question_set_id" in clean) clean.question_set_id = clean.question_set_id || null;
   const { error } = await supabase
     .from("coaching_lessons")
     .update(clean)

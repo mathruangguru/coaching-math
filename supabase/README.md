@@ -113,14 +113,33 @@ Atau paste `supabase/functions/admin-users/index.ts` di
 di-inject otomatis — nggak perlu set secret. Sebelum di-deploy, tombol
 buat/set-password/hapus di `/admin/users` akan error.
 
+## Latihan Soal (kuis pilihan ganda)
+
+1. **SQL Editor** → jalankan `quiz.sql` (setelah `admin.sql`). Bikin
+   `coaching_question_sets` / `coaching_questions` /
+   `coaching_question_keys` (kunci jawaban dipisah — murid nggak bisa
+   baca lewat API) / `coaching_quiz_attempts`, + kolom
+   `coaching_lessons.question_set_id`.
+2. **Deploy Edge Function `quiz-submit`** — nilai jawaban pakai kunci
+   (service_role) & simpan attempt biar skor nggak bisa dipalsukan:
+   ```bash
+   supabase functions deploy quiz-submit
+   ```
+3. Admin: `/admin/set-soal` bikin set + soal. Di editor kurikulum,
+   lesson tipe **Soal** → pilih set-nya.
+4. Murid: klik lesson Soal → `/course/:courseId/soal/:lessonId`,
+   kerjakan, submit → skor + koreksi per soal.
+
 ## Isi
 
 | File | |
 | --- | --- |
-| `schema.sql` | tabel `coaching_courses` / `coaching_course_sections` / `coaching_lessons` / `coaching_lesson_progress` + RLS + grant baca |
+| `schema.sql` | tabel `coaching_courses` / `_sections` / `_lessons` (+ `url`, `question_set_id`) / `_lesson_progress` + RLS + grant baca |
 | `admin.sql` | `coaching_profiles` (+ nama, role), `is_admin()`, policy profile & write admin-only, trigger guard role |
+| `quiz.sql` | `coaching_question_sets` / `_questions` / `_question_keys` / `_quiz_attempts` + RLS |
 | `seed.sql` | data awal PATOM (mirror `src/data/mock.js`) |
 | `functions/admin-users/` | Edge Function: admin create / set-password / delete user |
+| `functions/quiz-submit/` | Edge Function: nilai & simpan attempt kuis murid |
 
 Kode klien: `src/lib/supabase.js` (client), `src/lib/courses.js`
 (`getCourses`, `getCourse`, `createCourse`, `updateCourse`, `deleteCourse`),
