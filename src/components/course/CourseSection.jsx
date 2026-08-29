@@ -9,6 +9,7 @@ const typeTint = {
   soal: "bg-amber-50 text-amber-600",
   meet: "bg-sky-50 text-sky-600",
   recording: "bg-teal-50 text-teal-600",
+  form: "bg-violet-50 text-violet-600",
 };
 
 function CardInner({ item, clickable }) {
@@ -32,6 +33,11 @@ function CardInner({ item, clickable }) {
             {item.duration ? ` · ${item.duration}` : ""}
             {item.type === "soal" && !item.question_set_id && " · segera"}
           </span>
+          {item.publish_status && item.publish_status !== "all" && (
+            <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-500">
+              {item.publish_status === "admin" ? "Admin only" : "Draft"}
+            </span>
+          )}
           {clickable === "external" && (
             <ExternalLink size={12} className="text-brand-500" />
           )}
@@ -74,7 +80,8 @@ export default function CourseSection({ section, courseId }) {
       {open && (
         <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {section.items.map((item) => {
-            const external = item.type === "meet" && item.url;
+            const external =
+              (item.type === "meet" || item.type === "form") && item.url;
             const recording = item.type === "recording" && item.url;
             const quiz = item.type === "soal" && item.question_set_id;
 
