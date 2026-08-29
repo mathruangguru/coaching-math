@@ -1,11 +1,19 @@
 import { createElement } from "react";
-import { FileText, HelpCircle, Video, Play, Circle } from "lucide-react";
+import {
+  FileText,
+  HelpCircle,
+  Video,
+  Play,
+  ClipboardList,
+  Circle,
+} from "lucide-react";
 
 const icons = {
   materi: FileText,
   soal: HelpCircle,
   meet: Video,
   recording: Play,
+  form: ClipboardList,
 };
 
 // Merender ikon sesuai tipe item materi.

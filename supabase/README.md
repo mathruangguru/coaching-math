@@ -75,8 +75,7 @@ Role: `student` < `admin` < `super_admin`.
 
 | Aksi | admin | super_admin |
 | --- | :-: | :-: |
-| Buat user (role dipaksa `student`) | ✅ | — |
-| Buat user role apa pun | — | ✅ |
+| Buat user | ✅ (role dipaksa `student`) | ✅ (role apa pun) |
 | Ganti role user | — | ✅ |
 | Set password user (kasus lupa) | — | ✅ |
 | Hapus user (cascade profile & progress; nggak bisa diri sendiri) | — | ✅ |
@@ -138,12 +137,26 @@ buat/set-password/hapus di `/admin/users` akan error.
 4. Murid: klik lesson Soal → `/course/:courseId/soal/:lessonId`,
    kerjakan, submit → skor + koreksi per soal.
 
+## Materi: tipe & status publikasi
+
+Jalankan ulang `schema.sql` lalu `admin.sql` (idempotent) untuk dapat:
+
+- Tipe materi baru **Form** (Google Form / survei) — sama seperti Link
+  Meet, buka `url` di tab baru.
+- Kolom `coaching_lessons.publish_status`:
+  - `none` — draft, cuma kelihatan di editor kurikulum
+  - `admin` — tampil di halaman course **hanya buat admin** (preview)
+  - `all` — tampil buat semua murid yang enroll
+  Gate-nya di policy `"coaching_lessons read"` (admin.sql): murid cuma
+  bisa `select` baris `publish_status = 'all'`; admin baca semua. Materi
+  baru dari editor default `none`. Baris lama ke-backfill `all`.
+
 ## Isi
 
 | File | |
 | --- | --- |
-| `schema.sql` | tabel `coaching_courses` / `_sections` / `_lessons` (+ `url`, `question_set_id`) / `_lesson_progress` + RLS + grant baca |
-| `admin.sql` | `coaching_profiles` (+ nama, role), `is_admin()`, policy profile & write admin-only, trigger guard role |
+| `schema.sql` | tabel `coaching_courses` / `_sections` / `_lessons` (+ `url`, `question_set_id`, `publish_status`, tipe `form`) / `_lesson_progress` + RLS + grant baca |
+| `admin.sql` | `coaching_profiles` (+ nama, role), `is_admin()`, policy profile & write admin-only, gate baca materi draft/admin-only, trigger guard role |
 | `quiz.sql` | `coaching_question_sets` / `_questions` / `_question_keys` / `_quiz_attempts` + RLS |
 | `enroll.sql` | `coaching_enrollments` (murid ↔ course) + RLS (enroll/lihat milik sendiri, admin baca semua) |
 | `seed.sql` | data awal PATOM (mirror `src/data/mock.js`) |

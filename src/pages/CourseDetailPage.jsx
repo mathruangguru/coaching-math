@@ -98,6 +98,9 @@ export default function CourseDetailPage() {
   }
 
   const canView = enrolled || isAdmin;
+  // Materi draft/admin-only sudah disaring server-side buat murid; pertemuan
+  // yang jadi kosong nggak usah ditampilkan.
+  const visibleSections = sections.filter((s) => (s.items?.length ?? 0) > 0);
 
   return (
     <div className="mx-auto flex max-w-[1180px] flex-col gap-6">
@@ -137,12 +140,12 @@ export default function CourseDetailPage() {
         </div>
       ) : (
         <div className="flex flex-col gap-3">
-          {sections.length === 0 ? (
+          {visibleSections.length === 0 ? (
             <p className="rounded-2xl border border-dashed border-zinc-300 bg-white px-6 py-12 text-center text-sm text-zinc-400">
               Belum ada materi di course ini.
             </p>
           ) : (
-            sections.map((section) => (
+            visibleSections.map((section) => (
               <CourseSection
                 key={section.id}
                 section={section}
