@@ -41,34 +41,49 @@ Lalu di `.github/workflows/deploy.yml`, step **Build** dikasih env:
 > `anon` key memang dirancang untuk dipakai di frontend — datanya diproteksi
 > Row Level Security (lihat `schema.sql`). Jangan pernah pakai `service_role` key di frontend.
 
-## Admin (edit course)
+## Auth & Admin
 
-1. **SQL Editor** → jalankan `admin.sql` (setelah `schema.sql`). Ini bikin:
-   - tabel `coaching_profiles` (`role`: `student` | `admin`) + trigger auto-buat
+Seluruh app butuh login (buka `/` tanpa sesi → lempar ke `/login`).
+Katalog tetap bisa dibaca `anon` di level DB, tapi UI-nya di balik login.
+
+### Setup sekali
+
+1. **SQL Editor** → jalankan `admin.sql` (setelah `schema.sql`). Bikin:
+   - `coaching_profiles` (`role`: `student` | `admin`) + trigger auto-buat
      profile tiap ada user baru
-   - fungsi `is_admin()` + write policy admin-only untuk
-     `coaching_courses` / `_sections` / `_lessons`
-2. **Authentication → Users → Add user** → isi email + password,
-   centang **Auto Confirm User**.
-3. Balik ke **SQL Editor**, jalankan (ganti email):
+   - `is_admin()` + policy: admin bisa baca/ubah semua profile, dan
+     write admin-only untuk `coaching_courses` / `_sections` / `_lessons`
+2. **Authentication → Providers → Email**:
+   - **"Confirm email" → OFF** (user bikinan admin bisa langsung login)
+   - "Allow new users to sign up" → **ON** (halaman `/admin/users` bikin
+     user lewat `signUp` dari client)
+3. **Authentication → Users → Add user** → email + password, centang
+   **Auto Confirm User**. Ini calon admin pertama.
+4. **SQL Editor**, jalankan (ganti email):
    ```sql
    update public.coaching_profiles set role = 'admin'
      where email = 'kamu@contoh.com';
    ```
-4. Buka `/admin/login` di app, masuk pakai user tadi. Halaman `/admin`
-   cuma kebuka buat `role = 'admin'`; user lain kena "Akses ditolak".
+5. Buka `/login`, masuk. Admin lihat menu **Admin** di sidebar.
 
-> Anon (pengunjung) tetap cuma bisa **baca** katalog. Write dijaga RLS —
-> tanpa session admin, `insert`/`update`/`delete` ditolak Postgres.
+### Bikin user berikutnya
+
+Dari `/admin/users`: isi email + password + role. Dibuat lewat client
+Supabase terisolasi (`src/lib/users.js`), jadi sesi admin nggak keganti.
+
+> **Batas:** hard-delete user butuh `service_role` (Edge Function) — belum ada.
+> Role bisa diubah dari `/admin/users`; admin nggak bisa menurunkan role
+> dirinya sendiri (cegah kekunci).
 
 ## Isi
 
 | File | |
 | --- | --- |
 | `schema.sql` | tabel `coaching_courses` / `coaching_course_sections` / `coaching_lessons` / `coaching_lesson_progress` + RLS + grant baca |
-| `admin.sql` | `coaching_profiles` + role, `is_admin()`, write policy admin-only |
+| `admin.sql` | `coaching_profiles` + role, `is_admin()`, policy profile & write admin-only |
 | `seed.sql` | data awal PATOM (mirror `src/data/mock.js`) |
 
 Kode klien: `src/lib/supabase.js` (client), `src/lib/courses.js`
 (`getCourses`, `getCourse`, `createCourse`, `updateCourse`, `deleteCourse`),
+`src/lib/users.js` (`getUsers`, `createUser`, `setUserRole`),
 `src/lib/auth.js` + `src/context/AuthProvider.jsx` (session & role).

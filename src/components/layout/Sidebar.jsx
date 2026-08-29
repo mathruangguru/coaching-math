@@ -1,9 +1,9 @@
-import { NavLink } from "react-router-dom";
-import { LayoutDashboard, BookOpen } from "lucide-react";
+import { NavLink, useNavigate } from "react-router-dom";
+import { LayoutDashboard, BookOpen, Shield, LogOut } from "lucide-react";
 import ruangguruLogo from "../../assets/ruangguru.png";
 import brainAcademyLogo from "../../assets/brain-academy.png";
-// Diparkir sementara (bareng blok Settings / Help & Support di bawah):
-//   Settings, LifeBuoy from "lucide-react"
+import { useAuth } from "../../context/auth-context";
+import { signOut } from "../../lib/auth";
 
 const mainNav = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
@@ -20,6 +20,17 @@ function navItemClass({ isActive }) {
 }
 
 export default function Sidebar() {
+  const { profile, isAdmin } = useAuth();
+  const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+    } finally {
+      navigate("/login", { replace: true });
+    }
+  };
+
   return (
     <aside className="flex w-[264px] shrink-0 flex-col border-r border-zinc-200/70 bg-white px-5 py-6">
       {/* Brand */}
@@ -58,25 +69,38 @@ export default function Sidebar() {
             )}
           </NavLink>
         ))}
+
+        {isAdmin && (
+          <NavLink to="/admin" className={navItemClass}>
+            {({ isActive }) => (
+              <>
+                <Shield
+                  size={18}
+                  strokeWidth={isActive ? 2.4 : 2}
+                  className={isActive ? "text-white" : "text-zinc-400"}
+                />
+                Admin
+              </>
+            )}
+          </NavLink>
+        )}
       </nav>
 
-      {/* Parkir sementara: Settings & Help & Support
-      <div className="mt-auto flex flex-col gap-1.5 border-t border-zinc-200/70 pt-5">
-        <button className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-[15px] font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-900">
-          <Settings size={20} strokeWidth={2} className="text-zinc-400" />
-          Settings
-        </button>
-        <button className="flex items-center justify-between rounded-xl px-3 py-2.5 text-[15px] font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-900">
-          <span className="flex items-center gap-3">
-            <LifeBuoy size={20} strokeWidth={2} className="text-zinc-400" />
-            Help and Support
-          </span>
-          <span className="grid h-5 min-w-5 place-items-center rounded-full bg-emerald-100 px-1 text-xs font-bold text-emerald-700">
-            8
-          </span>
+      {/* User + sign out */}
+      <div className="mt-auto flex flex-col gap-2 border-t border-zinc-200/70 pt-4">
+        {profile?.email && (
+          <p className="truncate px-3 text-xs text-zinc-400" title={profile.email}>
+            {profile.email}
+          </p>
+        )}
+        <button
+          onClick={handleSignOut}
+          className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-900"
+        >
+          <LogOut size={18} strokeWidth={2} className="text-zinc-400" />
+          Keluar
         </button>
       </div>
-      */}
     </aside>
   );
 }
