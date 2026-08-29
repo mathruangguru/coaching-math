@@ -7,6 +7,7 @@ const tabs = [
   { to: "/admin", label: "Course", end: true },
   { to: "/admin/set-soal", label: "Set Soal", end: false },
   { to: "/admin/users", label: "Pengguna", end: false },
+  { to: "/admin/enrollments", label: "Enrollment", end: false },
 ];
 
 function tabClass({ isActive }) {

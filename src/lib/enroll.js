@@ -20,6 +20,22 @@ export async function getMyEnrollments() {
   return data.map((r) => r.course_id);
 }
 
+/**
+ * Semua baris enrollment — buat rekap admin. Dijaga RLS
+ * "coaching_enrollments admin read" (butuh caller = admin).
+ * Bentuk: { user_id, course_id, created_at }[]
+ */
+export async function getAllEnrollments() {
+  if (!hasSupabase) return [];
+
+  const { data, error } = await supabase
+    .from("coaching_enrollments")
+    .select("user_id, course_id, created_at")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
 export async function enroll(courseId) {
   if (!hasSupabase) throw new Error("Supabase belum dikonfigurasi.");
   const {
