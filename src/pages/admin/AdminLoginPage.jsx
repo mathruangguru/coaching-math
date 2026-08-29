@@ -1,0 +1,91 @@
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { hasSupabase } from "../../lib/supabase";
+import { signIn } from "../../lib/auth";
+import { useAuth } from "../../context/auth-context";
+
+const inputCls =
+  "mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none transition-colors focus:border-brand-500";
+
+export default function AdminLoginPage() {
+  const navigate = useNavigate();
+  const { session, loading } = useAuth();
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  // Sudah login -> langsung ke /admin.
+  useEffect(() => {
+    if (!loading && session) navigate("/admin", { replace: true });
+  }, [loading, session, navigate]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      await signIn(email, password);
+      navigate("/admin", { replace: true });
+    } catch (err) {
+      setError(err?.message ?? "Gagal masuk.");
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="grid min-h-screen place-items-center bg-[#fafafa] px-6">
+      <form
+        onSubmit={handleSubmit}
+        className="w-full max-w-sm rounded-2xl border border-zinc-200 bg-white p-6"
+      >
+        <h1 className="text-lg font-bold tracking-tight text-zinc-900">
+          Masuk Admin
+        </h1>
+        <p className="mt-1 text-xs text-zinc-500">Khusus pengelola course.</p>
+
+        {!hasSupabase && (
+          <p className="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
+            Supabase belum dikonfigurasi (VITE_SUPABASE_URL / ANON_KEY). Login
+            nonaktif.
+          </p>
+        )}
+
+        <label className="mt-4 block text-xs font-medium text-zinc-600">
+          Email
+          <input
+            type="email"
+            required
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className={inputCls}
+          />
+        </label>
+
+        <label className="mt-3 block text-xs font-medium text-zinc-600">
+          Password
+          <input
+            type="password"
+            required
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className={inputCls}
+          />
+        </label>
+
+        {error && <p className="mt-3 text-xs text-rose-600">{error}</p>}
+
+        <button
+          type="submit"
+          disabled={busy || !hasSupabase}
+          className="mt-5 w-full rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-600 disabled:opacity-50"
+        >
+          {busy ? "Memproses…" : "Masuk"}
+        </button>
+      </form>
+    </div>
+  );
+}
