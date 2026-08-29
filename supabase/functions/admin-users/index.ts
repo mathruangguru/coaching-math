@@ -6,9 +6,11 @@
 // createUser lewat Admin API = TIDAK kirim email -> nggak kena email rate
 // limit, dan "Allow new users to sign up" boleh OFF.
 //
-// Deploy:
-//   supabase functions deploy admin-users
-// atau paste file ini di Dashboard -> Edge Functions -> Deploy a new function.
+// Deploy (--no-verify-jwt wajib, kalau nggak preflight CORS ditolak 401;
+// auth tetap dicek di dalam function):
+//   supabase functions deploy admin-users --no-verify-jwt
+// atau paste file ini di Dashboard -> Edge Functions -> Deploy a new function
+// lalu matikan toggle "Verify JWT" di tab Settings.
 //
 // Dipanggil dari app: supabase.functions.invoke("admin-users", { body: {...} })
 // — header Authorization ikut otomatis.
@@ -17,7 +19,8 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, content-type",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 

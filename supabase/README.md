@@ -95,8 +95,13 @@ frontend. Satu function, `action`-based (`create` | `set_password` |
 
 ```bash
 supabase login
-supabase functions deploy admin-users --project-ref <PROJECT_REF>
+supabase functions deploy admin-users --no-verify-jwt --project-ref <PROJECT_REF>
 ```
+
+`--no-verify-jwt` **wajib** — tanpa itu, preflight CORS (OPTIONS) dari
+browser ditolak 401 dan app dapat `FunctionsFetchError`. Auth tetap aman:
+function-nya sendiri cek `caller.auth.getUser()` + `role = 'admin'`.
+(Deploy via dashboard: matikan toggle **Verify JWT** di tab Settings function.)
 
 Atau paste `supabase/functions/admin-users/index.ts` di
 **Dashboard → Edge Functions → Deploy a new function** (nama: `admin-users`).
