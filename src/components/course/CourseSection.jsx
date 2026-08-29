@@ -1,11 +1,10 @@
 import { useState } from "react";
-import { ChevronDown, Check } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import LessonIcon from "../ui/LessonIcon";
 import { lessonTypeLabels } from "../../lib/lessonTypes";
 
-export default function CourseSection({ section, onToggleLesson }) {
+export default function CourseSection({ section }) {
   const [open, setOpen] = useState(true);
-  const doneCount = section.items.filter((i) => i.done).length;
 
   return (
     <section className="overflow-hidden rounded-2xl border border-zinc-200/80 bg-white">
@@ -24,7 +23,7 @@ export default function CourseSection({ section, onToggleLesson }) {
           {section.title}
         </span>
         <span className="shrink-0 text-xs font-medium text-zinc-400">
-          {doneCount}/{section.items.length} selesai
+          {section.items.length} materi
         </span>
       </button>
 
@@ -35,36 +34,18 @@ export default function CourseSection({ section, onToggleLesson }) {
               key={item.id}
               className="flex items-start gap-3 border-b border-zinc-100 px-4 py-2.5 last:border-b-0"
             >
-              <button
-                onClick={() => onToggleLesson(section.id, item.id)}
-                aria-pressed={item.done}
-                aria-label={item.done ? "Tandai belum selesai" : "Tandai selesai"}
-                className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full border-2 transition-colors ${
-                  item.done
-                    ? "border-teal-500 bg-teal-500 text-white"
-                    : "border-zinc-300 text-transparent hover:border-teal-400"
-                }`}
-              >
-                <Check size={11} strokeWidth={3.5} />
-              </button>
-
               <LessonIcon
                 type={item.type}
                 size={15}
-                className="mt-1 shrink-0 text-zinc-400"
+                className="mt-0.5 shrink-0 text-zinc-400"
               />
 
               <div className="flex min-w-0 flex-1 flex-col gap-0.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-                <span
-                  className={`text-sm ${
-                    item.done ? "text-zinc-400 line-through" : "text-zinc-700"
-                  }`}
-                >
-                  {item.title}
-                </span>
+                <span className="text-sm text-zinc-700">{item.title}</span>
 
                 <span className="shrink-0 text-xs text-zinc-400">
-                  {lessonTypeLabels[item.type]} · {item.duration}
+                  {lessonTypeLabels[item.type]}
+                  {item.duration ? ` · ${item.duration}` : ""}
                 </span>
               </div>
             </li>
