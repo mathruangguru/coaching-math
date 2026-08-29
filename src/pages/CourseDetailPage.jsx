@@ -129,7 +129,7 @@ export default function CourseDetailPage() {
           </div>
           <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-zinc-200">
             <div
-              className="h-full rounded-full bg-brand-500 transition-all"
+              className="h-full rounded-full bg-teal-500 transition-all"
               style={{ width: `${pct}%` }}
             />
           </div>

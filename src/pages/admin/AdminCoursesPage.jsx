@@ -91,7 +91,7 @@ export default function AdminCoursesPage() {
               key={course.id}
               className="flex items-center gap-3 rounded-xl border border-zinc-200 bg-white px-4 py-3"
             >
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-brand-50 text-brand-500">
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-sky-50 text-sky-600">
                 <SubjectIcon name={course.icon} size={17} />
               </span>
 

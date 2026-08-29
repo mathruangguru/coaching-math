@@ -8,7 +8,7 @@ export default function CourseCard({ course }) {
       to={`/course/${course.id}`}
       className="group flex flex-col rounded-2xl border border-zinc-200/80 bg-white p-5 transition hover:border-zinc-300 hover:shadow-sm"
     >
-      <span className="grid h-10 w-10 place-items-center rounded-xl bg-brand-50 text-brand-500">
+      <span className="grid h-10 w-10 place-items-center rounded-xl bg-sky-50 text-sky-600">
         <SubjectIcon name={course.icon} size={20} />
       </span>
 
