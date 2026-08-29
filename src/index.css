@@ -4,11 +4,28 @@
   --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system,
     "Segoe UI", Roboto, sans-serif;
 
-  --color-brand-50: #eef3ff;
-  --color-brand-100: #dbe6ff;
-  --color-brand-500: #2f6bff;
-  --color-brand-600: #1f5cf5;
-  --color-brand-700: #1a4fd6;
+  /* Primary = oranye (tombol, state aktif, CTA) */
+  --color-brand-50: #fff3eb;
+  --color-brand-100: #ffe0cc;
+  --color-brand-400: #f79a55;
+  --color-brand-500: #f1802d;
+  --color-brand-600: #e06a1c;
+  --color-brand-700: #bf561a;
+
+  /* Aksen tosca = progres / selesai */
+  --color-teal-50: #e7f8f5;
+  --color-teal-100: #c6efe9;
+  --color-teal-400: #3fc9b8;
+  --color-teal-500: #25b6a5;
+  --color-teal-600: #1aa090;
+  --color-teal-700: #177c70;
+
+  /* Aksen biru = info / ikon mapel */
+  --color-sky-50: #edf3fe;
+  --color-sky-100: #d6e4fd;
+  --color-sky-500: #3f79e8;
+  --color-sky-600: #2e64d4;
+  --color-sky-700: #2551b0;
 }
 
 html {

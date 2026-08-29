@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from "react-router-dom";
-import { LayoutDashboard, BookOpen, Shield, LogOut } from "lucide-react";
+import { LayoutDashboard, BookOpen, Shield, LogOut, X } from "lucide-react";
 import ruangguruLogo from "../../assets/ruangguru.png";
 import brainAcademyLogo from "../../assets/brain-academy.png";
 import { useAuth } from "../../context/auth-context";
@@ -19,7 +19,7 @@ function navItemClass({ isActive }) {
   ].join(" ");
 }
 
-export default function Sidebar() {
+export default function Sidebar({ open = false, onClose = () => {} }) {
   const { profile, isAdmin } = useAuth();
   const navigate = useNavigate();
 
@@ -27,12 +27,26 @@ export default function Sidebar() {
     try {
       await signOut();
     } finally {
+      onClose();
       navigate("/login", { replace: true });
     }
   };
 
   return (
-    <aside className="flex w-[264px] shrink-0 flex-col border-r border-zinc-200/70 bg-white px-5 py-6">
+    <aside
+      className={`fixed inset-y-0 left-0 z-50 flex w-[264px] shrink-0 flex-col border-r border-zinc-200/70 bg-white px-5 py-6 transition-transform duration-200 lg:static lg:z-auto lg:translate-x-0 ${
+        open ? "translate-x-0" : "-translate-x-full"
+      }`}
+    >
+      {/* Tombol tutup — mobile only */}
+      <button
+        onClick={onClose}
+        aria-label="Tutup menu"
+        className="absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-lg text-zinc-400 transition-colors hover:bg-zinc-100 lg:hidden"
+      >
+        <X size={18} />
+      </button>
+
       {/* Brand */}
       <div className="flex flex-col items-center gap-2.5 px-1 text-center">
         <div className="flex items-center gap-3">
@@ -56,7 +70,13 @@ export default function Sidebar() {
       {/* Main nav */}
       <nav className="mt-8 flex flex-col gap-1">
         {mainNav.map(({ to, label, icon: Icon, end }) => (
-          <NavLink key={to} to={to} end={end} className={navItemClass}>
+          <NavLink
+            key={to}
+            to={to}
+            end={end}
+            onClick={onClose}
+            className={navItemClass}
+          >
             {({ isActive }) => (
               <>
                 <Icon
@@ -71,7 +91,7 @@ export default function Sidebar() {
         ))}
 
         {isAdmin && (
-          <NavLink to="/admin" className={navItemClass}>
+          <NavLink to="/admin" onClick={onClose} className={navItemClass}>
             {({ isActive }) => (
               <>
                 <Shield
@@ -89,7 +109,10 @@ export default function Sidebar() {
       {/* User + sign out */}
       <div className="mt-auto flex flex-col gap-2 border-t border-zinc-200/70 pt-4">
         {profile?.email && (
-          <p className="truncate px-3 text-xs text-zinc-400" title={profile.email}>
+          <p
+            className="truncate px-3 text-xs text-zinc-400"
+            title={profile.email}
+          >
             {profile.email}
           </p>
         )}
