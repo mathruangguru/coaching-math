@@ -64,6 +64,99 @@ export async function createUser({
   });
 }
 
+const ROLES = ["student", "admin", "super_admin"];
+
+/**
+ * Parse teks bulk jadi { items, errors }. Dua format diterima:
+ *   - JSON array: [{ email, firstName, lastName, password?, role? }, ...]
+ *   - Baris (CSV-ish), 1 user per baris:
+ *       email, nama depan, nama belakang, password?, role?
+ * `password` boleh kosong -> digenerate server-side. `role` default student.
+ */
+export function parseUsersInput(text) {
+  const raw = (text ?? "").trim();
+  if (!raw) return { items: [], errors: ["Kosong."] };
+
+  let rows;
+  if (raw.startsWith("[")) {
+    try {
+      const arr = JSON.parse(raw);
+      if (!Array.isArray(arr)) return { items: [], errors: ["JSON harus array."] };
+      rows = arr.map((o, i) => ({
+        _line: i + 1,
+        email: o.email ?? o.Email ?? "",
+        firstName: o.firstName ?? o.first_name ?? o.nama_depan ?? "",
+        lastName: o.lastName ?? o.last_name ?? o.nama_belakang ?? "",
+        password: o.password ?? "",
+        role: o.role ?? "",
+      }));
+    } catch (err) {
+      return { items: [], errors: [`JSON invalid: ${err.message}`] };
+    }
+  } else {
+    rows = raw
+      .split(/\r?\n/)
+      .map((l, i) => ({ line: i + 1, cols: l.split(",").map((c) => c.trim()) }))
+      .filter((r) => r.cols.some(Boolean))
+      .map((r) => ({
+        _line: r.line,
+        email: r.cols[0] ?? "",
+        firstName: r.cols[1] ?? "",
+        lastName: r.cols[2] ?? "",
+        password: r.cols[3] ?? "",
+        role: r.cols[4] ?? "",
+      }));
+  }
+
+  const items = [];
+  const errors = [];
+  const seen = new Set();
+  for (const r of rows) {
+    const email = String(r.email).trim().toLowerCase();
+    const where = `baris ${r._line}`;
+    if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+      errors.push(`${where}: email nggak valid ("${r.email}")`);
+      continue;
+    }
+    if (seen.has(email)) {
+      errors.push(`${where}: email dobel ("${email}")`);
+      continue;
+    }
+    seen.add(email);
+    if (!String(r.firstName).trim() || !String(r.lastName).trim()) {
+      errors.push(`${where}: nama depan & belakang wajib`);
+      continue;
+    }
+    const password = String(r.password ?? "").trim();
+    if (password && password.length < 6) {
+      errors.push(`${where}: password < 6 karakter`);
+      continue;
+    }
+    let role = String(r.role ?? "").trim().toLowerCase();
+    if (role && !ROLES.includes(role)) {
+      errors.push(`${where}: role "${role}" nggak dikenal`);
+      continue;
+    }
+    items.push({
+      email,
+      firstName: String(r.firstName).trim(),
+      lastName: String(r.lastName).trim(),
+      password,
+      role: role || "student",
+    });
+  }
+  return { items, errors };
+}
+
+/**
+ * Bikin banyak user sekaligus lewat Edge Function. Balikannya:
+ * { results: [{ email, ok, password?, role?, error? }] }
+ * Non-super-admin: semua role dipaksa "student".
+ */
+export async function createUsersBulk(items) {
+  return callAdminUsers({ action: "create_bulk", users: items });
+}
+
 /**
  * Ganti role user. Update biasa — dijaga RLS "update admin".
  */

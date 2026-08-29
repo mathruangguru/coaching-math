@@ -1,14 +1,20 @@
 import { useEffect, useState } from "react";
-import { UserPlus, KeyRound, Trash2 } from "lucide-react";
+import { UserPlus, KeyRound, Trash2, Users, X } from "lucide-react";
 import {
   getUsers,
   createUser,
+  createUsersBulk,
+  parseUsersInput,
   setUserRole,
   setUserPassword,
   deleteUser,
 } from "../../lib/users";
 import { useAuth } from "../../context/auth-context";
 import Skeleton from "../../components/ui/Skeleton";
+
+const BULK_EXAMPLE = `budi@sekolah.id, Budi, Santoso
+siti@sekolah.id, Siti, Aminah, rahasia123
+adi@sekolah.id, Adi, Nugroho, , admin`;
 
 const inputCls =
   "w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none transition-colors focus:border-brand-500";
@@ -31,6 +37,180 @@ function fullName(u) {
   return [u.first_name, u.last_name].filter(Boolean).join(" ");
 }
 
+function BulkModal({ isSuperAdmin, onClose, onDone }) {
+  const [text, setText] = useState("");
+  const [parsed, setParsed] = useState(null); // { items, errors }
+  const [busy, setBusy] = useState(false);
+  const [results, setResults] = useState(null); // [{ email, ok, password, role, error }]
+
+  const check = () => {
+    setResults(null);
+    setParsed(parseUsersInput(text));
+  };
+
+  const run = async () => {
+    const p = parsed ?? parseUsersInput(text);
+    setParsed(p);
+    if (!p.items.length) return;
+    setBusy(true);
+    try {
+      const { results: res } = await createUsersBulk(p.items);
+      setResults(res ?? []);
+    } catch (err) {
+      window.alert(err?.message ?? "Gagal membuat user.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const okCount = results?.filter((r) => r.ok).length ?? 0;
+  const tsv = results
+    ?.filter((r) => r.ok)
+    .map((r) => `${r.email}\t${r.password}`)
+    .join("\n");
+
+  const close = () => {
+    onClose();
+    if (results?.some((r) => r.ok)) onDone();
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-zinc-900/40 p-4 sm:p-8"
+      onClick={close}
+    >
+      <div
+        className="w-full max-w-xl rounded-2xl border border-zinc-200 bg-white shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between gap-3 border-b border-zinc-100 px-5 py-3.5">
+          <h3 className="text-sm font-bold text-zinc-900">Tambah banyak user</h3>
+          <button
+            type="button"
+            onClick={close}
+            aria-label="Tutup"
+            className="grid h-8 w-8 place-items-center rounded-lg text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="max-h-[70vh] overflow-y-auto p-5">
+          {!results && (
+            <>
+              <p className="text-xs text-zinc-500">
+                Satu user per baris:{" "}
+                <code className="rounded bg-zinc-100 px-1">
+                  email, nama depan, nama belakang, password?, role?
+                </code>
+                . Password kosong = digenerate.
+                {!isSuperAdmin && " Semua dibuat sebagai student."}
+              </p>
+              <textarea
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                rows={8}
+                spellCheck={false}
+                placeholder={BULK_EXAMPLE}
+                className="mt-2 w-full rounded-lg border border-zinc-300 px-3 py-2 font-mono text-xs text-zinc-900 outline-none focus:border-brand-500"
+              />
+
+              {parsed && (
+                <div className="mt-3 text-xs">
+                  <p className="font-semibold text-zinc-700">
+                    {parsed.items.length} user siap dibuat
+                    {parsed.errors.length > 0 &&
+                      ` · ${parsed.errors.length} baris dilewati`}
+                  </p>
+                  {parsed.errors.length > 0 && (
+                    <ul className="mt-1 list-inside list-disc text-rose-600">
+                      {parsed.errors.map((e, i) => (
+                        <li key={i}>{e}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+
+              <div className="mt-4 flex gap-2">
+                <button
+                  type="button"
+                  onClick={check}
+                  className="rounded-lg border border-zinc-200 px-3 py-2 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-50"
+                >
+                  Cek
+                </button>
+                <button
+                  type="button"
+                  onClick={run}
+                  disabled={busy || !parsed?.items.length}
+                  className="rounded-lg bg-brand-500 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-brand-600 disabled:opacity-50"
+                >
+                  {busy
+                    ? "Membuat…"
+                    : parsed?.items.length
+                      ? `Buat ${parsed.items.length} user`
+                      : "Buat user"}
+                </button>
+              </div>
+            </>
+          )}
+
+          {results && (
+            <>
+              <p className="text-xs font-semibold text-zinc-700">
+                {okCount} dari {results.length} user dibuat
+              </p>
+              <ul className="mt-2 flex flex-col gap-1">
+                {results.map((r, i) => (
+                  <li
+                    key={i}
+                    className="flex items-center justify-between gap-3 rounded-md border border-zinc-100 px-2.5 py-1.5 text-xs"
+                  >
+                    <span className="min-w-0 truncate text-zinc-700">
+                      {r.email}
+                    </span>
+                    {r.ok ? (
+                      <span className="shrink-0 font-mono text-emerald-600">
+                        {r.password}
+                      </span>
+                    ) : (
+                      <span className="shrink-0 text-rose-600">{r.error}</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+
+              {tsv && (
+                <label className="mt-3 block text-xs font-medium text-zinc-600">
+                  Email &amp; password (copy buat dibagikan)
+                  <textarea
+                    readOnly
+                    value={tsv}
+                    rows={Math.min(okCount + 1, 8)}
+                    onFocus={(e) => e.target.select()}
+                    className="mt-1 w-full rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-2 font-mono text-xs text-zinc-900"
+                  />
+                </label>
+              )}
+
+              <div className="mt-4">
+                <button
+                  type="button"
+                  onClick={close}
+                  className="rounded-lg bg-zinc-900 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-zinc-700"
+                >
+                  Selesai
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminUsersPage() {
   const { session, isSuperAdmin } = useAuth();
   const myId = session?.user?.id ?? null;
@@ -43,6 +223,7 @@ export default function AdminUsersPage() {
   const [formError, setFormError] = useState("");
   const [formOk, setFormOk] = useState("");
   const [rowBusyId, setRowBusyId] = useState(null);
+  const [showBulk, setShowBulk] = useState(false);
 
   const fetchUsers = () =>
     getUsers()
@@ -168,12 +349,29 @@ export default function AdminUsersPage() {
         </p>
       </div>
 
+      {showBulk && (
+        <BulkModal
+          isSuperAdmin={isSuperAdmin}
+          onClose={() => setShowBulk(false)}
+          onDone={fetchUsers}
+        />
+      )}
+
       {/* Tambah user */}
       <form
         onSubmit={handleCreate}
         className="flex flex-col gap-3 rounded-2xl border border-zinc-200 bg-white p-5"
       >
-        <p className="text-xs font-semibold text-zinc-700">Tambah user</p>
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-xs font-semibold text-zinc-700">Tambah user</p>
+          <button
+            type="button"
+            onClick={() => setShowBulk(true)}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 px-2.5 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-50"
+          >
+            <Users size={13} /> Tambah banyak
+          </button>
+        </div>
 
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="block text-xs font-medium text-zinc-600">

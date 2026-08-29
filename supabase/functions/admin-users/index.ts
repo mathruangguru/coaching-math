@@ -1,6 +1,8 @@
 // Edge Function: operasi user yang butuh service_role (nggak boleh di frontend).
 //   action "create"        -> { email, password, firstName, lastName, role }
 //                             admin biasa: role dipaksa "student".
+//   action "create_bulk"   -> { users: [{ email, firstName, lastName, password?, role? }] }
+//                             password kosong -> digenerate; balik di results.
 //   action "set_password"  -> { userId, password }   (super_admin only)
 //   action "delete"        -> { userId }             (super_admin only)
 //
@@ -30,6 +32,16 @@ function json(body: unknown, status = 200) {
     status,
     headers: { ...cors, "content-type": "application/json" },
   });
+}
+
+// Password acak yang kebaca — tanpa 0/O/1/l biar nggak ambigu.
+function genPassword(len = 10) {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+  const buf = new Uint32Array(len);
+  crypto.getRandomValues(buf);
+  let out = "";
+  for (let i = 0; i < len; i++) out += chars[buf[i] % chars.length];
+  return out;
 }
 
 Deno.serve(async (req) => {
@@ -100,6 +112,58 @@ Deno.serve(async (req) => {
       if (patchErr) return json({ error: patchErr.message }, 400);
     }
     return json({ ok: true, id });
+  }
+
+  if (body.action === "create_bulk") {
+    const rows = Array.isArray(body.users) ? body.users : [];
+    if (rows.length === 0) return json({ error: "users kosong" }, 400);
+    if (rows.length > 200) return json({ error: "maks 200 user per batch" }, 400);
+
+    const results: Array<Record<string, unknown>> = [];
+    for (const r of rows) {
+      const email = String(r?.email ?? "").trim();
+      if (!email) {
+        results.push({ email: r?.email ?? "", ok: false, error: "email kosong" });
+        continue;
+      }
+      let role = ROLES.includes(r?.role) ? r.role : "student";
+      if (!isSuperAdmin) role = "student";
+      const password =
+        typeof r?.password === "string" && r.password.length >= 6
+          ? r.password
+          : genPassword();
+      const firstName = String(r?.firstName ?? "");
+      const lastName = String(r?.lastName ?? "");
+
+      const { data, error } = await admin.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: { first_name: firstName, last_name: lastName },
+      });
+      if (error) {
+        results.push({ email, ok: false, error: error.message });
+        continue;
+      }
+      const id = data.user?.id;
+      if (id) {
+        const patch: Record<string, string | null> = {
+          first_name: firstName || null,
+          last_name: lastName || null,
+        };
+        if (role !== "student") patch.role = role;
+        const { error: patchErr } = await admin
+          .from("coaching_profiles")
+          .update(patch)
+          .eq("id", id);
+        if (patchErr) {
+          results.push({ email, ok: false, error: patchErr.message });
+          continue;
+        }
+      }
+      results.push({ email, ok: true, password, role });
+    }
+    return json({ results });
   }
 
   // set_password & delete = super admin only.
