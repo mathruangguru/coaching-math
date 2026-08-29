@@ -47,7 +47,11 @@ export async function getCourse(id) {
   for (const section of data.sections) {
     section.items.sort((a, b) => a.position - b.position);
     delete section.position;
-    for (const item of section.items) delete item.position;
+    for (const item of section.items) {
+      delete item.position;
+      // Progress belum ada di DB (nunggu Auth) -> mulai dari belum selesai.
+      item.done = false;
+    }
   }
 
   return data;

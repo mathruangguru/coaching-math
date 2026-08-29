@@ -1,13 +1,40 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
-import { myCourses, courseSections } from "../data/mock";
+import { getCourse } from "../lib/courses";
+import Skeleton from "../components/ui/Skeleton";
 import CourseSection from "../components/course/CourseSection";
 
 export default function CourseDetailPage() {
   const { courseId } = useParams();
-  const course = myCourses.find((c) => c.id === courseId);
-  const [sections, setSections] = useState(() => courseSections[courseId] ?? []);
+  const [course, setCourse] = useState(null);
+  const [sections, setSections] = useState([]);
+  const [status, setStatus] = useState("loading"); // loading | error | not-found | ready
+
+  useEffect(() => {
+    let alive = true;
+
+    getCourse(courseId)
+      .then((data) => {
+        if (!alive) return;
+        if (!data) {
+          setStatus("not-found");
+          return;
+        }
+        setCourse(data);
+        setSections(data.sections ?? []);
+        setStatus("ready");
+      })
+      .catch((err) => {
+        if (!alive) return;
+        console.error("[CourseDetailPage] gagal memuat course:", err);
+        setStatus("error");
+      });
+
+    return () => {
+      alive = false;
+    };
+  }, [courseId]);
 
   const { total, done } = useMemo(() => {
     const items = sections.flatMap((s) => s.items);
@@ -28,7 +55,38 @@ export default function CourseDetailPage() {
       )
     );
 
-  if (!course) {
+  if (status === "loading") {
+    return (
+      <div className="mx-auto flex max-w-[1180px] flex-col gap-6">
+        <div>
+          <Skeleton className="h-3 w-28" />
+          <Skeleton className="mt-3 h-6 w-2/3" />
+          <Skeleton className="mt-2 h-3 w-full max-w-md" />
+          <Skeleton className="mt-4 h-1.5 w-full max-w-sm" />
+        </div>
+        <div className="flex flex-col gap-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} className="h-14 w-full rounded-2xl" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (status === "error") {
+    return (
+      <div className="mx-auto max-w-[1180px]">
+        <p className="text-sm text-zinc-500">
+          Gagal memuat course.{" "}
+          <Link to="/course" className="font-semibold text-brand-600">
+            Kembali ke daftar
+          </Link>
+        </p>
+      </div>
+    );
+  }
+
+  if (status === "not-found") {
     return (
       <div className="mx-auto max-w-[1180px]">
         <p className="text-sm text-zinc-500">

@@ -40,6 +40,20 @@ create table if not exists public.coaching_lesson_progress (
   primary key (user_id, lesson_id)
 );
 
+-- ── Grants ─────────────────────────────────────────────────────────────
+-- RLS policy != privilege. Postgres butuh dua-duanya: role harus punya
+-- GRANT ke tabel DAN lolos policy. Tanpa blok ini, request anon balik
+-- 401 "permission denied for table ...".
+
+grant usage on schema public to anon, authenticated;
+
+grant select on public.coaching_courses         to anon, authenticated;
+grant select on public.coaching_course_sections to anon, authenticated;
+grant select on public.coaching_lessons         to anon, authenticated;
+
+-- Progress: cuma user login yang nulis/baca (dibatasi policy ke miliknya).
+grant select, insert, update on public.coaching_lesson_progress to authenticated;
+
 -- ── Row Level Security ─────────────────────────────────────────────────
 
 alter table public.coaching_courses          enable row level security;
