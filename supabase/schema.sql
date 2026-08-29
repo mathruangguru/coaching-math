@@ -28,8 +28,8 @@ create table if not exists public.coaching_lessons (
   title      text not null,
   duration   text,
   url        text,
-  publish_status text not null default 'all'
-             check (publish_status in ('none', 'admin', 'all')),
+  publish_status text not null default 'none'
+             check (publish_status in ('none', 'all')),
   position   int  not null default 0
 );
 create index if not exists coaching_lessons_section_idx
@@ -39,16 +39,24 @@ create index if not exists coaching_lessons_section_idx
 alter table public.coaching_lessons add column if not exists url text;
 
 -- Status publikasi per materi (ditambahkan belakangan). Aman diulang.
---   none  = draft, cuma kelihatan di editor kurikulum (admin)
---   admin = tampil di halaman course hanya buat admin (preview sebelum rilis)
---   all   = tampil buat semua murid yang enroll
+--   none = Not Publish -> non-admin nggak bisa akses & hidden. Admin
+--          tetap lihat (editor + preview di halaman course, ada tag).
+--   all  = Publish     -> tampil buat semua murid yang enroll.
 -- Gate baca-nya ada di admin.sql (policy "coaching_lessons read").
+-- Kolom baru di-backfill 'all' biar materi yang udah ada nggak ilang;
+-- default lalu digeser ke 'none' (materi baru mulai sebagai draft — app
+-- juga kirim 'none' eksplisit di createLesson).
 alter table public.coaching_lessons
   add column if not exists publish_status text not null default 'all';
+alter table public.coaching_lessons
+  alter column publish_status set default 'none';
+-- Baris lama yang sempat 'admin' (model 3-state) -> jadikan 'none'.
+update public.coaching_lessons set publish_status = 'none'
+  where publish_status = 'admin';
 alter table public.coaching_lessons drop constraint if exists coaching_lessons_publish_status_check;
 alter table public.coaching_lessons
   add constraint coaching_lessons_publish_status_check
-    check (publish_status in ('none', 'admin', 'all'));
+    check (publish_status in ('none', 'all'));
 
 -- Migrasi tipe lesson lama -> baru. Aman dijalankan ulang (idempotent):
 -- kalau tabel sudah terisi tipe lama, jalankan blok ini di project yang ada.
