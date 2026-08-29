@@ -2,20 +2,25 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { getCourse } from "../lib/courses";
+import { getMyEnrollments, enroll } from "../lib/enroll";
+import { useAuth } from "../context/auth-context";
 import Skeleton from "../components/ui/Skeleton";
 import CourseSection from "../components/course/CourseSection";
 
 export default function CourseDetailPage() {
   const { courseId } = useParams();
+  const { isAdmin } = useAuth();
   const [course, setCourse] = useState(null);
   const [sections, setSections] = useState([]);
   const [status, setStatus] = useState("loading"); // loading | error | not-found | ready
+  const [enrolled, setEnrolled] = useState(true); // sampai kebukti belum
+  const [enrolling, setEnrolling] = useState(false);
 
   useEffect(() => {
     let alive = true;
 
-    getCourse(courseId)
-      .then((data) => {
+    Promise.all([getCourse(courseId), getMyEnrollments().catch(() => null)])
+      .then(([data, mine]) => {
         if (!alive) return;
         if (!data) {
           setStatus("not-found");
@@ -23,6 +28,7 @@ export default function CourseDetailPage() {
         }
         setCourse(data);
         setSections(data.sections ?? []);
+        setEnrolled(mine === null || mine.includes(courseId));
         setStatus("ready");
       })
       .catch((err) => {
@@ -35,6 +41,18 @@ export default function CourseDetailPage() {
       alive = false;
     };
   }, [courseId]);
+
+  const handleEnroll = async () => {
+    setEnrolling(true);
+    try {
+      await enroll(courseId);
+      setEnrolled(true);
+    } catch (err) {
+      window.alert(`Gagal enroll: ${err?.message ?? err}`);
+    } finally {
+      setEnrolling(false);
+    }
+  };
 
   if (status === "loading") {
     return (
@@ -79,6 +97,8 @@ export default function CourseDetailPage() {
     );
   }
 
+  const canView = enrolled || isAdmin;
+
   return (
     <div className="mx-auto flex max-w-[1180px] flex-col gap-6">
       {/* Header */}
@@ -98,22 +118,40 @@ export default function CourseDetailPage() {
         </p>
       </div>
 
-      {/* Curriculum */}
-      <div className="flex flex-col gap-3">
-        {sections.length === 0 ? (
-          <p className="rounded-2xl border border-dashed border-zinc-300 bg-white px-6 py-12 text-center text-sm text-zinc-400">
-            Belum ada materi di course ini.
+      {!canView ? (
+        <div className="rounded-2xl border border-zinc-200/80 bg-white px-6 py-10 text-center">
+          <p className="text-sm font-semibold text-zinc-900">
+            Kamu belum enroll di course ini
           </p>
-        ) : (
-          sections.map((section) => (
-            <CourseSection
-              key={section.id}
-              section={section}
-              courseId={courseId}
-            />
-          ))
-        )}
-      </div>
+          <p className="mt-1 text-xs text-zinc-500">
+            Enroll dulu untuk membuka materinya.
+          </p>
+          <button
+            type="button"
+            onClick={handleEnroll}
+            disabled={enrolling}
+            className="mt-4 rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-600 disabled:opacity-50"
+          >
+            {enrolling ? "Mendaftar…" : "Enroll sekarang"}
+          </button>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {sections.length === 0 ? (
+            <p className="rounded-2xl border border-dashed border-zinc-300 bg-white px-6 py-12 text-center text-sm text-zinc-400">
+              Belum ada materi di course ini.
+            </p>
+          ) : (
+            sections.map((section) => (
+              <CourseSection
+                key={section.id}
+                section={section}
+                courseId={courseId}
+              />
+            ))
+          )}
+        </div>
+      )}
     </div>
   );
 }

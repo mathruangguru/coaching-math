@@ -2,18 +2,24 @@ import { useEffect, useState } from "react";
 import CourseCard from "../components/course/CourseCard";
 import Skeleton from "../components/ui/Skeleton";
 import { getCourses } from "../lib/courses";
+import { getMyEnrollments, enroll } from "../lib/enroll";
 
 export default function CoursePage() {
   const [courses, setCourses] = useState([]);
+  const [enrolled, setEnrolled] = useState(new Set());
+  const [gated, setGated] = useState(true); // false = mode mock, semua kebuka
   const [status, setStatus] = useState("loading"); // loading | error | ready
+  const [enrollingId, setEnrollingId] = useState(null);
 
   useEffect(() => {
     let alive = true;
 
-    getCourses()
-      .then((data) => {
+    Promise.all([getCourses(), getMyEnrollments().catch(() => null)])
+      .then(([list, mine]) => {
         if (!alive) return;
-        setCourses(data);
+        setCourses(list);
+        if (mine === null) setGated(false);
+        else setEnrolled(new Set(mine));
         setStatus("ready");
       })
       .catch((err) => {
@@ -27,13 +33,22 @@ export default function CoursePage() {
     };
   }, []);
 
+  const handleEnroll = async (courseId) => {
+    setEnrollingId(courseId);
+    try {
+      await enroll(courseId);
+      setEnrolled((s) => new Set(s).add(courseId));
+    } catch (err) {
+      window.alert(`Gagal enroll: ${err?.message ?? err}`);
+    } finally {
+      setEnrollingId(null);
+    }
+  };
+
   return (
     <div className="mx-auto flex max-w-[1180px] flex-col gap-6">
       <div>
-        <p className="text-xs text-zinc-500">Katalog Pembelajaran</p>
-        <h1 className="mt-1 text-xl font-bold tracking-tight text-zinc-900">
-          Course
-        </h1>
+        <h1 className="text-xl font-bold tracking-tight text-zinc-900">Course</h1>
         {status === "ready" && (
           <p className="mt-1 text-xs text-zinc-400">
             {courses.length} course tersedia
@@ -52,7 +67,7 @@ export default function CoursePage() {
               <Skeleton className="mt-4 h-4 w-3/4" />
               <Skeleton className="mt-2 h-3 w-full" />
               <Skeleton className="mt-1.5 h-3 w-4/5" />
-              <Skeleton className="mt-4 h-3 w-24" />
+              <Skeleton className="mt-4 h-8 w-24 rounded-lg" />
             </div>
           ))}
         </div>
@@ -72,7 +87,13 @@ export default function CoursePage() {
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {courses.map((course) => (
-              <CourseCard key={course.id} course={course} />
+              <CourseCard
+                key={course.id}
+                course={course}
+                enrolled={!gated || enrolled.has(course.id)}
+                enrolling={enrollingId === course.id}
+                onEnroll={handleEnroll}
+              />
             ))}
           </div>
         ))}
