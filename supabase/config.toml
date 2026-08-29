@@ -1,0 +1,9 @@
+# Supabase CLI config. Ref project ada di `supabase link` (disimpan di
+# supabase/.temp/, gitignored). Deploy: `supabase functions deploy admin-users`.
+
+project_id = "coaching-math"
+
+# admin-users dipanggil dari browser -> preflight CORS OPTIONS nggak bawa
+# JWT, jadi verifikasinya dimatikan di sini (function cek admin sendiri).
+[functions.admin-users]
+verify_jwt = false
