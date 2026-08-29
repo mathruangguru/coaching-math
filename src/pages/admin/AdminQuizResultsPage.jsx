@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { ListChecks, User, Search } from "lucide-react";
 import { getUsers } from "../../lib/users";
-import { getQuestionSets, getAllAttempts } from "../../lib/quiz";
+import {
+  getQuestionSets,
+  getQuestionSetAdmin,
+  getAllAttempts,
+} from "../../lib/quiz";
 import Skeleton from "../../components/ui/Skeleton";
 
 function fullName(u) {
@@ -43,6 +47,53 @@ function ScorePill({ score, total }) {
   );
 }
 
+const markTone = {
+  ok: "bg-teal-100 text-teal-700",
+  wrong: "bg-rose-100 text-rose-700",
+  blank: "bg-zinc-100 text-zinc-400",
+};
+const markLabel = { ok: "benar", wrong: "salah", blank: "kosong" };
+
+// Benar / salah / kosong per soal, urut posisi. `detail` dari getQuestionSetAdmin.
+function marksFor(attempt, detail) {
+  if (!detail?.questions?.length) return null;
+  return detail.questions.map((q) => {
+    const chosen = attempt.answers?.[q.id];
+    if (chosen == null) return "blank";
+    return chosen === q.answer ? "ok" : "wrong";
+  });
+}
+
+function AttemptRow({ attempt, label, detail }) {
+  const marks = marksFor(attempt, detail);
+  return (
+    <li className="border-b border-zinc-100 px-4 py-2.5 last:border-b-0">
+      <div className="flex items-center justify-between gap-3">
+        <span className="min-w-0 flex-1 truncate text-sm text-zinc-700">
+          {label}
+        </span>
+        <span className="shrink-0 text-xs text-zinc-400">
+          {fmtDate(attempt.created_at)}
+        </span>
+        <ScorePill score={attempt.score} total={attempt.total} />
+      </div>
+      {marks && (
+        <div className="mt-2 flex flex-wrap gap-1">
+          {marks.map((m, i) => (
+            <span
+              key={i}
+              title={`Soal ${i + 1}: ${markLabel[m]}`}
+              className={`grid h-5 w-5 place-items-center rounded text-[10px] font-semibold ${markTone[m]}`}
+            >
+              {i + 1}
+            </span>
+          ))}
+        </div>
+      )}
+    </li>
+  );
+}
+
 export default function AdminQuizResultsPage() {
   const [view, setView] = useState("set"); // set | user
   const [q, setQ] = useState("");
@@ -50,15 +101,28 @@ export default function AdminQuizResultsPage() {
 
   useEffect(() => {
     let alive = true;
-    Promise.all([getQuestionSets(), getUsers(), getAllAttempts()])
-      .then(([sets, users, attempts]) => {
+    (async () => {
+      try {
+        const [sets, users, attempts] = await Promise.all([
+          getQuestionSets(),
+          getUsers(),
+          getAllAttempts(),
+        ]);
+        const setIds = [
+          ...new Set(attempts.map((a) => a.set_id).filter(Boolean)),
+        ];
+        const details = await Promise.all(
+          setIds.map((id) => getQuestionSetAdmin(id).catch(() => null))
+        );
         if (!alive) return;
-        setData({ status: "ready", sets, users, attempts });
-      })
-      .catch((err) => {
+        const setDetail = new Map();
+        setIds.forEach((id, i) => setDetail.set(id, details[i]));
+        setData({ status: "ready", sets, users, attempts, setDetail });
+      } catch (err) {
         console.error("[admin] gagal memuat hasil soal:", err);
         if (alive) setData({ status: "error" });
-      });
+      }
+    })();
     return () => {
       alive = false;
     };
@@ -89,7 +153,7 @@ export default function AdminQuizResultsPage() {
           Hasil Soal
         </h1>
         <p className="mt-1 text-xs text-zinc-400">
-          Skor tiap attempt latihan soal murid.
+          Skor + benar/salah per nomor tiap attempt latihan soal.
         </p>
       </div>
 
@@ -156,6 +220,18 @@ export default function AdminQuizResultsPage() {
             </p>
           )}
 
+          {/* Legenda */}
+          {data.attempts.length > 0 && (
+            <div className="flex items-center gap-3 text-[11px] text-zinc-400">
+              {["ok", "wrong", "blank"].map((m) => (
+                <span key={m} className="inline-flex items-center gap-1">
+                  <span className={`h-3 w-3 rounded ${markTone[m]}`} />
+                  {markLabel[m]}
+                </span>
+              ))}
+            </div>
+          )}
+
           {view === "set" &&
             [...grouped.bySet.entries()]
               .map(([sid, rows]) => ({
@@ -182,23 +258,18 @@ export default function AdminQuizResultsPage() {
                     </span>
                   </div>
                   <ul className="border-t border-zinc-100">
-                    {rows.map((a) => {
-                      const u = grouped.usersById.get(a.user_id);
-                      return (
-                        <li
-                          key={a.id}
-                          className="flex items-center justify-between gap-3 border-b border-zinc-100 px-4 py-2 last:border-b-0"
-                        >
-                          <span className="min-w-0 flex-1 truncate text-sm text-zinc-700">
-                            {u ? fullName(u) : a.user_id}
-                          </span>
-                          <span className="shrink-0 text-xs text-zinc-400">
-                            {fmtDate(a.created_at)}
-                          </span>
-                          <ScorePill score={a.score} total={a.total} />
-                        </li>
-                      );
-                    })}
+                    {rows.map((a) => (
+                      <AttemptRow
+                        key={a.id}
+                        attempt={a}
+                        detail={data.setDetail.get(a.set_id)}
+                        label={
+                          grouped.usersById.get(a.user_id)
+                            ? fullName(grouped.usersById.get(a.user_id))
+                            : a.user_id
+                        }
+                      />
+                    ))}
                   </ul>
                 </div>
               ))}
@@ -237,19 +308,15 @@ export default function AdminQuizResultsPage() {
                   </div>
                   <ul className="border-t border-zinc-100">
                     {rows.map((a) => (
-                      <li
+                      <AttemptRow
                         key={a.id}
-                        className="flex items-center justify-between gap-3 border-b border-zinc-100 px-4 py-2 last:border-b-0"
-                      >
-                        <span className="min-w-0 flex-1 truncate text-sm text-zinc-700">
-                          {grouped.setsById.get(a.set_id)?.title ??
-                            "(set dihapus)"}
-                        </span>
-                        <span className="shrink-0 text-xs text-zinc-400">
-                          {fmtDate(a.created_at)}
-                        </span>
-                        <ScorePill score={a.score} total={a.total} />
-                      </li>
+                        attempt={a}
+                        detail={data.setDetail.get(a.set_id)}
+                        label={
+                          grouped.setsById.get(a.set_id)?.title ??
+                          "(set dihapus)"
+                        }
+                      />
                     ))}
                   </ul>
                 </div>
