@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -7,6 +7,8 @@ import {
   ChevronUp,
   ChevronDown,
   Check,
+  Pencil,
+  X,
 } from "lucide-react";
 import {
   getQuestionSetAdmin,
@@ -17,6 +19,7 @@ import {
   reorderQuestions,
 } from "../../lib/quiz";
 import Skeleton from "../../components/ui/Skeleton";
+import MathText from "../../components/ui/MathText";
 
 const input =
   "w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none transition-colors focus:border-brand-500";
@@ -28,11 +31,56 @@ function move(arr, from, to) {
   return n;
 }
 
+function Modal({ title, onClose, children }) {
+  useEffect(() => {
+    const onKey = (e) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-zinc-900/40 p-4 sm:p-8"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-2xl rounded-2xl border border-zinc-200 bg-white shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between gap-3 border-b border-zinc-100 px-5 py-3.5">
+          <h3 className="truncate text-sm font-bold text-zinc-900">{title}</h3>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Tutup"
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700"
+          >
+            <X size={16} />
+          </button>
+        </div>
+        <div className="max-h-[70vh] overflow-y-auto p-5">{children}</div>
+        <div className="flex justify-end border-t border-zinc-100 px-5 py-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-zinc-700"
+          >
+            Selesai
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function SetSoalFormPage() {
   const { setId } = useParams();
   const [set, setSet] = useState(null);
-  const [status, setStatus] = useState("loading"); // loading | error | not-found | ready
+  const [status, setStatus] = useState("loading");
   const [saving, setSaving] = useState(false);
+  const [selectedId, setSelectedId] = useState(null);
+  const [editingId, setEditingId] = useState(null);
+
+  const closeModal = useCallback(() => setEditingId(null), []);
 
   const load = () => {
     setStatus("loading");
@@ -40,6 +88,7 @@ export default function SetSoalFormPage() {
       .then((data) => {
         if (!data) return setStatus("not-found");
         setSet(data);
+        setSelectedId((cur) => cur ?? data.questions[0]?.id ?? null);
         setStatus("ready");
       })
       .catch((err) => {
@@ -55,6 +104,7 @@ export default function SetSoalFormPage() {
         if (!alive) return;
         if (!data) return setStatus("not-found");
         setSet(data);
+        setSelectedId(data.questions[0]?.id ?? null);
         setStatus("ready");
       })
       .catch((err) => {
@@ -114,16 +164,22 @@ export default function SetSoalFormPage() {
         position: set.questions.length,
       });
       setSet((s) => ({ ...s, questions: [...s.questions, row] }));
+      setSelectedId(row.id);
+      setEditingId(row.id);
     });
 
   const removeQuestion = (q, idx) => {
-    if (!window.confirm(`Hapus soal ${idx + 1}?`)) return;
+    if (!window.confirm(`Hapus soal ${idx + 1} (${q.code})?`)) return;
     run(async () => {
       await deleteQuestion(q.id);
-      setSet((s) => ({
-        ...s,
-        questions: s.questions.filter((x) => x.id !== q.id),
-      }));
+      setSet((s) => {
+        const questions = s.questions.filter((x) => x.id !== q.id);
+        setSelectedId((cur) =>
+          cur === q.id ? (questions[0]?.id ?? null) : cur
+        );
+        return { ...s, questions };
+      });
+      setEditingId((id) => (id === q.id ? null : id));
     });
   };
 
@@ -136,14 +192,16 @@ export default function SetSoalFormPage() {
   };
 
   if (status === "loading")
-    return <Skeleton className="h-96 w-full max-w-2xl rounded-2xl" />;
-  if (status === "error")
-    return <BackNote text="Gagal memuat set soal." />;
+    return <Skeleton className="h-96 w-full max-w-4xl rounded-2xl" />;
+  if (status === "error") return <BackNote text="Gagal memuat set soal." />;
   if (status === "not-found")
     return <BackNote text="Set soal tidak ditemukan." />;
 
+  const selected = set.questions.find((q) => q.id === selectedId) ?? null;
+  const editing = set.questions.find((q) => q.id === editingId) ?? null;
+
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-5">
+    <div className="mx-auto flex max-w-4xl flex-col gap-5">
       <div className="flex items-center justify-between gap-3">
         <Link
           to="/admin/set-soal"
@@ -156,7 +214,7 @@ export default function SetSoalFormPage() {
         </span>
       </div>
 
-      {/* Meta */}
+      {/* Metadata */}
       <div className="flex flex-col gap-3 rounded-2xl border border-zinc-200/80 bg-white p-5">
         <label className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-zinc-400">
           Judul set
@@ -179,131 +237,233 @@ export default function SetSoalFormPage() {
         </label>
       </div>
 
-      {/* Questions */}
-      {set.questions.map((q, qi) => (
-        <div
-          key={q.id}
-          className="flex flex-col gap-3 rounded-2xl border border-zinc-200/80 bg-white p-5"
-        >
-          <div className="flex items-center gap-2">
-            <span className="grid h-6 w-6 shrink-0 place-items-center rounded-lg bg-zinc-900 text-xs font-bold text-white">
-              {qi + 1}
-            </span>
-            <span className="flex-1 text-xs font-semibold uppercase tracking-wide text-zinc-400">
-              Soal
-            </span>
-            <button
-              type="button"
-              className="grid h-6 w-6 place-items-center rounded text-zinc-300 hover:bg-zinc-100 hover:text-zinc-600 disabled:opacity-25"
-              disabled={qi === 0}
-              onClick={() => moveQuestion(qi, -1)}
-              aria-label="Naikkan soal"
-            >
-              <ChevronUp size={14} />
-            </button>
-            <button
-              type="button"
-              className="grid h-6 w-6 place-items-center rounded text-zinc-300 hover:bg-zinc-100 hover:text-zinc-600 disabled:opacity-25"
-              disabled={qi === set.questions.length - 1}
-              onClick={() => moveQuestion(qi, 1)}
-              aria-label="Turunkan soal"
-            >
-              <ChevronDown size={14} />
-            </button>
-            <button
-              type="button"
-              onClick={() => removeQuestion(q, qi)}
-              aria-label="Hapus soal"
-              className="grid h-7 w-7 place-items-center rounded-md text-zinc-400 transition-colors hover:bg-rose-50 hover:text-rose-500"
-            >
-              <Trash2 size={14} />
-            </button>
-          </div>
-
-          <textarea
-            value={q.prompt}
-            onChange={(e) => patchQ(q.id, { prompt: e.target.value })}
-            onBlur={() => saveQ(q)}
-            rows={2}
-            placeholder="Tulis pertanyaan…"
-            className={`${input} resize-y`}
-          />
-
-          <div className="flex flex-col gap-1.5">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
-              Opsi · klik bulatan untuk kunci jawaban
-            </p>
-            {q.options.map((opt, oi) => (
-              <div key={oi} className="flex items-center gap-2">
+      {/* Master-detail */}
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,240px)_minmax(0,1fr)] lg:items-start">
+        {/* List */}
+        <div className="flex flex-col gap-1.5">
+          {set.questions.map((q, qi) => {
+            const active = q.id === selectedId;
+            return (
+              <div
+                key={q.id}
+                className={`flex items-center gap-1 rounded-lg border px-2 py-1.5 transition-colors ${
+                  active
+                    ? "border-brand-300 bg-brand-50"
+                    : "border-zinc-200 bg-white hover:bg-zinc-50"
+                }`}
+              >
                 <button
                   type="button"
-                  onClick={() => {
-                    patchQ(q.id, { answer: oi });
-                    saveQ({ ...q, answer: oi });
-                  }}
-                  aria-label={`Tandai opsi ${oi + 1} benar`}
-                  className={`grid h-5 w-5 shrink-0 place-items-center rounded-full border-2 transition-colors ${
-                    q.answer === oi
-                      ? "border-teal-500 bg-teal-500 text-white"
-                      : "border-zinc-300 text-transparent hover:border-teal-400"
-                  }`}
+                  onClick={() => setSelectedId(q.id)}
+                  className="flex min-w-0 flex-1 items-center gap-2 text-left"
                 >
-                  <Check size={11} strokeWidth={3.5} />
+                  <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-zinc-900 text-xs font-bold text-white">
+                    {qi + 1}
+                  </span>
+                  <span className="truncate font-mono text-xs text-zinc-500">
+                    {q.code}
+                  </span>
                 </button>
-                <input
-                  value={opt}
-                  onChange={(e) => {
-                    const options = q.options.slice();
-                    options[oi] = e.target.value;
-                    patchQ(q.id, { options });
-                  }}
-                  onBlur={() => saveQ(q)}
-                  placeholder={`Opsi ${oi + 1}`}
-                  className={`${input} py-1.5`}
-                />
                 <button
                   type="button"
-                  disabled={q.options.length <= 2}
-                  onClick={() => {
-                    const options = q.options.filter((_, i) => i !== oi);
-                    const answer =
-                      q.answer === oi
-                        ? 0
-                        : q.answer > oi
-                          ? q.answer - 1
-                          : q.answer;
-                    patchQ(q.id, { options, answer });
-                    saveQ({ ...q, options, answer });
-                  }}
-                  aria-label="Hapus opsi"
-                  className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-zinc-300 transition-colors hover:bg-rose-50 hover:text-rose-500 disabled:opacity-25"
+                  className="grid h-6 w-5 place-items-center rounded text-zinc-300 hover:text-zinc-600 disabled:opacity-20"
+                  disabled={qi === 0}
+                  onClick={() => moveQuestion(qi, -1)}
+                  aria-label="Naikkan"
+                >
+                  <ChevronUp size={13} />
+                </button>
+                <button
+                  type="button"
+                  className="grid h-6 w-5 place-items-center rounded text-zinc-300 hover:text-zinc-600 disabled:opacity-20"
+                  disabled={qi === set.questions.length - 1}
+                  onClick={() => moveQuestion(qi, 1)}
+                  aria-label="Turunkan"
+                >
+                  <ChevronDown size={13} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => removeQuestion(q, qi)}
+                  aria-label="Hapus"
+                  className="grid h-6 w-6 shrink-0 place-items-center rounded text-zinc-300 transition-colors hover:bg-rose-50 hover:text-rose-500"
                 >
                   <Trash2 size={12} />
                 </button>
               </div>
-            ))}
-            <button
-              type="button"
-              onClick={() => {
-                const options = [...q.options, ""];
-                patchQ(q.id, { options });
-                saveQ({ ...q, options });
-              }}
-              className="mt-0.5 inline-flex w-fit items-center gap-1 text-xs font-semibold text-brand-600 hover:text-brand-700"
-            >
-              <Plus size={12} /> Tambah opsi
-            </button>
-          </div>
-        </div>
-      ))}
+            );
+          })}
 
-      <button
-        type="button"
-        onClick={addQuestion}
-        className="flex items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed border-zinc-200 py-3 text-xs font-semibold text-zinc-500 transition-colors hover:border-brand-300 hover:bg-brand-50/30 hover:text-brand-600"
-      >
-        <Plus size={14} /> Tambah soal
-      </button>
+          <button
+            type="button"
+            onClick={addQuestion}
+            className="mt-1 flex items-center justify-center gap-1.5 rounded-lg border-2 border-dashed border-zinc-200 py-2 text-xs font-semibold text-zinc-500 transition-colors hover:border-brand-300 hover:bg-brand-50/30 hover:text-brand-600"
+          >
+            <Plus size={13} /> Tambah soal
+          </button>
+        </div>
+
+        {/* Preview */}
+        <div className="rounded-2xl border border-zinc-200/80 bg-white p-5">
+          {!selected ? (
+            <p className="py-8 text-center text-sm text-zinc-400">
+              Pilih soal di kiri.
+            </p>
+          ) : (
+            <div className="flex flex-col gap-4">
+              <div className="flex items-start justify-between gap-3">
+                <p className="font-mono text-xs text-zinc-400">
+                  {selected.code}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setEditingId(selected.id)}
+                  className="inline-flex shrink-0 items-center gap-1 rounded-md border border-zinc-200 px-2.5 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-50"
+                >
+                  <Pencil size={12} /> Edit soal
+                </button>
+              </div>
+
+              <MathText className="text-sm text-zinc-900">
+                {selected.prompt || "(soal masih kosong)"}
+              </MathText>
+
+              <ul className="flex flex-col gap-1.5">
+                {selected.options.map((opt, oi) => (
+                  <li
+                    key={oi}
+                    className={`flex items-start gap-2 rounded-lg border px-3 py-2 text-sm ${
+                      selected.answer === oi
+                        ? "border-teal-300 bg-teal-50"
+                        : "border-zinc-200"
+                    }`}
+                  >
+                    <span className="mt-0.5 shrink-0 font-semibold text-zinc-400">
+                      {String.fromCharCode(65 + oi)}.
+                    </span>
+                    <MathText className="text-zinc-700">
+                      {opt || "(kosong)"}
+                    </MathText>
+                    {selected.answer === oi && (
+                      <span className="ml-auto shrink-0 text-[11px] font-semibold text-teal-700">
+                        kunci
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Edit modal */}
+      {editing && (
+        <Modal title={`Soal · ${editing.code}`} onClose={closeModal}>
+          <div className="flex flex-col gap-4">
+            <label className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-zinc-400">
+              Pertanyaan
+              <span className="ml-2 font-normal normal-case tracking-normal text-zinc-400">
+                math pakai $…$ atau $$…$$
+              </span>
+              <textarea
+                value={editing.prompt}
+                onChange={(e) => patchQ(editing.id, { prompt: e.target.value })}
+                onBlur={() => saveQ(editing)}
+                rows={3}
+                placeholder={"Tulis pertanyaan… mis: Nilai dari $\\sqrt{2}+\\sqrt{8}$"}
+                className={`mt-1.5 ${input} resize-y font-mono normal-case tracking-normal`}
+              />
+            </label>
+
+            <div className="flex flex-col gap-1.5">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-zinc-400">
+                Opsi · klik bulatan untuk kunci jawaban
+              </p>
+              {editing.options.map((opt, oi) => (
+                <div key={oi} className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      patchQ(editing.id, { answer: oi });
+                      saveQ({ ...editing, answer: oi });
+                    }}
+                    aria-label={`Tandai opsi ${oi + 1} benar`}
+                    className={`grid h-5 w-5 shrink-0 place-items-center rounded-full border-2 transition-colors ${
+                      editing.answer === oi
+                        ? "border-teal-500 bg-teal-500 text-white"
+                        : "border-zinc-300 text-transparent hover:border-teal-400"
+                    }`}
+                  >
+                    <Check size={11} strokeWidth={3.5} />
+                  </button>
+                  <input
+                    value={opt}
+                    onChange={(e) => {
+                      const options = editing.options.slice();
+                      options[oi] = e.target.value;
+                      patchQ(editing.id, { options });
+                    }}
+                    onBlur={() => saveQ(editing)}
+                    placeholder={`Opsi ${String.fromCharCode(65 + oi)}`}
+                    className={`${input} py-1.5 font-mono`}
+                  />
+                  <button
+                    type="button"
+                    disabled={editing.options.length <= 2}
+                    onClick={() => {
+                      const options = editing.options.filter((_, i) => i !== oi);
+                      const answer =
+                        editing.answer === oi
+                          ? 0
+                          : editing.answer > oi
+                            ? editing.answer - 1
+                            : editing.answer;
+                      patchQ(editing.id, { options, answer });
+                      saveQ({ ...editing, options, answer });
+                    }}
+                    aria-label="Hapus opsi"
+                    className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-zinc-300 transition-colors hover:bg-rose-50 hover:text-rose-500 disabled:opacity-25"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={() => {
+                  const options = [...editing.options, ""];
+                  patchQ(editing.id, { options });
+                  saveQ({ ...editing, options });
+                }}
+                className="mt-0.5 inline-flex w-fit items-center gap-1 text-xs font-semibold text-brand-600 hover:text-brand-700"
+              >
+                <Plus size={12} /> Tambah opsi
+              </button>
+            </div>
+
+            {/* Live preview */}
+            <div className="rounded-lg border border-zinc-200 bg-zinc-50/60 p-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
+                Pratinjau
+              </p>
+              <MathText className="mt-1.5 block text-sm text-zinc-900">
+                {editing.prompt || "(soal masih kosong)"}
+              </MathText>
+              <ul className="mt-2 flex flex-col gap-1 text-sm text-zinc-600">
+                {editing.options.map((opt, oi) => (
+                  <li key={oi} className="flex gap-2">
+                    <span className="font-semibold text-zinc-400">
+                      {String.fromCharCode(65 + oi)}.
+                    </span>
+                    <MathText>{opt || "(kosong)"}</MathText>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

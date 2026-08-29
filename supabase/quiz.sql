@@ -13,12 +13,19 @@ create table if not exists public.coaching_question_sets (
 create table if not exists public.coaching_questions (
   id       text primary key,
   set_id   text not null references public.coaching_question_sets (id) on delete cascade,
-  prompt   text not null,
+  code     text,                                 -- 8 char [A-Z0-9], referensi manusia
+  prompt   text not null,                        -- boleh mengandung LaTeX ($...$ / $$...$$)
   options  jsonb not null default '[]'::jsonb,   -- ["opsi A", "opsi B", ...]
   position int  not null default 0
 );
 create index if not exists coaching_questions_set_idx
   on public.coaching_questions (set_id, position);
+
+-- kolom code ditambahkan belakangan; backfill baris lama.
+alter table public.coaching_questions add column if not exists code text;
+update public.coaching_questions
+  set code = upper(substr(md5(random()::text || id), 1, 8))
+  where code is null;
 
 -- Kunci jawaban dipisah: murid nggak boleh bisa baca ini lewat API.
 create table if not exists public.coaching_question_keys (
