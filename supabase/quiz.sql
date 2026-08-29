@@ -103,3 +103,9 @@ drop policy if exists "coaching_quiz_attempts select own" on public.coaching_qui
 create policy "coaching_quiz_attempts select own"
   on public.coaching_quiz_attempts for select
   using (auth.uid() = user_id);
+
+-- Admin baca semua attempt (rekap nilai di /admin/hasil-soal).
+drop policy if exists "coaching_quiz_attempts admin read" on public.coaching_quiz_attempts;
+create policy "coaching_quiz_attempts admin read"
+  on public.coaching_quiz_attempts for select
+  using (public.is_admin());

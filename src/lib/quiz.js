@@ -269,6 +269,21 @@ export async function submitQuiz(lessonId, setId, answers) {
 }
 
 /**
+ * Semua attempt kuis — buat rekap admin. Dijaga RLS
+ * "coaching_quiz_attempts admin read" (butuh caller = admin).
+ * Bentuk: { id, user_id, lesson_id, set_id, score, total, created_at }[]
+ */
+export async function getAllAttempts() {
+  ensure();
+  const { data, error } = await supabase
+    .from("coaching_quiz_attempts")
+    .select("id, user_id, lesson_id, set_id, score, total, created_at")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
+/**
  * Attempt terakhir user di lesson ini (buat nampilin skor sebelumnya).
  */
 export async function getLastAttempt(lessonId) {
