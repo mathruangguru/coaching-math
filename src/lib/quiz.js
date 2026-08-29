@@ -31,7 +31,7 @@ export async function getQuestionSet(id) {
     .from("coaching_question_sets")
     .select(
       `id, title, description,
-       questions:coaching_questions ( id, prompt, options, position )`
+       questions:coaching_questions ( id, code, prompt, options, position )`
     )
     .eq("id", id)
     .maybeSingle();
@@ -101,18 +101,27 @@ export async function deleteQuestionSet(id) {
 
 // ── Soal (pilihan ganda) ────────────────────────────────────────────
 
+const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // tanpa 0/O/1/I
+function randomCode() {
+  let s = "";
+  for (let i = 0; i < 8; i++)
+    s += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
+  return s;
+}
+
 export async function createQuestion(setId, { prompt, options, answer, position }) {
   ensure();
   const id = crypto.randomUUID();
+  const code = randomCode();
   const { error } = await supabase
     .from("coaching_questions")
-    .insert({ id, set_id: setId, prompt, options, position });
+    .insert({ id, set_id: setId, code, prompt, options, position });
   if (error) throw error;
   const { error: keyErr } = await supabase
     .from("coaching_question_keys")
     .insert({ question_id: id, answer: answer ?? 0 });
   if (keyErr) throw keyErr;
-  return { id, prompt, options, answer: answer ?? 0 };
+  return { id, code, prompt, options, answer: answer ?? 0 };
 }
 
 export async function updateQuestion(id, { prompt, options, answer }) {

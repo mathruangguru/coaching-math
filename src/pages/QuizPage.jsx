@@ -4,6 +4,7 @@ import { ArrowLeft, Check, X } from "lucide-react";
 import { getCourse } from "../lib/courses";
 import { getQuestionSet, getLastAttempt, submitQuiz } from "../lib/quiz";
 import Skeleton from "../components/ui/Skeleton";
+import MathText from "../components/ui/MathText";
 
 export default function QuizPage() {
   const { courseId, lessonId } = useParams();
@@ -152,7 +153,8 @@ export default function QuizPage() {
                     {ok ? <Check size={12} strokeWidth={3} /> : <X size={12} strokeWidth={3} />}
                   </span>
                   <p className="text-sm font-medium text-zinc-900">
-                    {i + 1}. {q.prompt}
+                    {i + 1}.{" "}
+                    <MathText>{q.prompt}</MathText>
                   </p>
                 </div>
                 <ul className="mt-2 flex flex-col gap-1 pl-7">
@@ -167,7 +169,7 @@ export default function QuizPage() {
                           : "text-zinc-500"
                       }`}
                     >
-                      {opt}
+                      <MathText>{opt}</MathText>
                       {oi === chosen ? " ← jawabanmu" : ""}
                     </li>
                   ))}
@@ -197,13 +199,13 @@ export default function QuizPage() {
               className="rounded-2xl border border-zinc-200/80 bg-white p-5"
             >
               <p className="text-sm font-medium text-zinc-900">
-                {i + 1}. {q.prompt}
+                {i + 1}. <MathText>{q.prompt}</MathText>
               </p>
               <div className="mt-3 flex flex-col gap-2">
                 {q.options.map((opt, oi) => (
                   <label
                     key={oi}
-                    className={`flex cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2 text-sm transition-colors ${
+                    className={`flex cursor-pointer items-start gap-2.5 rounded-lg border px-3 py-2 text-sm transition-colors ${
                       answers[q.id] === oi
                         ? "border-brand-500 bg-brand-50 text-brand-800"
                         : "border-zinc-200 text-zinc-700 hover:bg-zinc-50"
@@ -216,9 +218,9 @@ export default function QuizPage() {
                       onChange={() =>
                         setAnswers((a) => ({ ...a, [q.id]: oi }))
                       }
-                      className="accent-brand-500"
+                      className="mt-0.5 accent-brand-500"
                     />
-                    {opt}
+                    <MathText>{opt}</MathText>
                   </label>
                 ))}
               </div>
