@@ -68,22 +68,52 @@ Katalog tetap bisa dibaca `anon` di level DB, tapi UI-nya di balik login.
 
 ### Bikin user berikutnya
 
-Dari `/admin/users`: isi email + password + role. Dibuat lewat client
-Supabase terisolasi (`src/lib/users.js`), jadi sesi admin nggak keganti.
+Dari `/admin/users`: isi nama depan, nama belakang, email, password, role.
+Dibuat lewat client Supabase terisolasi (`src/lib/users.js`), jadi sesi
+admin nggak keganti. Nama masuk ke `coaching_profiles` (via user metadata +
+di-`update` ulang biar pasti).
 
-> **Batas:** hard-delete user butuh `service_role` (Edge Function) — belum ada.
-> Role bisa diubah dari `/admin/users`; admin nggak bisa menurunkan role
-> dirinya sendiri (cegah kekunci).
+- **Ganti role** dari daftar user. Admin nggak bisa nurunin role sendiri.
+- **Set password** user (kasus lupa) → tombol di tiap baris. Butuh Edge
+  Function `admin-set-password` (lihat bawah).
+
+### Profil (semua user) — `/profile`
+
+User bisa ganti nama depan/belakang & password sendiri. Nama diproteksi
+RLS "update own"; kolom `role` dijaga trigger `guard_profile_role` biar
+user biasa nggak bisa naikin dirinya jadi admin. Ganti password sendiri
+pakai `supabase.auth.updateUser` (nggak butuh Edge Function).
+
+### Edge Function: `admin-set-password`
+
+Set password user **lain** butuh `service_role` → nggak boleh di frontend.
+Deploy function-nya:
+
+```bash
+supabase login
+supabase link --project-ref <PROJECT_REF>
+supabase functions deploy admin-set-password
+```
+
+Atau paste `supabase/functions/admin-set-password/index.ts` di
+**Dashboard → Edge Functions → Deploy a new function**.
+`SUPABASE_URL` / `SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY`
+di-inject otomatis — nggak perlu set secret. Sebelum di-deploy, tombol
+"Set password" akan error (fungsinya belum ada).
+
+> **Masih manual:** hard-delete user (butuh `service_role` juga).
 
 ## Isi
 
 | File | |
 | --- | --- |
 | `schema.sql` | tabel `coaching_courses` / `coaching_course_sections` / `coaching_lessons` / `coaching_lesson_progress` + RLS + grant baca |
-| `admin.sql` | `coaching_profiles` + role, `is_admin()`, policy profile & write admin-only |
+| `admin.sql` | `coaching_profiles` (+ nama, role), `is_admin()`, policy profile & write admin-only, trigger guard role |
 | `seed.sql` | data awal PATOM (mirror `src/data/mock.js`) |
+| `functions/admin-set-password/` | Edge Function: admin set password user lain |
 
 Kode klien: `src/lib/supabase.js` (client), `src/lib/courses.js`
 (`getCourses`, `getCourse`, `createCourse`, `updateCourse`, `deleteCourse`),
-`src/lib/users.js` (`getUsers`, `createUser`, `setUserRole`),
-`src/lib/auth.js` + `src/context/AuthProvider.jsx` (session & role).
+`src/lib/users.js` (`getUsers`, `createUser`, `setUserRole`, `setUserPassword`),
+`src/lib/profile.js` (`updateMyProfile`, `changeMyPassword`),
+`src/lib/auth.js` + `src/context/AuthProvider.jsx` (session, role, `refreshProfile`).

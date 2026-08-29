@@ -1,5 +1,12 @@
 import { NavLink, useNavigate } from "react-router-dom";
-import { LayoutDashboard, BookOpen, Shield, LogOut, X } from "lucide-react";
+import {
+  LayoutDashboard,
+  BookOpen,
+  UserRound,
+  Shield,
+  LogOut,
+  X,
+} from "lucide-react";
 import ruangguruLogo from "../../assets/ruangguru.png";
 import brainAcademyLogo from "../../assets/brain-academy.png";
 import { useAuth } from "../../context/auth-context";
@@ -8,6 +15,7 @@ import { signOut } from "../../lib/auth";
 const mainNav = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
   { to: "/course", label: "Course", icon: BookOpen },
+  { to: "/profile", label: "Profil", icon: UserRound },
 ];
 
 function navItemClass({ isActive }) {
@@ -108,13 +116,21 @@ export default function Sidebar({ open = false, onClose = () => {} }) {
 
       {/* User + sign out */}
       <div className="mt-auto flex flex-col gap-2 border-t border-zinc-200/70 pt-4">
-        {profile?.email && (
-          <p
-            className="truncate px-3 text-xs text-zinc-400"
-            title={profile.email}
-          >
-            {profile.email}
-          </p>
+        {profile && (
+          <div className="px-3">
+            {(profile.first_name || profile.last_name) && (
+              <p className="truncate text-sm font-semibold text-zinc-800">
+                {[profile.first_name, profile.last_name]
+                  .filter(Boolean)
+                  .join(" ")}
+              </p>
+            )}
+            {profile.email && (
+              <p className="truncate text-xs text-zinc-400" title={profile.email}>
+                {profile.email}
+              </p>
+            )}
+          </div>
         )}
         <button
           onClick={handleSignOut}
