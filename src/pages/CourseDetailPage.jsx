@@ -106,7 +106,11 @@ export default function CourseDetailPage() {
           </p>
         ) : (
           sections.map((section) => (
-            <CourseSection key={section.id} section={section} />
+            <CourseSection
+              key={section.id}
+              section={section}
+              courseId={courseId}
+            />
           ))
         )}
       </div>

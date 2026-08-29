@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { ChevronDown, ExternalLink } from "lucide-react";
+import { Link } from "react-router-dom";
+import { ChevronDown, ExternalLink, Play } from "lucide-react";
 import LessonIcon from "../ui/LessonIcon";
 import { lessonTypeLabels } from "../../lib/lessonTypes";
 
@@ -23,8 +24,11 @@ function LessonBody({ item }) {
             {item.duration ? ` · ${item.duration}` : ""}
             {item.type === "soal" && " · segera"}
           </span>
-          {(item.type === "meet" || item.type === "recording") && item.url && (
+          {item.type === "meet" && item.url && (
             <ExternalLink size={12} className="text-brand-500" />
+          )}
+          {item.type === "recording" && item.url && (
+            <Play size={12} className="text-brand-500" />
           )}
         </span>
       </div>
@@ -32,7 +36,10 @@ function LessonBody({ item }) {
   );
 }
 
-export default function CourseSection({ section }) {
+const rowCls =
+  "group flex items-start gap-3 px-4 py-2.5 transition-colors hover:bg-brand-50/40";
+
+export default function CourseSection({ section, courseId }) {
   const [open, setOpen] = useState(true);
 
   return (
@@ -59,27 +66,44 @@ export default function CourseSection({ section }) {
       {open && (
         <ul className="border-t border-zinc-100">
           {section.items.map((item) => {
-            const isLink =
-              (item.type === "meet" || item.type === "recording") && item.url;
+            const external = item.type === "meet" && item.url;
+            const recording = item.type === "recording" && item.url;
+
+            let row;
+            if (external) {
+              row = (
+                <a
+                  href={item.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={rowCls}
+                >
+                  <LessonBody item={item} />
+                </a>
+              );
+            } else if (recording) {
+              row = (
+                <Link
+                  to={`/course/${courseId}/recording/${item.id}`}
+                  className={rowCls}
+                >
+                  <LessonBody item={item} />
+                </Link>
+              );
+            } else {
+              row = (
+                <div className="flex items-start gap-3 px-4 py-2.5">
+                  <LessonBody item={item} />
+                </div>
+              );
+            }
+
             return (
               <li
                 key={item.id}
                 className="border-b border-zinc-100 last:border-b-0"
               >
-                {isLink ? (
-                  <a
-                    href={item.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="group flex items-start gap-3 px-4 py-2.5 transition-colors hover:bg-brand-50/40"
-                  >
-                    <LessonBody item={item} />
-                  </a>
-                ) : (
-                  <div className="flex items-start gap-3 px-4 py-2.5">
-                    <LessonBody item={item} />
-                  </div>
-                )}
+                {row}
               </li>
             );
           })}
