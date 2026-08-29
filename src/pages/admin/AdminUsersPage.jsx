@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { UserPlus, KeyRound } from "lucide-react";
+import { UserPlus, KeyRound, Trash2 } from "lucide-react";
 import {
   getUsers,
   createUser,
   setUserRole,
   setUserPassword,
+  deleteUser,
 } from "../../lib/users";
 import { useAuth } from "../../context/auth-context";
 import Skeleton from "../../components/ui/Skeleton";
@@ -125,6 +126,23 @@ export default function AdminUsersPage() {
       window.alert("Password diganti.");
     } catch (err) {
       window.alert(`Gagal: ${err?.message ?? err}`);
+    } finally {
+      setRowBusyId(null);
+    }
+  };
+
+  const handleDelete = async (user) => {
+    const ok = window.confirm(
+      `Hapus user ${user.email ?? fullName(user)}? Nggak bisa dibatalkan.`
+    );
+    if (!ok) return;
+
+    setRowBusyId(user.id);
+    try {
+      await deleteUser(user.id);
+      setUsers((prev) => prev.filter((u) => u.id !== user.id));
+    } catch (err) {
+      window.alert(`Gagal menghapus: ${err?.message ?? err}`);
     } finally {
       setRowBusyId(null);
     }
@@ -280,6 +298,17 @@ export default function AdminUsersPage() {
                   <option value="student">student</option>
                   <option value="admin">admin</option>
                 </select>
+
+                {!isSelf && (
+                  <button
+                    onClick={() => handleDelete(user)}
+                    disabled={rowBusyId === user.id}
+                    aria-label={`Hapus ${user.email ?? name}`}
+                    className="inline-flex items-center gap-1 rounded-lg border border-rose-200 px-2.5 py-1.5 text-xs font-medium text-rose-600 transition-colors hover:bg-rose-50 disabled:opacity-50"
+                  >
+                    <Trash2 size={12} /> Hapus
+                  </button>
+                )}
               </li>
             );
           })}

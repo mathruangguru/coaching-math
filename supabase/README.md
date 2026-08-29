@@ -53,11 +53,13 @@ Katalog tetap bisa dibaca `anon` di level DB, tapi UI-nya di balik login.
      profile tiap ada user baru
    - `is_admin()` + policy: admin bisa baca/ubah semua profile, dan
      write admin-only untuk `coaching_courses` / `_sections` / `_lessons`
-2. **Authentication → Providers → Email**:
+2. **Deploy Edge Function `admin-users`** (lihat bagian bawah) — dipakai
+   buat create / set-password / delete user.
+3. **Authentication → Providers → Email**:
    - **"Confirm email" → OFF** (user bikinan admin bisa langsung login)
-   - "Allow new users to sign up" → **ON** (halaman `/admin/users` bikin
-     user lewat `signUp` dari client)
-3. **Authentication → Users → Add user** → email + password, centang
+   - "Allow new users to sign up" boleh **OFF** — bikin user lewat Admin
+     API di Edge Function, bukan `signUp` publik.
+4. **Authentication → Users → Add user** → email + password, centang
    **Auto Confirm User**. Ini calon admin pertama.
 4. **SQL Editor**, jalankan (ganti email):
    ```sql
@@ -66,16 +68,17 @@ Katalog tetap bisa dibaca `anon` di level DB, tapi UI-nya di balik login.
    ```
 5. Buka `/login`, masuk. Admin lihat menu **Admin** di sidebar.
 
-### Bikin user berikutnya
+### Kelola user — `/admin/users`
 
-Dari `/admin/users`: isi nama depan, nama belakang, email, password, role.
-Dibuat lewat client Supabase terisolasi (`src/lib/users.js`), jadi sesi
-admin nggak keganti. Nama masuk ke `coaching_profiles` (via user metadata +
-di-`update` ulang biar pasti).
+- **Buat user**: nama depan/belakang, email, password, role. Lewat Admin
+  API di Edge Function `admin-users` → **nggak kirim email** (nggak kena
+  rate limit), sesi admin nggak keganti.
+- **Ganti role** dari daftar. Admin nggak bisa nurunin role sendiri.
+- **Set password** user (kasus lupa) → tombol di tiap baris.
+- **Hapus user** → tombol di tiap baris. Profile & progress ikut kehapus
+  (cascade). Nggak bisa hapus akun sendiri.
 
-- **Ganti role** dari daftar user. Admin nggak bisa nurunin role sendiri.
-- **Set password** user (kasus lupa) → tombol di tiap baris. Butuh Edge
-  Function `admin-set-password` (lihat bawah).
+Tiga yang terakhir butuh Edge Function `admin-users` ke-deploy.
 
 ### Profil (semua user) — `/profile`
 
@@ -84,24 +87,22 @@ RLS "update own"; kolom `role` dijaga trigger `guard_profile_role` biar
 user biasa nggak bisa naikin dirinya jadi admin. Ganti password sendiri
 pakai `supabase.auth.updateUser` (nggak butuh Edge Function).
 
-### Edge Function: `admin-set-password`
+### Edge Function: `admin-users`
 
-Set password user **lain** butuh `service_role` → nggak boleh di frontend.
-Deploy function-nya:
+Create / set-password / delete user butuh `service_role` → nggak boleh di
+frontend. Satu function, `action`-based (`create` | `set_password` |
+`delete`); di dalamnya dicek caller = admin.
 
 ```bash
 supabase login
-supabase link --project-ref <PROJECT_REF>
-supabase functions deploy admin-set-password
+supabase functions deploy admin-users --project-ref <PROJECT_REF>
 ```
 
-Atau paste `supabase/functions/admin-set-password/index.ts` di
-**Dashboard → Edge Functions → Deploy a new function**.
+Atau paste `supabase/functions/admin-users/index.ts` di
+**Dashboard → Edge Functions → Deploy a new function** (nama: `admin-users`).
 `SUPABASE_URL` / `SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY`
 di-inject otomatis — nggak perlu set secret. Sebelum di-deploy, tombol
-"Set password" akan error (fungsinya belum ada).
-
-> **Masih manual:** hard-delete user (butuh `service_role` juga).
+buat/set-password/hapus di `/admin/users` akan error.
 
 ## Isi
 
@@ -110,10 +111,10 @@ di-inject otomatis — nggak perlu set secret. Sebelum di-deploy, tombol
 | `schema.sql` | tabel `coaching_courses` / `coaching_course_sections` / `coaching_lessons` / `coaching_lesson_progress` + RLS + grant baca |
 | `admin.sql` | `coaching_profiles` (+ nama, role), `is_admin()`, policy profile & write admin-only, trigger guard role |
 | `seed.sql` | data awal PATOM (mirror `src/data/mock.js`) |
-| `functions/admin-set-password/` | Edge Function: admin set password user lain |
+| `functions/admin-users/` | Edge Function: admin create / set-password / delete user |
 
 Kode klien: `src/lib/supabase.js` (client), `src/lib/courses.js`
 (`getCourses`, `getCourse`, `createCourse`, `updateCourse`, `deleteCourse`),
-`src/lib/users.js` (`getUsers`, `createUser`, `setUserRole`, `setUserPassword`),
+`src/lib/users.js` (`getUsers`, `createUser`, `setUserRole`, `setUserPassword`, `deleteUser`),
 `src/lib/profile.js` (`updateMyProfile`, `changeMyPassword`),
 `src/lib/auth.js` + `src/context/AuthProvider.jsx` (session, role, `refreshProfile`).
