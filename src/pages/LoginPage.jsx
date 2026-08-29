@@ -46,13 +46,16 @@ export default function LoginPage() {
         onSubmit={handleSubmit}
         className="w-full max-w-sm rounded-2xl border border-zinc-200 bg-white p-6"
       >
-        <img src={ruangguruLogo} alt="Ruangguru" className="h-7 w-auto" />
+        <div className="flex items-center gap-2.5">
+          <img src={ruangguruLogo} alt="Ruangguru" className="h-7 w-auto" />
+          <span className="h-6 w-px bg-zinc-200" />
+          <span className="text-xs font-extrabold uppercase tracking-wide text-zinc-900">
+            Coaching Matematika
+          </span>
+        </div>
         <h1 className="mt-4 text-lg font-bold tracking-tight text-zinc-900">
-          Masuk
+          LOGIN
         </h1>
-        <p className="mt-1 text-xs text-zinc-500">
-          Coaching Matematika — masuk dengan akun yang diberikan pengelola.
-        </p>
 
         {!hasSupabase && (
           <p className="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
@@ -92,7 +95,7 @@ export default function LoginPage() {
           disabled={busy || !hasSupabase}
           className="mt-5 w-full rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-600 disabled:opacity-50"
         >
-          {busy ? "Memproses…" : "Masuk"}
+          {busy ? "Memproses…" : "LOGIN"}
         </button>
       </form>
     </div>
