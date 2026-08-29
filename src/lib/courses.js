@@ -56,3 +56,50 @@ export async function getCourse(id) {
 
   return data;
 }
+
+// ── Admin: tulis katalog (butuh login + role admin, dijaga RLS) ──────
+
+const COURSE_COLS = "id, title, description, icon";
+
+/**
+ * Buat course baru. `payload`: { id, title, description, icon }
+ */
+export async function createCourse(payload) {
+  if (!hasSupabase) throw new Error("Supabase belum dikonfigurasi.");
+
+  const { data, error } = await supabase
+    .from("coaching_courses")
+    .insert(payload)
+    .select(COURSE_COLS)
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * Ubah metadata course. `patch`: { title, description, icon }
+ */
+export async function updateCourse(id, patch) {
+  if (!hasSupabase) throw new Error("Supabase belum dikonfigurasi.");
+
+  const { data, error } = await supabase
+    .from("coaching_courses")
+    .update(patch)
+    .eq("id", id)
+    .select(COURSE_COLS)
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * Hapus course. Section & lesson ikut terhapus (ON DELETE CASCADE).
+ */
+export async function deleteCourse(id) {
+  if (!hasSupabase) throw new Error("Supabase belum dikonfigurasi.");
+
+  const { error } = await supabase.from("coaching_courses").delete().eq("id", id);
+  if (error) throw error;
+}
