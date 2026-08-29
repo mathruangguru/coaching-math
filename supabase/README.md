@@ -137,6 +137,7 @@ buat/set-password/hapus di `/admin/users` akan error.
 | `schema.sql` | tabel `coaching_courses` / `_sections` / `_lessons` (+ `url`, `question_set_id`) / `_lesson_progress` + RLS + grant baca |
 | `admin.sql` | `coaching_profiles` (+ nama, role), `is_admin()`, policy profile & write admin-only, trigger guard role |
 | `quiz.sql` | `coaching_question_sets` / `_questions` / `_question_keys` / `_quiz_attempts` + RLS |
+| `enroll.sql` | `coaching_enrollments` (murid ↔ course) + RLS (enroll/lihat milik sendiri, admin baca semua) |
 | `seed.sql` | data awal PATOM (mirror `src/data/mock.js`) |
 | `functions/admin-users/` | Edge Function: admin create / set-password / delete user |
 | `functions/quiz-submit/` | Edge Function: nilai & simpan attempt kuis murid |
