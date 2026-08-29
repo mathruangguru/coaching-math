@@ -45,7 +45,7 @@ Lalu di `.github/workflows/deploy.yml`, step **Build** dikasih env:
 
 | File | |
 | --- | --- |
-| `schema.sql` | tabel `courses` / `course_sections` / `lessons` / `lesson_progress` + RLS |
+| `schema.sql` | tabel `coaching_courses` / `coaching_course_sections` / `coaching_lessons` / `coaching_lesson_progress` + RLS |
 | `seed.sql` | data awal PATOM (mirror `src/data/mock.js`) |
 
 Kode klien: `src/lib/supabase.js` (client) dan `src/lib/courses.js` (`getCourses`, `getCourse`).

@@ -1,18 +1,18 @@
 -- Data awal: course PATOM (sama persis dengan src/data/mock.js).
 -- Jalankan SETELAH schema.sql, di SQL Editor Supabase.
 
-insert into public.courses (id, title, description, icon) values
+insert into public.coaching_courses (id, title, description, icon) values
   ('patom-mtk-2627-1', 'PATOM Matematika 26/27 - 1',
    'Pathway to Mastery Matematika 2026/2027 Term 1', 'sigma')
 on conflict (id) do nothing;
 
-insert into public.course_sections (id, course_id, title, position) values
+insert into public.coaching_course_sections (id, course_id, title, position) values
   ('p1', 'patom-mtk-2627-1', 'Pertemuan 1 — Bilangan & Operasi Dasar', 1),
   ('p2', 'patom-mtk-2627-1', 'Pertemuan 2 — Aljabar: Bentuk & Persamaan Linear', 2),
   ('p3', 'patom-mtk-2627-1', 'Pertemuan 3 — Perbandingan & Aritmetika Sosial', 3)
 on conflict (id) do nothing;
 
-insert into public.lessons (id, section_id, type, title, duration, position) values
+insert into public.coaching_lessons (id, section_id, type, title, duration, position) values
   ('p1-1', 'p1', 'video',    'Sistem bilangan real & garis bilangan',            '12 mnt',     1),
   ('p1-2', 'p1', 'reading',  'Rangkuman: sifat operasi & urutan pengerjaan',     '5 mnt baca', 2),
   ('p1-3', 'p1', 'exercise', 'Latihan: operasi campuran, KPK & FPB',             '10 soal',    3),

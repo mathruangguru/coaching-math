@@ -8,7 +8,7 @@ export async function getCourses() {
   if (!hasSupabase) return myCourses;
 
   const { data, error } = await supabase
-    .from("courses")
+    .from("coaching_courses")
     .select("id, title, description, icon")
     .order("created_at");
 
@@ -28,12 +28,12 @@ export async function getCourse(id) {
   }
 
   const { data, error } = await supabase
-    .from("courses")
+    .from("coaching_courses")
     .select(
       `id, title, description, icon,
-       sections:course_sections (
+       sections:coaching_course_sections (
          id, title, position,
-         items:lessons ( id, type, title, duration, position )
+         items:coaching_lessons ( id, type, title, duration, position )
        )`
     )
     .eq("id", id)
