@@ -88,6 +88,15 @@ export default function QuizPage() {
   const total = questions.length;
 
   const submit = async () => {
+    const blanks = questions.filter((qq) => answers[qq.id] == null).length;
+    if (
+      blanks > 0 &&
+      !window.confirm(
+        `Masih ada ${blanks} soal belum dijawab. Kirim sekarang?`
+      )
+    ) {
+      return;
+    }
     setBusy(true);
     try {
       const res = await submitQuiz(lessonId, set.id, answers);
@@ -106,8 +115,7 @@ export default function QuizPage() {
     setCurrent(0);
   };
 
-  const allAnswered =
-    total > 0 && questions.every((q) => answers[q.id] != null);
+  const answeredCount = questions.filter((qq) => answers[qq.id] != null).length;
 
   const header = (
     <div>
@@ -270,9 +278,26 @@ export default function QuizPage() {
 
         {/* Soal */}
         <div className="rounded-2xl border border-zinc-200/80 bg-white p-5">
-          <p className="text-xs text-zinc-400">
-            Soal {current + 1} dari {total}
-          </p>
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs text-zinc-400">
+              Soal {current + 1} dari {total}
+            </p>
+            {answers[q.id] != null && (
+              <button
+                type="button"
+                onClick={() =>
+                  setAnswers((a) => {
+                    const next = { ...a };
+                    delete next[q.id];
+                    return next;
+                  })
+                }
+                className="text-xs font-medium text-zinc-400 transition-colors hover:text-rose-500"
+              >
+                Clear
+              </button>
+            )}
+          </div>
           <p className="mt-1.5 text-sm font-medium text-zinc-900">
             <MathText>{q.prompt}</MathText>
           </p>
@@ -312,38 +337,38 @@ export default function QuizPage() {
         </div>
 
         {/* Navigasi */}
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={() => setCurrent((c) => c - 1)}
+              disabled={current === 0}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3.5 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 disabled:opacity-40"
+            >
+              <ChevronLeft size={15} /> Sebelumnya
+            </button>
+
+            {!isLast && (
+              <button
+                type="button"
+                onClick={() => setCurrent((c) => c + 1)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3.5 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50"
+              >
+                Berikutnya <ChevronRight size={15} />
+              </button>
+            )}
+          </div>
+
           <button
             type="button"
-            onClick={() => setCurrent((c) => c - 1)}
-            disabled={current === 0}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3.5 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 disabled:opacity-40"
+            onClick={submit}
+            disabled={busy}
+            className="rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-600 disabled:opacity-50"
           >
-            <ChevronLeft size={15} /> Sebelumnya
+            {busy
+              ? "Mengirim…"
+              : `Kirim jawaban · ${answeredCount}/${total} terjawab`}
           </button>
-
-          {isLast ? (
-            <button
-              type="button"
-              onClick={submit}
-              disabled={busy || !allAnswered}
-              className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-600 disabled:opacity-50"
-            >
-              {busy
-                ? "Mengirim…"
-                : allAnswered
-                  ? "Kirim jawaban"
-                  : "Jawab semua soal dulu"}
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setCurrent((c) => c + 1)}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3.5 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50"
-            >
-              Berikutnya <ChevronRight size={15} />
-            </button>
-          )}
         </div>
       </div>
     </div>
