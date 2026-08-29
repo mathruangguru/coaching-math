@@ -9,6 +9,7 @@ import {
   Check,
   Pencil,
   X,
+  FileJson,
 } from "lucide-react";
 import {
   getQuestionSetAdmin,
@@ -17,6 +18,8 @@ import {
   updateQuestion,
   deleteQuestion,
   reorderQuestions,
+  parseQuestionsJson,
+  bulkCreateQuestions,
 } from "../../lib/quiz";
 import Skeleton from "../../components/ui/Skeleton";
 import MathText from "../../components/ui/MathText";
@@ -79,8 +82,10 @@ export default function SetSoalFormPage() {
   const [saving, setSaving] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
   const [editingId, setEditingId] = useState(null);
+  const [importOpen, setImportOpen] = useState(false);
 
   const closeModal = useCallback(() => setEditingId(null), []);
+  const closeImport = useCallback(() => setImportOpen(false), []);
 
   const load = () => {
     setStatus("loading");
@@ -166,6 +171,18 @@ export default function SetSoalFormPage() {
       setSet((s) => ({ ...s, questions: [...s.questions, row] }));
       setSelectedId(row.id);
       setEditingId(row.id);
+    });
+
+  const importJson = (items) =>
+    run(async () => {
+      const rows = await bulkCreateQuestions(
+        set.id,
+        items,
+        set.questions.length
+      );
+      setSet((s) => ({ ...s, questions: [...s.questions, ...rows] }));
+      if (rows[0]) setSelectedId(rows[0].id);
+      setImportOpen(false);
     });
 
   const removeQuestion = (q, idx) => {
@@ -294,13 +311,23 @@ export default function SetSoalFormPage() {
             );
           })}
 
-          <button
-            type="button"
-            onClick={addQuestion}
-            className="mt-1 flex items-center justify-center gap-1.5 rounded-lg border-2 border-dashed border-zinc-200 py-2 text-xs font-semibold text-zinc-500 transition-colors hover:border-brand-300 hover:bg-brand-50/30 hover:text-brand-600"
-          >
-            <Plus size={13} /> Tambah soal
-          </button>
+          <div className="mt-1 flex gap-1.5">
+            <button
+              type="button"
+              onClick={addQuestion}
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border-2 border-dashed border-zinc-200 py-2 text-xs font-semibold text-zinc-500 transition-colors hover:border-brand-300 hover:bg-brand-50/30 hover:text-brand-600"
+            >
+              <Plus size={13} /> Tambah soal
+            </button>
+            <button
+              type="button"
+              onClick={() => setImportOpen(true)}
+              title="Import banyak soal dari JSON"
+              className="flex items-center justify-center gap-1.5 rounded-lg border-2 border-dashed border-zinc-200 px-3 py-2 text-xs font-semibold text-zinc-500 transition-colors hover:border-brand-300 hover:bg-brand-50/30 hover:text-brand-600"
+            >
+              <FileJson size={13} /> Import
+            </button>
+          </div>
         </div>
 
         {/* Preview */}
@@ -356,6 +383,10 @@ export default function SetSoalFormPage() {
           )}
         </div>
       </div>
+
+      {importOpen && (
+        <ImportModal onClose={closeImport} onImport={importJson} />
+      )}
 
       {/* Edit modal */}
       {editing && (
@@ -465,6 +496,85 @@ export default function SetSoalFormPage() {
         </Modal>
       )}
     </div>
+  );
+}
+
+const IMPORT_EXAMPLE = `[
+  {
+    "prompt": "Nilai dari $\\\\sqrt{8}+\\\\sqrt{18}$ adalah…",
+    "options": ["$3\\\\sqrt{2}$", "$5\\\\sqrt{2}$", "$6\\\\sqrt{2}$", "$7\\\\sqrt{2}$"],
+    "answer": "B"
+  }
+]`;
+
+function ImportModal({ onClose, onImport }) {
+  const [text, setText] = useState("");
+  const [check, setCheck] = useState(null); // { items, errors }
+
+  const run = () => setCheck(parseQuestionsJson(text));
+
+  return (
+    <Modal title="Import soal dari JSON" onClose={onClose}>
+      <div className="flex flex-col gap-3">
+        <p className="text-xs text-zinc-500">
+          Array objek. Tiap objek: <code>prompt</code> (teks, boleh LaTeX
+          <code> $…$ </code>), <code>options</code> (array, min 2),{" "}
+          <code>answer</code> (index 0-based, huruf <code>&quot;A&quot;</code>…,
+          atau teks opsi persis). Soal ditambahkan di akhir.
+        </p>
+        <details className="text-xs text-zinc-400">
+          <summary className="cursor-pointer select-none">Contoh</summary>
+          <pre className="mt-1 overflow-x-auto rounded-lg bg-zinc-50 p-3 text-[11px] text-zinc-600">
+            {IMPORT_EXAMPLE}
+          </pre>
+        </details>
+
+        <textarea
+          value={text}
+          onChange={(e) => {
+            setText(e.target.value);
+            setCheck(null);
+          }}
+          rows={10}
+          placeholder="Paste JSON di sini…"
+          className={`${input} resize-y font-mono text-xs`}
+        />
+
+        {check && (
+          <div className="text-xs">
+            {check.errors.length > 0 ? (
+              <ul className="flex flex-col gap-0.5 text-rose-600">
+                {check.errors.map((e, i) => (
+                  <li key={i}>• {e}</li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-emerald-600">
+                {check.items.length} soal siap diimport.
+              </p>
+            )}
+          </div>
+        )}
+
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={run}
+            className="rounded-lg border border-zinc-200 px-3 py-2 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-50"
+          >
+            Cek
+          </button>
+          <button
+            type="button"
+            disabled={!check || check.errors.length > 0 || !check.items.length}
+            onClick={() => onImport(check.items)}
+            className="rounded-lg bg-brand-500 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-brand-600 disabled:opacity-50"
+          >
+            Import{check?.items.length ? ` ${check.items.length} soal` : ""}
+          </button>
+        </div>
+      </div>
+    </Modal>
   );
 }
 

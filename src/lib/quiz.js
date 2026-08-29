@@ -124,6 +124,95 @@ export async function createQuestion(setId, { prompt, options, answer, position 
   return { id, code, prompt, options, answer: answer ?? 0 };
 }
 
+/**
+ * Parse + validasi array JSON soal. Terima array langsung atau
+ * { questions: [...] }. Tiap item butuh:
+ *   prompt  : string
+ *   options : string[] (>= 2)
+ *   answer  : index 0-based, ATAU huruf "A".."Z", ATAU teks opsi yang persis
+ * Balikin { items: normalized[], errors: string[] }.
+ */
+export function parseQuestionsJson(text) {
+  let raw;
+  try {
+    raw = JSON.parse(text);
+  } catch (e) {
+    return { items: [], errors: [`JSON tidak valid: ${e.message}`] };
+  }
+  const arr = Array.isArray(raw) ? raw : raw?.questions;
+  if (!Array.isArray(arr)) {
+    return { items: [], errors: ['Harus berupa array, atau { "questions": [...] }.'] };
+  }
+
+  const items = [];
+  const errors = [];
+  arr.forEach((q, i) => {
+    const n = i + 1;
+    const prompt = typeof q?.prompt === "string" ? q.prompt.trim() : "";
+    const options = Array.isArray(q?.options)
+      ? q.options.map((o) => String(o))
+      : [];
+    if (!prompt) errors.push(`Soal ${n}: "prompt" wajib string.`);
+    if (options.length < 2) errors.push(`Soal ${n}: minimal 2 "options".`);
+
+    let answer = q?.answer;
+    if (typeof answer === "string") {
+      const letter = answer.trim().toUpperCase();
+      if (/^[A-Z]$/.test(letter)) answer = letter.charCodeAt(0) - 65;
+      else answer = options.indexOf(answer);
+    }
+    if (!Number.isInteger(answer) || answer < 0 || answer >= options.length) {
+      errors.push(`Soal ${n}: "answer" harus index/huruf opsi yang valid.`);
+      answer = 0;
+    }
+
+    if (prompt && options.length >= 2) items.push({ prompt, options, answer });
+  });
+
+  if (!items.length && !errors.length) errors.push("Tidak ada soal.");
+  return { items, errors };
+}
+
+/**
+ * Tambah banyak soal sekaligus (2 insert batch: questions + keys).
+ */
+export async function bulkCreateQuestions(setId, items, startPosition = 0) {
+  ensure();
+  const meta = items.map((it, i) => ({
+    id: crypto.randomUUID(),
+    code: randomCode(),
+    answer: it.answer ?? 0,
+    prompt: it.prompt,
+    options: it.options,
+    position: startPosition + i,
+  }));
+
+  const { error } = await supabase.from("coaching_questions").insert(
+    meta.map((m) => ({
+      id: m.id,
+      set_id: setId,
+      code: m.code,
+      prompt: m.prompt,
+      options: m.options,
+      position: m.position,
+    }))
+  );
+  if (error) throw error;
+
+  const { error: keyErr } = await supabase
+    .from("coaching_question_keys")
+    .insert(meta.map((m) => ({ question_id: m.id, answer: m.answer })));
+  if (keyErr) throw keyErr;
+
+  return meta.map((m) => ({
+    id: m.id,
+    code: m.code,
+    prompt: m.prompt,
+    options: m.options,
+    answer: m.answer,
+  }));
+}
+
 export async function updateQuestion(id, { prompt, options, answer }) {
   ensure();
   const { error } = await supabase
