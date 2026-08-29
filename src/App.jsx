@@ -12,6 +12,7 @@ import RequireAdmin from "./components/admin/RequireAdmin";
 import AdminLayout from "./components/admin/AdminLayout";
 import AdminCoursesPage from "./pages/admin/AdminCoursesPage";
 import AdminUsersPage from "./pages/admin/AdminUsersPage";
+import AdminEnrollmentsPage from "./pages/admin/AdminEnrollmentsPage";
 import CourseFormPage from "./pages/admin/CourseFormPage";
 import SetSoalPage from "./pages/admin/SetSoalPage";
 import SetSoalFormPage from "./pages/admin/SetSoalFormPage";
@@ -46,6 +47,7 @@ export default function App() {
         <Route element={<AdminLayout />}>
           <Route index element={<AdminCoursesPage />} />
           <Route path="users" element={<AdminUsersPage />} />
+          <Route path="enrollments" element={<AdminEnrollmentsPage />} />
           <Route path="set-soal" element={<SetSoalPage />} />
           <Route path="set-soal/:setId" element={<SetSoalFormPage />} />
           <Route path="course/new" element={<CourseFormPage />} />
