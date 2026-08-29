@@ -53,18 +53,15 @@ export default function LoginPage() {
             Coaching Matematika
           </span>
         </div>
-        <h1 className="mt-4 text-lg font-bold tracking-tight text-zinc-900">
-          LOGIN
-        </h1>
 
         {!hasSupabase && (
-          <p className="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
+          <p className="mt-5 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
             Supabase belum dikonfigurasi (VITE_SUPABASE_URL / ANON_KEY). Login
             nonaktif.
           </p>
         )}
 
-        <label className="mt-4 block text-xs font-medium text-zinc-600">
+        <label className="mt-6 block text-xs font-medium text-zinc-600">
           Email
           <input
             type="email"
@@ -95,7 +92,7 @@ export default function LoginPage() {
           disabled={busy || !hasSupabase}
           className="mt-5 w-full rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-600 disabled:opacity-50"
         >
-          {busy ? "Memproses…" : "LOGIN"}
+          {busy ? "Memproses…" : "Login"}
         </button>
       </form>
     </div>
