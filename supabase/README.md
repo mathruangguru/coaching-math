@@ -143,12 +143,12 @@ Jalankan ulang `schema.sql` lalu `admin.sql` (idempotent) untuk dapat:
 
 - Tipe materi baru **Form** (Google Form / survei) — sama seperti Link
   Meet, buka `url` di tab baru.
-- Kolom `coaching_lessons.publish_status`:
-  - `none` — draft, cuma kelihatan di editor kurikulum
-  - `admin` — tampil di halaman course **hanya buat admin** (preview)
-  - `all` — tampil buat semua murid yang enroll
+- Kolom `coaching_lessons.publish_status` (toggle di editor kurikulum):
+  - `none` = **Not Publish** — non-admin nggak bisa akses & hidden
+  - `all` = **Publish** — semua murid yang enroll bisa akses
   Gate-nya di policy `"coaching_lessons read"` (admin.sql): murid cuma
-  bisa `select` baris `publish_status = 'all'`; admin baca semua. Materi
+  bisa `select` baris `publish_status = 'all'`; admin baca semua (buat
+  editor + preview, materi non-publish ada tag "Not publish"). Materi
   baru dari editor default `none`. Baris lama ke-backfill `all`.
 
 ## Isi

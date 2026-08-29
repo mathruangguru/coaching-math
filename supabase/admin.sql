@@ -176,8 +176,8 @@ create policy "coaching_lessons write admin"
   on public.coaching_lessons for all
   using (public.is_admin()) with check (public.is_admin());
 
--- Materi draft / admin-only nggak bocor ke murid lewat API: murid cuma
--- bisa baca publish_status = 'all', admin bisa baca semua (buat editor &
+-- Materi Not Publish (publish_status = 'none') nggak bocor ke murid lewat
+-- API: murid cuma bisa baca yang 'all', admin baca semua (buat editor &
 -- preview di halaman course). Menimpa policy permisif dari schema.sql.
 drop policy if exists "coaching_lessons read" on public.coaching_lessons;
 create policy "coaching_lessons read"

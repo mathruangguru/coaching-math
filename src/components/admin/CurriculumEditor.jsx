@@ -23,11 +23,10 @@ import {
   reorderLessons,
 } from "../../lib/courses";
 import { getQuestionSets } from "../../lib/quiz";
-import { lessonTypeLabels, publishStatusLabels } from "../../lib/lessonTypes";
+import { lessonTypeLabels } from "../../lib/lessonTypes";
 import LessonIcon from "../ui/LessonIcon";
 
 const LESSON_TYPES = Object.keys(lessonTypeLabels);
-const PUBLISH_STATUSES = Object.keys(publishStatusLabels);
 const URL_TYPES = ["meet", "recording", "form"];
 
 const typeTint = {
@@ -36,11 +35,6 @@ const typeTint = {
   meet: "bg-sky-50 text-sky-600",
   recording: "bg-teal-50 text-teal-600",
   form: "bg-violet-50 text-violet-600",
-};
-
-const publishPill = {
-  none: "bg-zinc-100 text-zinc-500",
-  admin: "bg-sky-50 text-sky-600",
 };
 
 const cell =
@@ -384,19 +378,11 @@ export default function CurriculumEditor({ courseId }) {
                       <span className="min-w-0 flex-1 truncate text-sm text-zinc-700">
                         {lesson.title}
                       </span>
-                      {lesson.publish_status &&
-                        lesson.publish_status !== "all" && (
-                          <span
-                            className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold ${
-                              publishPill[lesson.publish_status] ??
-                              "bg-zinc-100 text-zinc-500"
-                            }`}
-                          >
-                            {lesson.publish_status === "admin"
-                              ? "Admin"
-                              : "Draft"}
-                          </span>
-                        )}
+                      {lesson.publish_status !== "all" && (
+                        <span className="shrink-0 rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-500">
+                          Not publish
+                        </span>
+                      )}
                       <span className="shrink-0 text-xs text-zinc-400">
                         {lessonTypeLabels[lesson.type]}
                         {lesson.duration ? ` · ${lesson.duration}` : ""}
@@ -530,27 +516,41 @@ export default function CurriculumEditor({ courseId }) {
                         </button>
                       </div>
 
-                      <div className="mt-1.5 flex items-center gap-1.5 pl-9">
+                      <div className="mt-1.5 flex items-center gap-2 pl-9">
                         <Eye size={12} className="shrink-0 text-zinc-400" />
-                        <select
-                          value={lesson.publish_status ?? "none"}
-                          onChange={(e) => {
+                        {(() => {
+                          const published =
+                            (lesson.publish_status ?? "none") === "all";
+                          const toggle = () => {
+                            const next = published ? "none" : "all";
                             patchLessonLocal(editing.id, lesson.id, {
-                              publish_status: e.target.value,
+                              publish_status: next,
                             });
-                            saveLesson({
-                              ...lesson,
-                              publish_status: e.target.value,
-                            });
-                          }}
-                          className={`${cell} flex-1 text-xs`}
-                        >
-                          {PUBLISH_STATUSES.map((s) => (
-                            <option key={s} value={s}>
-                              {publishStatusLabels[s]}
-                            </option>
-                          ))}
-                        </select>
+                            saveLesson({ ...lesson, publish_status: next });
+                          };
+                          return (
+                            <>
+                              <button
+                                type="button"
+                                role="switch"
+                                aria-checked={published}
+                                onClick={toggle}
+                                className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
+                                  published ? "bg-brand-500" : "bg-zinc-200"
+                                }`}
+                              >
+                                <span
+                                  className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                                    published ? "translate-x-4" : "translate-x-0.5"
+                                  }`}
+                                />
+                              </button>
+                              <span className="text-xs text-zinc-600">
+                                {published ? "Publish" : "Not publish"}
+                              </span>
+                            </>
+                          );
+                        })()}
                       </div>
 
                       {hasUrl && (

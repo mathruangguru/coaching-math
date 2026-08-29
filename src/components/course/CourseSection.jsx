@@ -35,7 +35,7 @@ function CardInner({ item, clickable }) {
           </span>
           {item.publish_status && item.publish_status !== "all" && (
             <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-500">
-              {item.publish_status === "admin" ? "Admin only" : "Draft"}
+              Not publish
             </span>
           )}
           {clickable === "external" && (
