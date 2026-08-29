@@ -216,133 +216,135 @@ export default function QuizPage() {
   const isLast = current === total - 1;
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-5">
-      {backLink}
-      {header}
+    <div className="flex min-h-full flex-col">
+      <div className="mx-auto my-auto flex w-full max-w-2xl flex-col gap-5 py-2">
+        {backLink}
+        {header}
 
-      {/* Strip nomor soal, per 10 */}
-      <div className="flex items-center gap-1.5">
-        {groupStart > 0 && (
-          <button
-            type="button"
-            onClick={() => setCurrent(groupStart - GROUP)}
-            aria-label="10 soal sebelumnya"
-            className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-zinc-200 text-zinc-500 transition-colors hover:bg-zinc-50"
-          >
-            <ChevronLeft size={15} />
-          </button>
-        )}
-        <div className="flex flex-wrap gap-1.5">
-          {Array.from({ length: groupEnd - groupStart }, (_, k) => {
-            const idx = groupStart + k;
-            const answered = answers[questions[idx].id] != null;
-            const active = idx === current;
-            return (
-              <button
-                key={idx}
-                type="button"
-                onClick={() => setCurrent(idx)}
-                className={`h-8 w-8 shrink-0 rounded-lg border text-xs font-semibold transition-colors ${
-                  active
-                    ? "border-brand-500 bg-brand-500 text-white"
-                    : answered
-                      ? "border-teal-300 bg-teal-50 text-teal-700"
-                      : "border-zinc-200 bg-white text-zinc-500 hover:bg-zinc-50"
-                }`}
-              >
-                {idx + 1}
-              </button>
-            );
-          })}
-        </div>
-        {groupEnd < total && (
-          <button
-            type="button"
-            onClick={() => setCurrent(groupEnd)}
-            aria-label="10 soal berikutnya"
-            className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-zinc-200 text-zinc-500 transition-colors hover:bg-zinc-50"
-          >
-            <ChevronRight size={15} />
-          </button>
-        )}
-      </div>
-
-      {/* Soal */}
-      <div className="rounded-2xl border border-zinc-200/80 bg-white p-5">
-        <p className="text-xs text-zinc-400">
-          Soal {current + 1} dari {total}
-        </p>
-        <p className="mt-1.5 text-sm font-medium text-zinc-900">
-          <MathText>{q.prompt}</MathText>
-        </p>
-        <div className="mt-3 flex flex-col gap-2">
-          {q.options.map((opt, oi) => {
-            const picked = answers[q.id] === oi;
-            return (
-              <label
-                key={oi}
-                className={`flex cursor-pointer items-start gap-2.5 rounded-lg border px-3 py-2 text-sm transition-colors ${
-                  picked
-                    ? "border-brand-500 bg-brand-50 text-brand-800"
-                    : "border-zinc-200 text-zinc-700 hover:bg-zinc-50"
-                }`}
-              >
-                <input
-                  type="radio"
-                  name={q.id}
-                  checked={picked}
-                  onChange={() => setAnswers((a) => ({ ...a, [q.id]: oi }))}
-                  className="sr-only"
-                />
-                <span
-                  className={`grid h-6 w-6 shrink-0 place-items-center rounded-full border text-xs font-bold ${
-                    picked
+        {/* Strip nomor soal, per 10 */}
+        <div className="flex items-center gap-1.5">
+          {groupStart > 0 && (
+            <button
+              type="button"
+              onClick={() => setCurrent(groupStart - GROUP)}
+              aria-label="10 soal sebelumnya"
+              className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-zinc-200 text-zinc-500 transition-colors hover:bg-zinc-50"
+            >
+              <ChevronLeft size={15} />
+            </button>
+          )}
+          <div className="flex flex-wrap gap-1.5">
+            {Array.from({ length: groupEnd - groupStart }, (_, k) => {
+              const idx = groupStart + k;
+              const answered = answers[questions[idx].id] != null;
+              const active = idx === current;
+              return (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => setCurrent(idx)}
+                  className={`h-8 w-8 shrink-0 rounded-lg border text-xs font-semibold transition-colors ${
+                    active
                       ? "border-brand-500 bg-brand-500 text-white"
-                      : "border-zinc-300 text-zinc-500"
+                      : answered
+                        ? "border-teal-300 bg-teal-50 text-teal-700"
+                        : "border-zinc-200 bg-white text-zinc-500 hover:bg-zinc-50"
                   }`}
                 >
-                  {String.fromCharCode(65 + oi)}
-                </span>
-                <MathText>{opt}</MathText>
-              </label>
-            );
-          })}
+                  {idx + 1}
+                </button>
+              );
+            })}
+          </div>
+          {groupEnd < total && (
+            <button
+              type="button"
+              onClick={() => setCurrent(groupEnd)}
+              aria-label="10 soal berikutnya"
+              className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-zinc-200 text-zinc-500 transition-colors hover:bg-zinc-50"
+            >
+              <ChevronRight size={15} />
+            </button>
+          )}
         </div>
-      </div>
 
-      {/* Navigasi */}
-      <div className="flex items-center justify-between gap-3">
-        <button
-          type="button"
-          onClick={() => setCurrent((c) => c - 1)}
-          disabled={current === 0}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3.5 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 disabled:opacity-40"
-        >
-          <ChevronLeft size={15} /> Sebelumnya
-        </button>
+        {/* Soal */}
+        <div className="rounded-2xl border border-zinc-200/80 bg-white p-5">
+          <p className="text-xs text-zinc-400">
+            Soal {current + 1} dari {total}
+          </p>
+          <p className="mt-1.5 text-sm font-medium text-zinc-900">
+            <MathText>{q.prompt}</MathText>
+          </p>
+          <div className="mt-3 flex flex-col gap-2">
+            {q.options.map((opt, oi) => {
+              const picked = answers[q.id] === oi;
+              return (
+                <label
+                  key={oi}
+                  className={`flex cursor-pointer items-start gap-2.5 rounded-lg border px-3 py-2 text-sm transition-colors ${
+                    picked
+                      ? "border-brand-500 bg-brand-50 text-brand-800"
+                      : "border-zinc-200 text-zinc-700 hover:bg-zinc-50"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name={q.id}
+                    checked={picked}
+                    onChange={() => setAnswers((a) => ({ ...a, [q.id]: oi }))}
+                    className="sr-only"
+                  />
+                  <span
+                    className={`grid h-6 w-6 shrink-0 place-items-center rounded-full border text-xs font-bold ${
+                      picked
+                        ? "border-brand-500 bg-brand-500 text-white"
+                        : "border-zinc-300 text-zinc-500"
+                    }`}
+                  >
+                    {String.fromCharCode(65 + oi)}
+                  </span>
+                  <MathText>{opt}</MathText>
+                </label>
+              );
+            })}
+          </div>
+        </div>
 
-        {isLast ? (
+        {/* Navigasi */}
+        <div className="flex items-center justify-between gap-3">
           <button
             type="button"
-            onClick={submit}
-            disabled={busy || !allAnswered}
-            className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-600 disabled:opacity-50"
+            onClick={() => setCurrent((c) => c - 1)}
+            disabled={current === 0}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3.5 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 disabled:opacity-40"
           >
-            {busy
-              ? "Mengirim…"
-              : allAnswered
-                ? "Kirim jawaban"
-                : "Jawab semua soal dulu"}
+            <ChevronLeft size={15} /> Sebelumnya
           </button>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setCurrent((c) => c + 1)}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3.5 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50"
-          >
-            Berikutnya <ChevronRight size={15} />
-          </button>
-        )}
+
+          {isLast ? (
+            <button
+              type="button"
+              onClick={submit}
+              disabled={busy || !allAnswered}
+              className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-600 disabled:opacity-50"
+            >
+              {busy
+                ? "Mengirim…"
+                : allAnswered
+                  ? "Kirim jawaban"
+                  : "Jawab semua soal dulu"}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setCurrent((c) => c + 1)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3.5 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50"
+            >
+              Berikutnya <ChevronRight size={15} />
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
