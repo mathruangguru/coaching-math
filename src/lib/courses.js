@@ -103,3 +103,100 @@ export async function deleteCourse(id) {
   const { error } = await supabase.from("coaching_courses").delete().eq("id", id);
   if (error) throw error;
 }
+
+// ── Admin: kurikulum (section + lesson) ─────────────────────────────
+
+function ensureSupabase() {
+  if (!hasSupabase) throw new Error("Supabase belum dikonfigurasi.");
+}
+
+async function runAll(promises) {
+  const results = await Promise.all(promises);
+  const failed = results.find((r) => r?.error);
+  if (failed) throw failed.error;
+}
+
+export async function createSection(courseId, { title, position }) {
+  ensureSupabase();
+  const { data, error } = await supabase
+    .from("coaching_course_sections")
+    .insert({ id: crypto.randomUUID(), course_id: courseId, title, position })
+    .select("id, title")
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updateSection(id, patch) {
+  ensureSupabase();
+  const { error } = await supabase
+    .from("coaching_course_sections")
+    .update(patch)
+    .eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteSection(id) {
+  ensureSupabase();
+  const { error } = await supabase
+    .from("coaching_course_sections")
+    .delete()
+    .eq("id", id);
+  if (error) throw error;
+}
+
+export async function reorderSections(orderedIds) {
+  ensureSupabase();
+  await runAll(
+    orderedIds.map((id, i) =>
+      supabase
+        .from("coaching_course_sections")
+        .update({ position: i })
+        .eq("id", id)
+    )
+  );
+}
+
+export async function createLesson(sectionId, { type, title, duration, position }) {
+  ensureSupabase();
+  const { data, error } = await supabase
+    .from("coaching_lessons")
+    .insert({
+      id: crypto.randomUUID(),
+      section_id: sectionId,
+      type,
+      title,
+      duration: duration || null,
+      position,
+    })
+    .select("id, type, title, duration")
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updateLesson(id, patch) {
+  ensureSupabase();
+  const clean = { ...patch };
+  if ("duration" in clean) clean.duration = clean.duration || null;
+  const { error } = await supabase
+    .from("coaching_lessons")
+    .update(clean)
+    .eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteLesson(id) {
+  ensureSupabase();
+  const { error } = await supabase.from("coaching_lessons").delete().eq("id", id);
+  if (error) throw error;
+}
+
+export async function reorderLessons(orderedIds) {
+  ensureSupabase();
+  await runAll(
+    orderedIds.map((id, i) =>
+      supabase.from("coaching_lessons").update({ position: i }).eq("id", id)
+    )
+  );
+}

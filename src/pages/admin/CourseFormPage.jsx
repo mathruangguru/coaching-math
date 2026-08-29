@@ -5,6 +5,7 @@ import { getCourse, createCourse, updateCourse } from "../../lib/courses";
 import { subjectIcons } from "../../lib/subjectIcons";
 import SubjectIcon from "../../components/ui/SubjectIcon";
 import Skeleton from "../../components/ui/Skeleton";
+import CurriculumEditor from "../../components/admin/CurriculumEditor";
 
 const ICONS = Object.keys(subjectIcons);
 
@@ -33,6 +34,7 @@ export default function CourseFormPage() {
   const [status, setStatus] = useState(isEdit ? "loading" : "ready");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     if (!isEdit) return;
@@ -73,6 +75,7 @@ export default function CourseFormPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    setSaved(false);
 
     const title = form.title.trim();
     if (!title) {
@@ -90,6 +93,8 @@ export default function CourseFormPage() {
     try {
       if (isEdit) {
         await updateCourse(courseId, { title, description, icon: form.icon });
+        setSaved(true);
+        setBusy(false);
       } else {
         await createCourse({
           id: effectiveId,
@@ -97,8 +102,8 @@ export default function CourseFormPage() {
           description,
           icon: form.icon,
         });
+        navigate("/admin", { replace: true });
       }
-      navigate("/admin", { replace: true });
     } catch (err) {
       // 23505 = unique_violation (id sudah ada)
       setError(
@@ -203,7 +208,7 @@ export default function CourseFormPage() {
 
         {error && <p className="text-xs text-rose-600">{error}</p>}
 
-        <div className="flex gap-2 pt-1">
+        <div className="flex items-center gap-3 pt-1">
           <button
             type="submit"
             disabled={busy}
@@ -215,10 +220,15 @@ export default function CourseFormPage() {
             to="/admin"
             className="rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50"
           >
-            Batal
+            {isEdit ? "Selesai" : "Batal"}
           </Link>
+          {saved && <span className="text-xs text-emerald-600">tersimpan</span>}
         </div>
       </form>
+
+      {isEdit && status === "ready" && (
+        <CurriculumEditor courseId={courseId} />
+      )}
     </div>
   );
 }
