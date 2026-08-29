@@ -52,11 +52,12 @@ Deno.serve(async (req) => {
   } = await caller.auth.getUser();
   if (userErr || !user) return json({ error: "Unauthorized" }, 401);
 
-  const { data: profile } = await caller
+  const { data: profile, error: profileErr } = await caller
     .from("coaching_profiles")
     .select("role")
     .eq("id", user.id)
     .maybeSingle();
+  if (profileErr) return json({ error: profileErr.message }, 400);
   if (profile?.role !== "admin") return json({ error: "Bukan admin" }, 403);
 
   const body = await req.json().catch(() => ({}));
