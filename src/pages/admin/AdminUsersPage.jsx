@@ -490,6 +490,9 @@ export default function AdminUsersPage() {
                       {user.email}
                     </p>
                   )}
+                  <p className="truncate text-xs text-zinc-400">
+                    Cabang: {user.branch?.name ?? "—"}
+                  </p>
                 </div>
 
                 {isSuperAdmin ? (
