@@ -269,6 +269,23 @@ export async function submitQuiz(lessonId, setId, answers) {
 }
 
 /**
+ * Attempt user yang login buat set ini (1x per set). null kalau belum.
+ * Bentuk: { score, total, answers, results, created_at }
+ */
+export async function getMyAttempt(setId) {
+  ensure();
+  const { data, error } = await supabase
+    .from("coaching_quiz_attempts")
+    .select("score, total, answers, results, created_at")
+    .eq("set_id", setId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+/**
  * Semua attempt kuis — buat rekap admin. Dijaga RLS
  * "coaching_quiz_attempts admin read" (butuh caller = admin).
  * Bentuk: { id, user_id, lesson_id, set_id, answers, score, total, created_at }[]
@@ -281,6 +298,19 @@ export async function getAllAttempts() {
     .order("created_at", { ascending: false });
   if (error) throw error;
   return data;
+}
+
+/**
+ * Hapus 1 attempt (admin) — murid jadi bisa ngerjain set itu lagi.
+ * Dijaga RLS "coaching_quiz_attempts admin delete".
+ */
+export async function deleteAttempt(id) {
+  ensure();
+  const { error } = await supabase
+    .from("coaching_quiz_attempts")
+    .delete()
+    .eq("id", id);
+  if (error) throw error;
 }
 
 /**

@@ -33,19 +33,37 @@ create table if not exists public.coaching_question_keys (
   answer      int not null default 0                 -- index opsi yang benar
 );
 
--- Attempt murid: skor + snapshot jawaban. Boleh lebih dari 1x.
+-- Attempt murid: skor + snapshot jawaban. 1x per (user, set).
 create table if not exists public.coaching_quiz_attempts (
   id         uuid primary key default gen_random_uuid(),
   user_id    uuid not null references auth.users (id) on delete cascade,
   lesson_id  text not null references public.coaching_lessons (id) on delete cascade,
   set_id     text references public.coaching_question_sets (id) on delete set null,
   answers    jsonb not null default '{}'::jsonb,     -- { questionId: chosenIndex }
+  results    jsonb not null default '{}'::jsonb,     -- { questionId: boolean } (benar?)
   score      int not null default 0,
   total      int not null default 0,
   created_at timestamptz not null default now()
 );
 create index if not exists coaching_quiz_attempts_user_lesson_idx
   on public.coaching_quiz_attempts (user_id, lesson_id, created_at desc);
+
+-- Kolom results ditambahkan belakangan (dulu koreksi dihitung ulang).
+alter table public.coaching_quiz_attempts
+  add column if not exists results jsonb not null default '{}'::jsonb;
+
+-- 1 attempt per (user, set). Hapus dulu duplikat lama (simpan yang paling
+-- awal), lalu pasang unique index.
+delete from public.coaching_quiz_attempts a
+using public.coaching_quiz_attempts b
+where a.user_id = b.user_id
+  and a.set_id is not null
+  and a.set_id = b.set_id
+  and (b.created_at < a.created_at
+       or (b.created_at = a.created_at and b.id < a.id));
+create unique index if not exists coaching_quiz_attempts_user_set_uniq
+  on public.coaching_quiz_attempts (user_id, set_id)
+  where set_id is not null;
 
 -- Lesson tipe 'soal' nunjuk ke satu set.
 alter table public.coaching_lessons
@@ -59,7 +77,7 @@ grant select on public.coaching_questions     to anon, authenticated;
 grant insert, update, delete on public.coaching_question_sets  to authenticated;
 grant insert, update, delete on public.coaching_questions      to authenticated;
 grant select, insert, update, delete on public.coaching_question_keys to authenticated;
-grant select on public.coaching_quiz_attempts to authenticated;
+grant select, delete on public.coaching_quiz_attempts to authenticated;
 
 -- Edge Function quiz-submit pakai service_role.
 grant all on public.coaching_question_sets    to service_role;
@@ -104,8 +122,14 @@ create policy "coaching_quiz_attempts select own"
   on public.coaching_quiz_attempts for select
   using (auth.uid() = user_id);
 
--- Admin baca semua attempt (rekap nilai di /admin/hasil-soal).
+-- Admin baca semua attempt (rekap nilai di /admin/quiz-results).
 drop policy if exists "coaching_quiz_attempts admin read" on public.coaching_quiz_attempts;
 create policy "coaching_quiz_attempts admin read"
   on public.coaching_quiz_attempts for select
+  using (public.is_admin());
+
+-- Admin hapus attempt = reset murid buat set itu (bisa ngerjain lagi).
+drop policy if exists "coaching_quiz_attempts admin delete" on public.coaching_quiz_attempts;
+create policy "coaching_quiz_attempts admin delete"
+  on public.coaching_quiz_attempts for delete
   using (public.is_admin());
