@@ -54,3 +54,12 @@ body {
   background-color: #d4d4d8;
   border-radius: 9999px;
 }
+
+/* Scrollable but no visible scrollbar (still scrolls via trackpad/wheel) */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
