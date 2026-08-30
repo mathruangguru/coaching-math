@@ -36,7 +36,9 @@ export async function getUsers() {
   assertReady();
   const { data, error } = await supabase
     .from("coaching_profiles")
-    .select("id, email, first_name, last_name, role, created_at")
+    .select(
+      "id, email, first_name, last_name, role, created_at, branch:coaching_branches(name)"
+    )
     .order("created_at");
   if (error) throw error;
   return data;
