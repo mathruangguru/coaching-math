@@ -1,12 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import {
-  ArrowLeft,
-  Check,
-  X,
-  ChevronLeft,
-  ChevronRight,
-} from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
 import { getCourse } from "../lib/courses";
 import { getQuestionSet, getMyAttempt, submitQuiz } from "../lib/quiz";
 import Skeleton from "../components/ui/Skeleton";
@@ -43,12 +37,7 @@ export default function QuizPage() {
         );
         if (!alive) return;
         if (attempt) {
-          setAnswers(attempt.answers ?? {});
-          setResult({
-            score: attempt.score,
-            total: attempt.total,
-            results: attempt.results ?? {},
-          });
+          setResult({ score: attempt.score, total: attempt.total });
         }
         setData({ status: "ready", course, lesson, set });
       } catch (err) {
@@ -150,8 +139,9 @@ export default function QuizPage() {
 
   // ── Hasil ─────────────────────────────────────────────────────────
   if (result) {
-    const hasMarks =
-      result.results && Object.keys(result.results).length > 0;
+    const p = result.total
+      ? Math.round((result.score / result.total) * 100)
+      : 0;
     return (
       <div className="mx-auto flex max-w-2xl flex-col gap-5">
         {backLink}
@@ -165,64 +155,8 @@ export default function QuizPage() {
             {result.score}
             <span className="text-lg text-zinc-400"> / {result.total}</span>
           </p>
-          <p className="mt-2 text-xs text-zinc-400">
-            Latihan ini cuma bisa dikerjakan sekali.
-          </p>
+          <p className="mt-1 text-sm font-semibold text-zinc-400">({p}%)</p>
         </div>
-
-        {questions.map((q, i) => {
-          const ok = hasMarks ? result.results[q.id] : null;
-          const chosen = answers[q.id];
-          return (
-            <div
-              key={q.id}
-              className="rounded-2xl border border-zinc-200/80 bg-white p-5"
-            >
-              <div className="flex items-start gap-2">
-                {ok !== null ? (
-                  <span
-                    className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full text-white ${
-                      ok ? "bg-teal-500" : "bg-rose-500"
-                    }`}
-                  >
-                    {ok ? (
-                      <Check size={12} strokeWidth={3} />
-                    ) : (
-                      <X size={12} strokeWidth={3} />
-                    )}
-                  </span>
-                ) : (
-                  <span className="mt-0.5 h-5 w-5 shrink-0" />
-                )}
-                <p className="text-sm font-medium text-zinc-900">
-                  {i + 1}. <MathText>{q.prompt}</MathText>
-                </p>
-              </div>
-              <ul className="mt-2 flex flex-col gap-1 pl-7">
-                {q.options.map((opt, oi) => (
-                  <li
-                    key={oi}
-                    className={`text-sm ${
-                      oi === chosen
-                        ? ok === null
-                          ? "font-semibold text-zinc-700"
-                          : ok
-                            ? "font-semibold text-teal-700"
-                            : "font-semibold text-rose-700"
-                        : "text-zinc-500"
-                    }`}
-                  >
-                    <span className="font-semibold text-zinc-400">
-                      {String.fromCharCode(65 + oi)}.
-                    </span>{" "}
-                    <MathText>{opt}</MathText>
-                    {oi === chosen ? " ← jawabanmu" : ""}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          );
-        })}
       </div>
     );
   }
