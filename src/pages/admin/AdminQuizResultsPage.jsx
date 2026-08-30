@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ListChecks, User, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import { getUsers } from "../../lib/users";
 import {
   getQuestionSets,
@@ -40,57 +40,119 @@ function ScorePill({ score, total }) {
         : "bg-rose-50 text-rose-700";
   return (
     <span
-      className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${tone}`}
+      className={`inline-block rounded-full px-2 py-0.5 text-xs font-semibold ${tone}`}
     >
       {score}/{total} · {p}%
     </span>
   );
 }
 
-const markTone = {
-  ok: "bg-teal-100 text-teal-700",
-  wrong: "bg-rose-100 text-rose-700",
-  blank: "bg-zinc-100 text-zinc-400",
-};
-const markLabel = { ok: "benar", wrong: "salah", blank: "kosong" };
+const th =
+  "border border-zinc-100 px-2.5 py-1.5 text-xs font-semibold text-zinc-500";
+const td = "border border-zinc-100 px-2.5 py-1.5";
 
-// Benar / salah / kosong per soal, urut posisi. `detail` dari getQuestionSetAdmin.
-function marksFor(attempt, detail) {
-  if (!detail?.questions?.length) return null;
-  return detail.questions.map((q) => {
-    const chosen = attempt.answers?.[q.id];
-    if (chosen == null) return "blank";
-    return chosen === q.answer ? "ok" : "wrong";
-  });
+function Cell({ chosen, correct }) {
+  if (chosen == null) {
+    return (
+      <td className={`${td} bg-zinc-50 text-center text-xs text-zinc-300`}>–</td>
+    );
+  }
+  const ok = chosen === correct;
+  return (
+    <td
+      className={`${td} text-center text-xs font-bold ${
+        ok ? "bg-teal-50 text-teal-700" : "bg-rose-50 text-rose-700"
+      }`}
+    >
+      {String.fromCharCode(65 + chosen)}
+    </td>
+  );
 }
 
-function AttemptRow({ attempt, label, detail }) {
-  const marks = marksFor(attempt, detail);
+/** Matrix: kolom = nomor soal, baris = attempt, isi = huruf jawaban. */
+function ResultTable({ questions, attempts, showStudent, usersById }) {
   return (
-    <li className="border-b border-zinc-100 px-4 py-2.5 last:border-b-0">
-      <div className="flex items-center justify-between gap-3">
-        <span className="min-w-0 flex-1 truncate text-sm text-zinc-700">
-          {label}
-        </span>
-        <span className="shrink-0 text-xs text-zinc-400">
-          {fmtDate(attempt.created_at)}
-        </span>
-        <ScorePill score={attempt.score} total={attempt.total} />
-      </div>
-      {marks && (
-        <div className="mt-2 flex flex-wrap gap-1">
-          {marks.map((m, i) => (
-            <span
-              key={i}
-              title={`Soal ${i + 1}: ${markLabel[m]}`}
-              className={`grid h-5 w-5 place-items-center rounded text-[10px] font-semibold ${markTone[m]}`}
+    <div className="overflow-x-auto">
+      <table className="min-w-full border-collapse">
+        <thead>
+          <tr className="bg-zinc-50 text-left">
+            {showStudent && <th className={th}>Murid</th>}
+            <th className={th}>Tgl</th>
+            <th className={th}>Skor</th>
+            {questions.map((_, i) => (
+              <th key={i} className={`${th} text-center`}>
+                {i + 1}
+              </th>
+            ))}
+          </tr>
+          <tr className="bg-zinc-100/70 text-left">
+            <th
+              className={`${th} font-bold text-zinc-600`}
+              colSpan={showStudent ? 3 : 2}
             >
-              {i + 1}
+              Kunci
+            </th>
+            {questions.map((q, i) => (
+              <td
+                key={i}
+                className={`${td} text-center text-xs font-bold text-zinc-600`}
+              >
+                {String.fromCharCode(65 + (q.answer ?? 0))}
+              </td>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {attempts.map((a) => {
+            const u = usersById?.get(a.user_id);
+            return (
+              <tr key={a.id}>
+                {showStudent && (
+                  <td
+                    className={`${td} whitespace-nowrap text-sm text-zinc-700`}
+                  >
+                    {u ? fullName(u) : a.user_id}
+                  </td>
+                )}
+                <td className={`${td} whitespace-nowrap text-xs text-zinc-400`}>
+                  {fmtDate(a.created_at)}
+                </td>
+                <td className={`${td} whitespace-nowrap`}>
+                  <ScorePill score={a.score} total={a.total} />
+                </td>
+                {questions.map((q, i) => (
+                  <Cell key={i} chosen={a.answers?.[q.id]} correct={q.answer} />
+                ))}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function PlainRows({ attempts, usersById, showStudent }) {
+  return (
+    <ul className="divide-y divide-zinc-100">
+      {attempts.map((a) => {
+        const u = usersById?.get(a.user_id);
+        return (
+          <li
+            key={a.id}
+            className="flex items-center justify-between gap-3 px-4 py-2"
+          >
+            <span className="min-w-0 flex-1 truncate text-sm text-zinc-700">
+              {showStudent ? (u ? fullName(u) : a.user_id) : "Attempt"}
             </span>
-          ))}
-        </div>
-      )}
-    </li>
+            <span className="shrink-0 text-xs text-zinc-400">
+              {fmtDate(a.created_at)}
+            </span>
+            <ScorePill score={a.score} total={a.total} />
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
@@ -128,20 +190,27 @@ export default function AdminQuizResultsPage() {
     };
   }, []);
 
-  const grouped = useMemo(() => {
+  const model = useMemo(() => {
     if (data.status !== "ready") return null;
     const usersById = new Map(data.users.map((u) => [u.id, u]));
     const setsById = new Map(data.sets.map((s) => [s.id, s]));
+
     const bySet = new Map();
-    const byUser = new Map();
     for (const a of data.attempts) {
-      const sk = a.set_id ?? "—";
-      if (!bySet.has(sk)) bySet.set(sk, []);
-      bySet.get(sk).push(a);
-      if (!byUser.has(a.user_id)) byUser.set(a.user_id, []);
-      byUser.get(a.user_id).push(a);
+      const k = a.set_id ?? "—";
+      if (!bySet.has(k)) bySet.set(k, []);
+      bySet.get(k).push(a);
     }
-    return { usersById, setsById, bySet, byUser };
+
+    const byUserSet = new Map();
+    for (const a of data.attempts) {
+      const k = `${a.user_id}|${a.set_id ?? "—"}`;
+      if (!byUserSet.has(k)) byUserSet.set(k, []);
+      byUserSet.get(k).push(a);
+    }
+
+    const students = new Set(data.attempts.map((a) => a.user_id));
+    return { usersById, setsById, bySet, byUserSet, studentCount: students.size };
   }, [data]);
 
   const needle = q.trim().toLowerCase();
@@ -153,14 +222,14 @@ export default function AdminQuizResultsPage() {
           Hasil Soal
         </h1>
         <p className="mt-1 text-xs text-zinc-400">
-          Skor + benar/salah per nomor tiap attempt latihan soal.
+          Jawaban tiap murid per nomor. Hijau benar, merah salah, – kosong.
         </p>
       </div>
 
       {data.status === "loading" && (
         <div className="flex flex-col gap-2">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-16 w-full rounded-xl" />
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} className="h-24 w-full rounded-xl" />
           ))}
         </div>
       )}
@@ -209,9 +278,8 @@ export default function AdminQuizResultsPage() {
           </div>
 
           <p className="text-xs text-zinc-400">
-            {data.attempts.length} attempt ·{" "}
-            {grouped ? grouped.byUser.size : 0} murid ·{" "}
-            {grouped ? grouped.bySet.size : 0} set
+            {data.attempts.length} attempt · {model.studentCount} murid ·{" "}
+            {model.bySet.size} set
           </p>
 
           {data.attempts.length === 0 && (
@@ -220,105 +288,98 @@ export default function AdminQuizResultsPage() {
             </p>
           )}
 
-          {/* Legenda */}
-          {data.attempts.length > 0 && (
-            <div className="flex items-center gap-3 text-[11px] text-zinc-400">
-              {["ok", "wrong", "blank"].map((m) => (
-                <span key={m} className="inline-flex items-center gap-1">
-                  <span className={`h-3 w-3 rounded ${markTone[m]}`} />
-                  {markLabel[m]}
-                </span>
-              ))}
-            </div>
-          )}
-
           {view === "set" &&
-            [...grouped.bySet.entries()]
+            [...model.bySet.entries()]
               .map(([sid, rows]) => ({
                 sid,
                 rows,
-                title: grouped.setsById.get(sid)?.title ?? "(set dihapus)",
+                detail: data.setDetail.get(sid),
+                title: model.setsById.get(sid)?.title ?? "(set dihapus)",
               }))
               .filter((g) => g.title.toLowerCase().includes(needle))
               .sort((a, b) => a.title.localeCompare(b.title))
-              .map(({ sid, rows, title }) => (
+              .map(({ sid, rows, detail, title }) => (
                 <div
                   key={sid}
                   className="overflow-hidden rounded-xl border border-zinc-200 bg-white"
                 >
-                  <div className="flex items-center gap-2.5 px-4 py-3">
-                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-amber-50 text-amber-600">
-                      <ListChecks size={15} />
-                    </span>
-                    <p className="min-w-0 flex-1 truncate text-sm font-bold text-zinc-900">
+                  <div className="flex items-center justify-between gap-3 border-b border-zinc-100 px-4 py-3">
+                    <p className="min-w-0 truncate text-sm font-bold text-zinc-900">
                       {title}
                     </p>
                     <span className="shrink-0 rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold text-zinc-500">
                       {rows.length} attempt
                     </span>
                   </div>
-                  <ul className="border-t border-zinc-100">
-                    {rows.map((a) => (
-                      <AttemptRow
-                        key={a.id}
-                        attempt={a}
-                        detail={data.setDetail.get(a.set_id)}
-                        label={
-                          grouped.usersById.get(a.user_id)
-                            ? fullName(grouped.usersById.get(a.user_id))
-                            : a.user_id
-                        }
-                      />
-                    ))}
-                  </ul>
+                  {detail?.questions?.length ? (
+                    <ResultTable
+                      questions={detail.questions}
+                      attempts={rows}
+                      usersById={model.usersById}
+                      showStudent
+                    />
+                  ) : (
+                    <PlainRows
+                      attempts={rows}
+                      usersById={model.usersById}
+                      showStudent
+                    />
+                  )}
                 </div>
               ))}
 
           {view === "user" &&
-            data.users
+            [...model.byUserSet.entries()]
+              .map(([key, rows]) => {
+                const [uid, sid] = key.split("|");
+                return {
+                  key,
+                  rows,
+                  user: model.usersById.get(uid),
+                  uid,
+                  detail: data.setDetail.get(sid),
+                  setTitle: model.setsById.get(sid)?.title ?? "(set dihapus)",
+                };
+              })
               .filter(
-                (u) =>
-                  fullName(u).toLowerCase().includes(needle) ||
-                  (u.email ?? "").toLowerCase().includes(needle)
+                ({ user, uid }) =>
+                  (user ? fullName(user) : uid)
+                    .toLowerCase()
+                    .includes(needle) ||
+                  (user?.email ?? "").toLowerCase().includes(needle)
               )
-              .map((u) => ({ u, rows: grouped.byUser.get(u.id) ?? [] }))
-              .filter(({ rows }) => rows.length > 0)
-              .map(({ u, rows }) => (
+              .sort((a, b) =>
+                (a.user ? fullName(a.user) : a.uid).localeCompare(
+                  b.user ? fullName(b.user) : b.uid
+                )
+              )
+              .map(({ key, rows, user, uid, detail, setTitle }) => (
                 <div
-                  key={u.id}
+                  key={key}
                   className="overflow-hidden rounded-xl border border-zinc-200 bg-white"
                 >
-                  <div className="flex items-center gap-2.5 px-4 py-3">
-                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-violet-50 text-violet-600">
-                      <User size={15} />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold text-zinc-900">
-                        {fullName(u)}
+                  <div className="flex items-center justify-between gap-3 border-b border-zinc-100 px-4 py-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-bold text-zinc-900">
+                        {user ? fullName(user) : uid}
                       </p>
-                      {u.email && (
-                        <p className="truncate text-xs text-zinc-400">
-                          {u.email}
-                        </p>
-                      )}
+                      <p className="truncate text-xs text-zinc-400">
+                        {setTitle}
+                      </p>
                     </div>
                     <span className="shrink-0 rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold text-zinc-500">
                       {rows.length} attempt
                     </span>
                   </div>
-                  <ul className="border-t border-zinc-100">
-                    {rows.map((a) => (
-                      <AttemptRow
-                        key={a.id}
-                        attempt={a}
-                        detail={data.setDetail.get(a.set_id)}
-                        label={
-                          grouped.setsById.get(a.set_id)?.title ??
-                          "(set dihapus)"
-                        }
-                      />
-                    ))}
-                  </ul>
+                  {detail?.questions?.length ? (
+                    <ResultTable
+                      questions={detail.questions}
+                      attempts={rows}
+                      usersById={model.usersById}
+                    />
+                  ) : (
+                    <PlainRows attempts={rows} usersById={model.usersById} />
+                  )}
                 </div>
               ))}
         </>
