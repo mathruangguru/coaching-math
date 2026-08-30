@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { Search, ArrowLeft, ArrowRight } from "lucide-react";
+import { Search, ArrowLeft, ArrowRight, RotateCcw } from "lucide-react";
 import { getUsers } from "../../lib/users";
 import {
   getQuestionSets,
   getQuestionSetAdmin,
   getAllAttempts,
+  deleteAttempt,
 } from "../../lib/quiz";
 import Skeleton from "../../components/ui/Skeleton";
 
@@ -107,13 +108,28 @@ function Cell({ chosen, correct }) {
 }
 
 /** Matrix: kolom = nomor soal, baris = attempt, isi = huruf jawaban. */
-function ResultTable({ questions, attempts, showStudent, usersById }) {
+function ResultTable({
+  questions,
+  attempts,
+  showStudent,
+  usersById,
+  onReset,
+  resetBusyId,
+}) {
   const stats = questions.map((q) => {
     const correct = attempts.filter((a) => a.answers?.[q.id] === q.answer).length;
     return attempts.length
       ? Math.round((correct / attempts.length) * 100)
       : 0;
   });
+
+  if (attempts.length === 0) {
+    return (
+      <p className="px-4 py-6 text-center text-xs text-zinc-400">
+        Belum ada attempt.
+      </p>
+    );
+  }
 
   return (
     <div className="no-scrollbar overflow-x-auto">
@@ -128,6 +144,7 @@ function ResultTable({ questions, attempts, showStudent, usersById }) {
                 {i + 1}
               </th>
             ))}
+            {onReset && <th className={th} />}
           </tr>
           <tr className="bg-zinc-100/70 text-left">
             <th
@@ -144,6 +161,7 @@ function ResultTable({ questions, attempts, showStudent, usersById }) {
                 {String.fromCharCode(65 + (q.answer ?? 0))}
               </td>
             ))}
+            {onReset && <td className={td} />}
           </tr>
           <tr className="bg-white text-left">
             <th className={`${th} font-semibold`} colSpan={showStudent ? 3 : 2}>
@@ -157,6 +175,7 @@ function ResultTable({ questions, attempts, showStudent, usersById }) {
                 {s}%
               </td>
             ))}
+            {onReset && <td className={td} />}
           </tr>
         </thead>
         <tbody>
@@ -180,6 +199,18 @@ function ResultTable({ questions, attempts, showStudent, usersById }) {
                 {questions.map((q, i) => (
                   <Cell key={i} chosen={a.answers?.[q.id]} correct={q.answer} />
                 ))}
+                {onReset && (
+                  <td className={`${td} whitespace-nowrap`}>
+                    <button
+                      type="button"
+                      onClick={() => onReset(a)}
+                      disabled={resetBusyId === a.id}
+                      className="inline-flex items-center gap-1 rounded-md border border-rose-200 px-2 py-1 text-xs font-medium text-rose-600 transition-colors hover:bg-rose-50 disabled:opacity-50"
+                    >
+                      <RotateCcw size={12} /> Reset
+                    </button>
+                  </td>
+                )}
               </tr>
             );
           })}
@@ -232,7 +263,31 @@ export default function AdminQuizResultsPage() {
   const [q, setQ] = useState("");
   const [selSet, setSelSet] = useState(null); // sid | null
   const [selUser, setSelUser] = useState(null); // uid | null
+  const [resetBusyId, setResetBusyId] = useState(null);
   const [data, setData] = useState({ status: "loading" });
+
+  const handleReset = async (attempt) => {
+    const u = data.users?.find((x) => x.id === attempt.user_id);
+    const who = u ? fullName(u) : attempt.user_id;
+    if (
+      !window.confirm(
+        `Reset attempt ${who}? Dia bisa ngerjain set ini dari awal lagi.`
+      )
+    )
+      return;
+    setResetBusyId(attempt.id);
+    try {
+      await deleteAttempt(attempt.id);
+      setData((d) => ({
+        ...d,
+        attempts: d.attempts.filter((a) => a.id !== attempt.id),
+      }));
+    } catch (err) {
+      window.alert(`Gagal reset: ${err?.message ?? err}`);
+    } finally {
+      setResetBusyId(null);
+    }
+  };
 
   useEffect(() => {
     let alive = true;
@@ -439,6 +494,8 @@ export default function AdminQuizResultsPage() {
                         attempts={rows}
                         usersById={model.usersById}
                         showStudent
+                        onReset={handleReset}
+                        resetBusyId={resetBusyId}
                       />
                     ) : (
                       <PlainRows
@@ -531,6 +588,8 @@ export default function AdminQuizResultsPage() {
                           questions={detail.questions}
                           attempts={rows}
                           usersById={model.usersById}
+                          onReset={handleReset}
+                          resetBusyId={resetBusyId}
                         />
                       ) : (
                         <PlainRows
