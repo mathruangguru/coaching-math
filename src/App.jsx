@@ -14,6 +14,7 @@ import AdminCoursesPage from "./pages/admin/AdminCoursesPage";
 import AdminUsersPage from "./pages/admin/AdminUsersPage";
 import AdminEnrollmentsPage from "./pages/admin/AdminEnrollmentsPage";
 import AdminQuizResultsPage from "./pages/admin/AdminQuizResultsPage";
+import AdminBranchesPage from "./pages/admin/AdminBranchesPage";
 import CourseFormPage from "./pages/admin/CourseFormPage";
 import SetSoalPage from "./pages/admin/SetSoalPage";
 import SetSoalFormPage from "./pages/admin/SetSoalFormPage";
@@ -48,6 +49,7 @@ export default function App() {
         <Route element={<AdminLayout />}>
           <Route index element={<AdminCoursesPage />} />
           <Route path="users" element={<AdminUsersPage />} />
+          <Route path="branches" element={<AdminBranchesPage />} />
           <Route path="enrollments" element={<AdminEnrollmentsPage />} />
           <Route path="quiz-results" element={<AdminQuizResultsPage />} />
           <Route path="set-soal" element={<SetSoalPage />} />

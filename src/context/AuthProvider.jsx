@@ -49,7 +49,7 @@ export function AuthProvider({ children }) {
     let alive = true;
     supabase
       .from("coaching_profiles")
-      .select("id, email, first_name, last_name, role")
+      .select("id, email, first_name, last_name, role, branch_id")
       .eq("id", userId)
       .maybeSingle()
       .then(({ data, error }) => {
