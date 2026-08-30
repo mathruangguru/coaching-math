@@ -271,13 +271,20 @@ export async function submitQuiz(lessonId, setId, answers) {
 /**
  * Attempt user yang login buat set ini (1x per set). null kalau belum.
  * Bentuk: { score, total, answers, results, created_at }
+ * Filter user_id eksplisit — admin/super_admin bypass RLS "select own",
+ * jadi tanpa ini bisa ketarik attempt orang lain.
  */
 export async function getMyAttempt(setId) {
   ensure();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
   const { data, error } = await supabase
     .from("coaching_quiz_attempts")
     .select("score, total, answers, results, created_at")
     .eq("set_id", setId)
+    .eq("user_id", user.id)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
