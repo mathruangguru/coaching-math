@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "../context/auth-context";
 import { updateMyProfile, changeMyPassword } from "../lib/profile";
+import { getBranches } from "../lib/branches";
 
 const inputCls =
   "mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none transition-colors focus:border-brand-500";
@@ -20,8 +21,76 @@ export default function ProfilePage() {
       </div>
 
       <NameForm profile={profile} onSaved={refreshProfile} />
+      <BranchForm profile={profile} onSaved={refreshProfile} />
       <PasswordForm />
     </div>
+  );
+}
+
+function BranchForm({ profile, onSaved }) {
+  const [branches, setBranches] = useState([]);
+  const [branchId, setBranchId] = useState(profile?.branch_id ?? "");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState(null);
+
+  useEffect(() => {
+    let alive = true;
+    getBranches()
+      .then((d) => alive && setBranches(d))
+      .catch((err) => console.error("[profile] gagal memuat cabang:", err));
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setBusy(true);
+    setMsg(null);
+    try {
+      await updateMyProfile({ branchId: branchId || null });
+      await onSaved?.();
+      setMsg({ ok: true, text: "Cabang tersimpan." });
+    } catch (err) {
+      setMsg({ ok: false, text: err?.message ?? "Gagal menyimpan." });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form onSubmit={submit} className={card}>
+      <p className="text-sm font-bold tracking-tight text-zinc-900">Cabang</p>
+      <label className="mt-3 block text-xs font-medium text-zinc-600">
+        Cabang
+        <select
+          value={branchId}
+          onChange={(e) => setBranchId(e.target.value)}
+          className={inputCls}
+        >
+          <option value="">— pilih cabang —</option>
+          {branches.map((b) => (
+            <option key={b.id} value={b.id}>
+              {b.name}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      {msg && (
+        <p
+          className={`mt-3 text-xs ${
+            msg.ok ? "text-emerald-600" : "text-rose-600"
+          }`}
+        >
+          {msg.text}
+        </p>
+      )}
+
+      <button type="submit" disabled={busy} className={`mt-4 ${btn}`}>
+        {busy ? "Menyimpan…" : "Simpan"}
+      </button>
+    </form>
   );
 }
 

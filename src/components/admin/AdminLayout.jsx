@@ -8,6 +8,7 @@ const tabs = [
   { to: "/admin/set-soal", label: "Set Soal", end: false },
   { to: "/admin/quiz-results", label: "Hasil Soal", end: false },
   { to: "/admin/users", label: "Pengguna", end: false },
+  { to: "/admin/branches", label: "Cabang", end: false },
   { to: "/admin/enrollments", label: "Enrollment", end: false },
 ];
 

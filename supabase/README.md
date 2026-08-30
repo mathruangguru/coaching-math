@@ -155,6 +155,13 @@ Jalankan ulang `schema.sql` lalu `admin.sql` (idempotent) untuk dapat:
   editor + preview, materi non-publish ada tag "Not publish"). Materi
   baru dari editor default `none`. Baris lama ke-backfill `all`.
 
+## Cabang (branch)
+
+Jalankan `branches.sql` (setelah `admin.sql`). Bikin `coaching_branches`
+(nama unik case-insensitive) + kolom `coaching_profiles.branch_id`. Admin
+atur daftarnya di `/admin/branches` (tambah satuan / bulk 1 nama per
+baris — yang dobel diabaikan). Murid pilih cabang di `/profile`.
+
 ## Isi
 
 | File | |
@@ -163,6 +170,7 @@ Jalankan ulang `schema.sql` lalu `admin.sql` (idempotent) untuk dapat:
 | `admin.sql` | `coaching_profiles` (+ nama, role), `is_admin()`, policy profile & write admin-only, gate baca materi draft/admin-only, trigger guard role |
 | `quiz.sql` | `coaching_question_sets` / `_questions` / `_question_keys` / `_quiz_attempts` + RLS |
 | `enroll.sql` | `coaching_enrollments` (murid ↔ course) + RLS (enroll/lihat milik sendiri, admin baca semua) |
+| `branches.sql` | `coaching_branches` + `coaching_profiles.branch_id` + RLS (baca semua, tulis admin) |
 | `seed.sql` | data awal PATOM (mirror `src/data/mock.js`) |
 | `functions/admin-users/` | Edge Function: admin create / set-password / delete user |
 | `functions/quiz-submit/` | Edge Function: nilai & simpan attempt kuis murid |
