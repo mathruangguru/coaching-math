@@ -1,11 +1,14 @@
 // Edge Function: murid submit jawaban kuis -> dinilai pakai kunci jawaban
 // (service_role, murid nggak pernah lihat kunci) -> attempt disimpan.
 //
+// 1 attempt per (user, set). Kalau udah pernah, balikin hasil lama +
+// alreadyDone:true (nggak insert lagi).
+//
 // Deploy (--no-verify-jwt wajib, auth dicek di dalam):
 //   supabase functions deploy quiz-submit --no-verify-jwt
 //
 // Body: { lessonId, setId, answers: { [questionId]: chosenIndex } }
-// Return: { score, total, results: { [questionId]: boolean } }
+// Return: { score, total, results: { [questionId]: boolean }, alreadyDone? }
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
@@ -52,6 +55,22 @@ Deno.serve(async (req) => {
 
   const admin = createClient(url, serviceKey);
 
+  // Sudah pernah ngerjain set ini? -> balikin hasil lama, jangan insert.
+  const { data: prev } = await admin
+    .from("coaching_quiz_attempts")
+    .select("answers, results, score, total")
+    .eq("user_id", user.id)
+    .eq("set_id", setId)
+    .maybeSingle();
+  if (prev) {
+    return json({
+      score: prev.score,
+      total: prev.total,
+      results: prev.results ?? {},
+      alreadyDone: true,
+    });
+  }
+
   const { data: questions, error: qErr } = await admin
     .from("coaching_questions")
     .select("id")
@@ -81,10 +100,30 @@ Deno.serve(async (req) => {
     lesson_id: lessonId,
     set_id: setId,
     answers,
+    results,
     score,
     total,
   });
-  if (insErr) return json({ error: insErr.message }, 400);
+  if (insErr) {
+    // 23505 = unique (user, set) -> race; ambil yang barusan masuk.
+    if (insErr.code === "23505") {
+      const { data: race } = await admin
+        .from("coaching_quiz_attempts")
+        .select("results, score, total")
+        .eq("user_id", user.id)
+        .eq("set_id", setId)
+        .maybeSingle();
+      if (race) {
+        return json({
+          score: race.score,
+          total: race.total,
+          results: race.results ?? {},
+          alreadyDone: true,
+        });
+      }
+    }
+    return json({ error: insErr.message }, 400);
+  }
 
   return json({ score, total, results });
 });

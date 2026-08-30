@@ -8,7 +8,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { getCourse } from "../lib/courses";
-import { getQuestionSet, submitQuiz } from "../lib/quiz";
+import { getQuestionSet, getMyAttempt, submitQuiz } from "../lib/quiz";
 import Skeleton from "../components/ui/Skeleton";
 import MathText from "../components/ui/MathText";
 
@@ -37,7 +37,19 @@ export default function QuizPage() {
           return setData({ status: "ready", course, lesson, set: null });
 
         const set = await getQuestionSet(lesson.question_set_id);
+        // Udah pernah ngerjain? -> langsung tampilkan hasilnya (1x per set).
+        const attempt = await getMyAttempt(lesson.question_set_id).catch(
+          () => null
+        );
         if (!alive) return;
+        if (attempt) {
+          setAnswers(attempt.answers ?? {});
+          setResult({
+            score: attempt.score,
+            total: attempt.total,
+            results: attempt.results ?? {},
+          });
+        }
         setData({ status: "ready", course, lesson, set });
       } catch (err) {
         console.error("[QuizPage] gagal memuat:", err);
@@ -109,12 +121,6 @@ export default function QuizPage() {
     }
   };
 
-  const retry = () => {
-    setResult(null);
-    setAnswers({});
-    setCurrent(0);
-  };
-
   const answeredCount = questions.filter((qq) => answers[qq.id] != null).length;
 
   const header = (
@@ -144,6 +150,8 @@ export default function QuizPage() {
 
   // ── Hasil ─────────────────────────────────────────────────────────
   if (result) {
+    const hasMarks =
+      result.results && Object.keys(result.results).length > 0;
     return (
       <div className="mx-auto flex max-w-2xl flex-col gap-5">
         {backLink}
@@ -157,10 +165,13 @@ export default function QuizPage() {
             {result.score}
             <span className="text-lg text-zinc-400"> / {result.total}</span>
           </p>
+          <p className="mt-2 text-xs text-zinc-400">
+            Latihan ini cuma bisa dikerjakan sekali.
+          </p>
         </div>
 
         {questions.map((q, i) => {
-          const ok = result.results[q.id];
+          const ok = hasMarks ? result.results[q.id] : null;
           const chosen = answers[q.id];
           return (
             <div
@@ -168,17 +179,21 @@ export default function QuizPage() {
               className="rounded-2xl border border-zinc-200/80 bg-white p-5"
             >
               <div className="flex items-start gap-2">
-                <span
-                  className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full text-white ${
-                    ok ? "bg-teal-500" : "bg-rose-500"
-                  }`}
-                >
-                  {ok ? (
-                    <Check size={12} strokeWidth={3} />
-                  ) : (
-                    <X size={12} strokeWidth={3} />
-                  )}
-                </span>
+                {ok !== null ? (
+                  <span
+                    className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full text-white ${
+                      ok ? "bg-teal-500" : "bg-rose-500"
+                    }`}
+                  >
+                    {ok ? (
+                      <Check size={12} strokeWidth={3} />
+                    ) : (
+                      <X size={12} strokeWidth={3} />
+                    )}
+                  </span>
+                ) : (
+                  <span className="mt-0.5 h-5 w-5 shrink-0" />
+                )}
                 <p className="text-sm font-medium text-zinc-900">
                   {i + 1}. <MathText>{q.prompt}</MathText>
                 </p>
@@ -189,9 +204,11 @@ export default function QuizPage() {
                     key={oi}
                     className={`text-sm ${
                       oi === chosen
-                        ? ok
-                          ? "font-semibold text-teal-700"
-                          : "font-semibold text-rose-700"
+                        ? ok === null
+                          ? "font-semibold text-zinc-700"
+                          : ok
+                            ? "font-semibold text-teal-700"
+                            : "font-semibold text-rose-700"
                         : "text-zinc-500"
                     }`}
                   >
@@ -206,13 +223,6 @@ export default function QuizPage() {
             </div>
           );
         })}
-
-        <button
-          onClick={retry}
-          className="w-fit rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50"
-        >
-          Ulangi
-        </button>
       </div>
     );
   }
