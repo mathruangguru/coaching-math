@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, Check } from "lucide-react";
+import { ArrowLeft, Check, Star } from "lucide-react";
 import { getCourse } from "../lib/courses";
 import { getForm, submitFormResponse } from "../lib/forms";
 import { useAuth } from "../context/auth-context";
@@ -18,6 +18,45 @@ const todayISO = () => {
     d.getDate()
   ).padStart(2, "0")}`;
 };
+
+function StarRating({ value, onChange }) {
+  const [hover, setHover] = useState(0);
+  const active = hover || value || 0;
+  return (
+    <div className="mt-2 flex items-center gap-1">
+      {[1, 2, 3, 4, 5].map((n) => (
+        <button
+          key={n}
+          type="button"
+          onClick={() => onChange(n === value ? 0 : n)}
+          onMouseEnter={() => setHover(n)}
+          onMouseLeave={() => setHover(0)}
+          aria-label={`${n} bintang`}
+          aria-pressed={n <= (value || 0)}
+          className="rounded p-0.5"
+        >
+          <Star
+            size={26}
+            className={
+              n <= active
+                ? "fill-amber-400 text-amber-400"
+                : "fill-none text-zinc-300"
+            }
+          />
+        </button>
+      ))}
+      {value > 0 && (
+        <button
+          type="button"
+          onClick={() => onChange(0)}
+          className="ml-2 text-xs font-medium text-zinc-400 transition-colors hover:text-zinc-600"
+        >
+          Hapus
+        </button>
+      )}
+    </div>
+  );
+}
 
 export default function FormPage() {
   const { courseId, lessonId } = useParams();
@@ -142,6 +181,7 @@ export default function FormPage() {
     if (f.type === "name") return profileFullName(profile);
     if (f.type === "email") return profile?.email ?? "";
     if (f.type === "date") return todayISO();
+    if (f.type === "rating") return 0;
     return f.type === "multi" || f.type === "check" ? [] : "";
   };
 
@@ -160,6 +200,7 @@ export default function FormPage() {
     const v = valueFor(f);
     if (f.type === "check")
       return (f.options ?? []).some((opt) => !v.includes(opt));
+    if (f.type === "rating") return !v;
     return Array.isArray(v) ? v.length === 0 : !String(v ?? "").trim();
   });
 
@@ -225,8 +266,14 @@ export default function FormPage() {
             <input
               type="date"
               value={valueFor(f)}
-              onChange={(e) => setVal(f.id, e.target.value)}
-              className={`${inputCls} sm:w-auto`}
+              readOnly
+              className={`${inputCls} cursor-not-allowed bg-zinc-50 text-zinc-500 sm:w-auto`}
+            />
+          )}
+          {f.type === "rating" && (
+            <StarRating
+              value={valueFor(f)}
+              onChange={(n) => setVal(f.id, n)}
             />
           )}
           {f.type === "single" && (

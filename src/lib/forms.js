@@ -19,6 +19,7 @@ export const fieldTypeLabels = {
   name: "Nama (auto)",
   email: "Email (auto)",
   date: "Tanggal (auto hari ini)",
+  rating: "Rating (bintang)",
 };
 export const FIELD_TYPES = Object.keys(fieldTypeLabels);
 
