@@ -12,6 +12,13 @@ const inputCls =
 const profileFullName = (p) =>
   [p?.first_name, p?.last_name].filter(Boolean).join(" ");
 
+const todayISO = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate()
+  ).padStart(2, "0")}`;
+};
+
 export default function FormPage() {
   const { courseId, lessonId } = useParams();
   const { profile } = useAuth();
@@ -134,6 +141,7 @@ export default function FormPage() {
     if (f.id in values) return values[f.id];
     if (f.type === "name") return profileFullName(profile);
     if (f.type === "email") return profile?.email ?? "";
+    if (f.type === "date") return todayISO();
     return f.type === "multi" || f.type === "check" ? [] : "";
   };
 
@@ -211,6 +219,14 @@ export default function FormPage() {
               value={valueFor(f)}
               onChange={(e) => setVal(f.id, e.target.value)}
               className={`${inputCls} resize-y`}
+            />
+          )}
+          {f.type === "date" && (
+            <input
+              type="date"
+              value={valueFor(f)}
+              onChange={(e) => setVal(f.id, e.target.value)}
+              className={`${inputCls} sm:w-auto`}
             />
           )}
           {f.type === "single" && (
