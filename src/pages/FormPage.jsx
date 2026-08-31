@@ -190,19 +190,19 @@ export default function FormPage() {
             {f.required && <span className="text-rose-500"> *</span>}
           </p>
 
-          {(f.type === "short" || f.type === "name") && (
+          {f.type === "short" && (
             <input
               value={valueFor(f)}
               onChange={(e) => setVal(f.id, e.target.value)}
               className={inputCls}
             />
           )}
-          {f.type === "email" && (
+          {(f.type === "name" || f.type === "email") && (
             <input
-              type="email"
+              type={f.type === "email" ? "email" : "text"}
               value={valueFor(f)}
-              onChange={(e) => setVal(f.id, e.target.value)}
-              className={inputCls}
+              readOnly
+              className={`${inputCls} cursor-not-allowed bg-zinc-50 text-zinc-500`}
             />
           )}
           {f.type === "long" && (

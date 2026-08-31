@@ -148,6 +148,8 @@ export default function AdminFormFormPage() {
     );
 
   const hasOptions = (t) => OPTION_TYPES.includes(t);
+  // check boleh 1 pernyataan; single/multi minimal 2 opsi.
+  const minOptions = (t) => (t === "check" ? 1 : 2);
 
   return (
     <div className="flex flex-col gap-5">
@@ -244,7 +246,7 @@ export default function AdminFormFormPage() {
                     options: hasOptions(type)
                       ? f.options?.length
                         ? f.options
-                        : ["", ""]
+                        : Array(minOptions(type)).fill("")
                       : [],
                   };
                   if (autoLabel[type] && !f.label.trim())
@@ -285,7 +287,7 @@ export default function AdminFormFormPage() {
 
             {(f.type === "name" || f.type === "email") && (
               <p className="mt-1.5 pl-7 text-xs text-zinc-400">
-                Diisi otomatis dari akun murid (masih bisa diedit murid).
+                Diisi otomatis dari akun murid — murid nggak bisa ubah.
               </p>
             )}
 
@@ -313,7 +315,7 @@ export default function AdminFormFormPage() {
                     />
                     <button
                       type="button"
-                      disabled={(f.options ?? []).length <= 2}
+                      disabled={(f.options ?? []).length <= minOptions(f.type)}
                       onClick={() => {
                         const options = f.options.filter((_, i) => i !== oi);
                         patchField(f.id, { options });
