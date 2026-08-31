@@ -120,13 +120,15 @@ Atau paste `supabase/functions/admin-users/index.ts` di
 di-inject otomatis — nggak perlu set secret. Sebelum di-deploy, tombol
 buat/set-password/hapus di `/admin/users` akan error.
 
-## Latihan Soal (kuis pilihan ganda)
+## Latihan Soal (kuis)
 
 1. **SQL Editor** → jalankan `quiz.sql` (setelah `admin.sql`). Bikin
-   `coaching_question_sets` / `coaching_questions` /
-   `coaching_question_keys` (kunci jawaban dipisah — murid nggak bisa
-   baca lewat API) / `coaching_quiz_attempts`, + kolom
-   `coaching_lessons.question_set_id`.
+   `coaching_question_sets` / `coaching_questions` (kolom `type`:
+   `single` / `multi`) / `coaching_question_keys` (kunci jawaban dipisah,
+   `answers int[]` — murid nggak bisa baca lewat API) /
+   `coaching_quiz_attempts`, + kolom `coaching_lessons.question_set_id`.
+   Soal **checklist** (`type = 'multi'`) benar kalau himpunan jawaban
+   sama persis; dinilai di Edge Function `quiz-submit`.
 2. **Deploy Edge Function `quiz-submit`** — nilai jawaban pakai kunci
    (service_role) & simpan attempt biar skor nggak bisa dipalsukan:
    ```bash

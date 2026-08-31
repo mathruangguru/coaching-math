@@ -88,8 +88,24 @@ export default function QuizPage() {
   const questions = set?.questions ?? [];
   const total = questions.length;
 
+  const isAnswered = (qq) => {
+    const v = answers[qq.id];
+    return Array.isArray(v) ? v.length > 0 : v != null;
+  };
+
+  // Pilih opsi. multi = toggle di array; single = ganti.
+  const pick = (qq, oi) =>
+    setAnswers((a) => {
+      if (qq.type !== "multi") return { ...a, [qq.id]: oi };
+      const cur = Array.isArray(a[qq.id]) ? a[qq.id] : [];
+      const next = cur.includes(oi)
+        ? cur.filter((x) => x !== oi)
+        : [...cur, oi].sort((m, n) => m - n);
+      return { ...a, [qq.id]: next };
+    });
+
   const submit = async () => {
-    const blanks = questions.filter((qq) => answers[qq.id] == null).length;
+    const blanks = questions.filter((qq) => !isAnswered(qq)).length;
     if (
       blanks > 0 &&
       !window.confirm(
@@ -110,7 +126,7 @@ export default function QuizPage() {
     }
   };
 
-  const answeredCount = questions.filter((qq) => answers[qq.id] != null).length;
+  const answeredCount = questions.filter(isAnswered).length;
 
   const header = (
     <div>
@@ -188,7 +204,7 @@ export default function QuizPage() {
           <div className="flex flex-wrap justify-center gap-1.5">
             {Array.from({ length: groupEnd - groupStart }, (_, k) => {
               const idx = groupStart + k;
-              const answered = answers[questions[idx].id] != null;
+              const answered = isAnswered(questions[idx]);
               const active = idx === current;
               return (
                 <button
@@ -226,7 +242,7 @@ export default function QuizPage() {
             <p className="text-xs text-zinc-400">
               Soal {current + 1} dari {total}
             </p>
-            {answers[q.id] != null && (
+            {isAnswered(q) && (
               <button
                 type="button"
                 onClick={() =>
@@ -245,9 +261,18 @@ export default function QuizPage() {
           <p className="mt-1.5 text-sm font-medium text-zinc-900">
             <MathText>{q.prompt}</MathText>
           </p>
+          {q.type === "multi" && (
+            <p className="mt-1 text-xs font-medium text-brand-600">
+              Bisa pilih lebih dari satu.
+            </p>
+          )}
           <div className="mt-3 flex flex-col gap-2">
             {q.options.map((opt, oi) => {
-              const picked = answers[q.id] === oi;
+              const multi = q.type === "multi";
+              const chosen = answers[q.id];
+              const picked = multi
+                ? Array.isArray(chosen) && chosen.includes(oi)
+                : chosen === oi;
               return (
                 <label
                   key={oi}
@@ -258,14 +283,16 @@ export default function QuizPage() {
                   }`}
                 >
                   <input
-                    type="radio"
+                    type={multi ? "checkbox" : "radio"}
                     name={q.id}
                     checked={picked}
-                    onChange={() => setAnswers((a) => ({ ...a, [q.id]: oi }))}
+                    onChange={() => pick(q, oi)}
                     className="sr-only"
                   />
                   <span
-                    className={`grid h-6 w-6 shrink-0 place-items-center rounded-full border text-xs font-bold ${
+                    className={`grid h-6 w-6 shrink-0 place-items-center border text-xs font-bold ${
+                      multi ? "rounded-md" : "rounded-full"
+                    } ${
                       picked
                         ? "border-brand-500 bg-brand-500 text-white"
                         : "border-zinc-300 text-zinc-500"

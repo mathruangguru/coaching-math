@@ -156,7 +156,8 @@ export default function SetSoalFormPage() {
       updateQuestion(q.id, {
         prompt: q.prompt.trim() || "Soal tanpa teks",
         options: q.options,
-        answer: q.answer,
+        type: q.type ?? "single",
+        answers: q.answers ?? [q.answer ?? 0],
       })
     );
 
@@ -165,7 +166,8 @@ export default function SetSoalFormPage() {
       const row = await createQuestion(set.id, {
         prompt: "",
         options: ["", ""],
-        answer: 0,
+        type: "single",
+        answers: [0],
         position: set.questions.length,
       });
       setSet((s) => ({ ...s, questions: [...s.questions, row] }));
@@ -341,6 +343,9 @@ export default function SetSoalFormPage() {
               <div className="flex items-start justify-between gap-3">
                 <p className="font-mono text-xs text-zinc-400">
                   {selected.code}
+                  <span className="ml-2 rounded bg-zinc-100 px-1.5 py-0.5 font-sans font-semibold text-zinc-500">
+                    {selected.type === "multi" ? "Checklist" : "Pilihan ganda"}
+                  </span>
                 </p>
                 <button
                   type="button"
@@ -356,28 +361,31 @@ export default function SetSoalFormPage() {
               </MathText>
 
               <ul className="flex flex-col gap-1.5">
-                {selected.options.map((opt, oi) => (
-                  <li
-                    key={oi}
-                    className={`flex items-start gap-2 rounded-lg border px-3 py-2 text-sm ${
-                      selected.answer === oi
-                        ? "border-teal-300 bg-teal-50"
-                        : "border-zinc-200"
-                    }`}
-                  >
-                    <span className="mt-0.5 shrink-0 font-semibold text-zinc-400">
-                      {String.fromCharCode(65 + oi)}.
-                    </span>
-                    <MathText className="text-zinc-700">
-                      {opt || "(kosong)"}
-                    </MathText>
-                    {selected.answer === oi && (
-                      <span className="ml-auto shrink-0 text-[11px] font-semibold text-teal-700">
-                        kunci
+                {selected.options.map((opt, oi) => {
+                  const key = (selected.answers ?? [selected.answer]).includes(
+                    oi
+                  );
+                  return (
+                    <li
+                      key={oi}
+                      className={`flex items-start gap-2 rounded-lg border px-3 py-2 text-sm ${
+                        key ? "border-teal-300 bg-teal-50" : "border-zinc-200"
+                      }`}
+                    >
+                      <span className="mt-0.5 shrink-0 font-semibold text-zinc-400">
+                        {String.fromCharCode(65 + oi)}.
                       </span>
-                    )}
-                  </li>
-                ))}
+                      <MathText className="text-zinc-700">
+                        {opt || "(kosong)"}
+                      </MathText>
+                      {key && (
+                        <span className="ml-auto shrink-0 text-[11px] font-semibold text-teal-700">
+                          kunci
+                        </span>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           )}
@@ -389,7 +397,22 @@ export default function SetSoalFormPage() {
       )}
 
       {/* Edit modal */}
-      {editing && (
+      {editing &&
+        (() => {
+          const eKeys = editing.answers ?? [editing.answer ?? 0];
+          const eMulti = editing.type === "multi";
+          const commit = (patch) => {
+            patchQ(editing.id, patch);
+            saveQ({ ...editing, ...patch });
+          };
+          const toggleKey = (oi) => {
+            if (!eMulti) return commit({ answers: [oi] });
+            const next = eKeys.includes(oi)
+              ? eKeys.filter((x) => x !== oi)
+              : [...eKeys, oi].sort((a, b) => a - b);
+            commit({ answers: next.length ? next : eKeys });
+          };
+          return (
         <Modal title={`Soal · ${editing.code}`} onClose={closeModal}>
           <div className="flex flex-col gap-4">
             <label className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-zinc-400">
@@ -407,21 +430,52 @@ export default function SetSoalFormPage() {
               />
             </label>
 
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-zinc-400">
+                Tipe soal
+              </p>
+              <div className="mt-1.5 inline-flex rounded-lg border border-zinc-200 p-0.5 text-xs font-semibold">
+                {[
+                  ["single", "Pilihan ganda"],
+                  ["multi", "Checklist"],
+                ].map(([val, label]) => (
+                  <button
+                    key={val}
+                    type="button"
+                    onClick={() => {
+                      if ((editing.type ?? "single") === val) return;
+                      commit({
+                        type: val,
+                        answers: val === "single" ? [eKeys[0] ?? 0] : eKeys,
+                      });
+                    }}
+                    className={`rounded-md px-3 py-1.5 transition-colors ${
+                      (editing.type ?? "single") === val
+                        ? "bg-brand-500 text-white"
+                        : "text-zinc-500 hover:text-zinc-800"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div className="flex flex-col gap-1.5">
               <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-zinc-400">
-                Opsi · klik bulatan untuk kunci jawaban
+                Opsi · klik kotak buat tandai kunci
+                {eMulti ? " (boleh > 1)" : ""}
               </p>
               {editing.options.map((opt, oi) => (
                 <div key={oi} className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => {
-                      patchQ(editing.id, { answer: oi });
-                      saveQ({ ...editing, answer: oi });
-                    }}
+                    onClick={() => toggleKey(oi)}
                     aria-label={`Tandai opsi ${oi + 1} benar`}
-                    className={`grid h-5 w-5 shrink-0 place-items-center rounded-full border-2 transition-colors ${
-                      editing.answer === oi
+                    className={`grid h-5 w-5 shrink-0 place-items-center border-2 transition-colors ${
+                      eMulti ? "rounded-md" : "rounded-full"
+                    } ${
+                      eKeys.includes(oi)
                         ? "border-teal-500 bg-teal-500 text-white"
                         : "border-zinc-300 text-transparent hover:border-teal-400"
                     }`}
@@ -444,14 +498,12 @@ export default function SetSoalFormPage() {
                     disabled={editing.options.length <= 2}
                     onClick={() => {
                       const options = editing.options.filter((_, i) => i !== oi);
-                      const answer =
-                        editing.answer === oi
-                          ? 0
-                          : editing.answer > oi
-                            ? editing.answer - 1
-                            : editing.answer;
-                      patchQ(editing.id, { options, answer });
-                      saveQ({ ...editing, options, answer });
+                      const shifted = eKeys
+                        .filter((a) => a !== oi)
+                        .map((a) => (a > oi ? a - 1 : a));
+                      const answers = shifted.length ? shifted : [0];
+                      patchQ(editing.id, { options, answers });
+                      saveQ({ ...editing, options, answers });
                     }}
                     aria-label="Hapus opsi"
                     className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-zinc-300 transition-colors hover:bg-rose-50 hover:text-rose-500 disabled:opacity-25"
@@ -484,17 +536,27 @@ export default function SetSoalFormPage() {
               <ul className="mt-2 flex flex-col gap-1 text-sm text-zinc-600">
                 {editing.options.map((opt, oi) => (
                   <li key={oi} className="flex gap-2">
-                    <span className="font-semibold text-zinc-400">
+                    <span
+                      className={`font-semibold ${
+                        eKeys.includes(oi) ? "text-teal-600" : "text-zinc-400"
+                      }`}
+                    >
                       {String.fromCharCode(65 + oi)}.
                     </span>
                     <MathText>{opt || "(kosong)"}</MathText>
+                    {eKeys.includes(oi) && (
+                      <span className="ml-auto text-[11px] font-semibold text-teal-700">
+                        kunci
+                      </span>
+                    )}
                   </li>
                 ))}
               </ul>
             </div>
           </div>
         </Modal>
-      )}
+          );
+        })()}
     </div>
   );
 }
@@ -504,6 +566,12 @@ const IMPORT_EXAMPLE = `[
     "prompt": "Nilai dari $\\\\sqrt{8}+\\\\sqrt{18}$ adalah…",
     "options": ["$3\\\\sqrt{2}$", "$5\\\\sqrt{2}$", "$6\\\\sqrt{2}$", "$7\\\\sqrt{2}$"],
     "answer": "B"
+  },
+  {
+    "prompt": "Bilangan prima di bawah ini:",
+    "options": ["2", "4", "7", "9"],
+    "type": "multi",
+    "answer": ["A", "C"]
   }
 ]`;
 
@@ -520,7 +588,9 @@ function ImportModal({ onClose, onImport }) {
           Array objek. Tiap objek: <code>prompt</code> (teks, boleh LaTeX
           <code> $…$ </code>), <code>options</code> (array, min 2),{" "}
           <code>answer</code> (index 0-based, huruf <code>&quot;A&quot;</code>…,
-          atau teks opsi persis). Soal ditambahkan di akhir.
+          atau teks opsi persis — boleh <code>array</code> untuk checklist).
+          Opsional <code>type</code>: <code>&quot;multi&quot;</code>. Soal
+          ditambahkan di akhir.
         </p>
         <details className="text-xs text-zinc-400">
           <summary className="cursor-pointer select-none">Contoh</summary>
