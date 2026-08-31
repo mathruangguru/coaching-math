@@ -164,6 +164,25 @@ export async function submitFormResponse(formId, lessonId, answers) {
   if (error) throw error;
 }
 
+/** Waktu (ISO) respons terakhir user ini di sebuah form, atau null. */
+export async function getMyLastFormResponseAt(formId) {
+  ensure();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+  const { data, error } = await supabase
+    .from("coaching_form_responses")
+    .select("created_at")
+    .eq("form_id", formId)
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data?.created_at ?? null;
+}
+
 /** Semua respons sebuah form — buat rekap admin (RLS admin read). */
 export async function getFormResponses(formId) {
   ensure();
