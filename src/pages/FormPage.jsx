@@ -326,13 +326,14 @@ export default function FormPage() {
           setData((d) =>
             d.status === "ready" && d.form ? { ...d, form: fresh } : d
           );
-        if (lastIso) setLastAt(Date.parse(lastIso));
-        const closed = fresh ? fresh.open === false : false;
-        const cooling = lastIso
-          ? Date.now() - Date.parse(lastIso) < COOLDOWN_MS
-          : false;
-        if (!closed && !cooling)
-          setErr("Nggak bisa mengirim sekarang. Coba lagi.");
+        // Form ditutup -> gate render "ditutup". Kebuka tapi RLS nolak ->
+        // satu-satunya sebab lain adalah masa tunggu form ini.
+        if (fresh?.open === false) return;
+        if (lastIso) {
+          setLastAt(Date.parse(lastIso)); // gate render nampilin hitung mundur
+        } else {
+          setErr("Kamu baru saja mengisi form ini. Coba lagi beberapa menit lagi.");
+        }
         return;
       }
       setErr(msg || "Gagal mengirim.");
