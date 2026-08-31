@@ -81,15 +81,28 @@ Deno.serve(async (req) => {
   const ids = questions.map((q) => q.id);
   const { data: keys, error: kErr } = await admin
     .from("coaching_question_keys")
-    .select("question_id, answer")
+    .select("question_id, answer, answers")
     .in("question_id", ids);
   if (kErr) return json({ error: kErr.message }, 400);
 
-  const keyMap = new Map(keys?.map((k) => [k.question_id, k.answer]));
+  // Normalisasi ke array index urut. Benar = himpunan sama persis.
+  const norm = (v: unknown): number[] => {
+    const a = Array.isArray(v) ? v : v == null ? [] : [v];
+    return [...new Set(a.map(Number))].sort((x, y) => x - y);
+  };
+  const same = (a: number[], b: number[]) =>
+    a.length > 0 && a.length === b.length && a.every((v, i) => v === b[i]);
+
+  const keyMap = new Map(
+    (keys ?? []).map((k) => [
+      k.question_id,
+      norm(k.answers?.length ? k.answers : [k.answer ?? 0]),
+    ])
+  );
   const results: Record<string, boolean> = {};
   let score = 0;
   for (const qid of ids) {
-    const ok = keyMap.get(qid) === answers[qid];
+    const ok = same(norm(answers[qid]), keyMap.get(qid) ?? []);
     results[qid] = ok;
     if (ok) score += 1;
   }

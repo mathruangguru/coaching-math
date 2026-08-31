@@ -22,6 +22,20 @@ export async function getQuestionSets() {
   return data;
 }
 
+/** Normalisasi jawaban jadi array index urut. number -> [n], null -> []. */
+export function toAnswerArray(v) {
+  if (Array.isArray(v)) return [...new Set(v)].sort((a, b) => a - b);
+  if (v == null) return [];
+  return [v];
+}
+
+/** Dua himpunan jawaban sama persis (dan nggak kosong)? */
+export function sameAnswerSet(a, b) {
+  const x = toAnswerArray(a);
+  const y = toAnswerArray(b);
+  return x.length > 0 && x.length === y.length && x.every((v, i) => v === y[i]);
+}
+
 /**
  * Set + soal-soalnya (tanpa kunci jawaban). Buat halaman murid.
  */
@@ -31,19 +45,22 @@ export async function getQuestionSet(id) {
     .from("coaching_question_sets")
     .select(
       `id, title, description,
-       questions:coaching_questions ( id, code, prompt, options, position )`
+       questions:coaching_questions ( id, code, type, prompt, options, position )`
     )
     .eq("id", id)
     .maybeSingle();
   if (error) throw error;
   if (!data) return null;
   data.questions.sort((a, b) => a.position - b.position);
-  for (const q of data.questions) delete q.position;
+  for (const q of data.questions) {
+    delete q.position;
+    q.type = q.type ?? "single";
+  }
   return data;
 }
 
 /**
- * Sama dengan getQuestionSet tapi tiap soal disertai `answer` (index).
+ * Sama dengan getQuestionSet tapi tiap soal disertai `answers` (array index).
  * Butuh caller = admin (RLS coaching_question_keys).
  */
 export async function getQuestionSetAdmin(id) {
@@ -54,11 +71,19 @@ export async function getQuestionSetAdmin(id) {
   if (ids.length) {
     const { data: keys, error } = await supabase
       .from("coaching_question_keys")
-      .select("question_id, answer")
+      .select("question_id, answer, answers")
       .in("question_id", ids);
     if (error) throw error;
-    const m = new Map(keys.map((k) => [k.question_id, k.answer]));
-    for (const q of set.questions) q.answer = m.get(q.id) ?? 0;
+    const m = new Map(
+      keys.map((k) => [
+        k.question_id,
+        k.answers?.length ? k.answers : [k.answer ?? 0],
+      ])
+    );
+    for (const q of set.questions) {
+      q.answers = toAnswerArray(m.get(q.id) ?? [0]);
+      q.answer = q.answers[0] ?? 0; // legacy
+    }
   }
   return set;
 }
@@ -109,19 +134,32 @@ function randomCode() {
   return s;
 }
 
-export async function createQuestion(setId, { prompt, options, answer, position }) {
+export async function createQuestion(
+  setId,
+  { prompt, options, type = "single", answers, position }
+) {
   ensure();
   const id = crypto.randomUUID();
   const code = randomCode();
+  const ans = toAnswerArray(answers).length ? toAnswerArray(answers) : [0];
   const { error } = await supabase
     .from("coaching_questions")
-    .insert({ id, set_id: setId, code, prompt, options, position });
+    .insert({ id, set_id: setId, code, type, prompt, options, position });
   if (error) throw error;
   const { error: keyErr } = await supabase
     .from("coaching_question_keys")
-    .insert({ question_id: id, answer: answer ?? 0 });
+    .insert({ question_id: id, answers: ans, answer: ans[0] });
   if (keyErr) throw keyErr;
-  return { id, code, prompt, options, answer: answer ?? 0 };
+  return { id, code, type, prompt, options, answers: ans, answer: ans[0] };
+}
+
+// "B" / 2 / "opsi persis" -> index; -1 kalau nggak ketemu.
+function toOptionIndex(v, options) {
+  if (typeof v === "number") return v;
+  const s = String(v).trim();
+  if (/^[A-Za-z]$/.test(s)) return s.toUpperCase().charCodeAt(0) - 65;
+  if (/^\d+$/.test(s)) return Number(s);
+  return options.indexOf(s);
 }
 
 /**
@@ -129,7 +167,9 @@ export async function createQuestion(setId, { prompt, options, answer, position 
  * { questions: [...] }. Tiap item butuh:
  *   prompt  : string
  *   options : string[] (>= 2)
- *   answer  : index 0-based, ATAU huruf "A".."Z", ATAU teks opsi yang persis
+ *   answer  : index / huruf "A".. / teks opsi. Boleh ARRAY buat checklist.
+ *   type    : "single" (default) / "multi" — atau otomatis "multi" kalau
+ *             answer array isinya > 1.
  * Balikin { items: normalized[], errors: string[] }.
  */
 export function parseQuestionsJson(text) {
@@ -155,18 +195,26 @@ export function parseQuestionsJson(text) {
     if (!prompt) errors.push(`Soal ${n}: "prompt" wajib string.`);
     if (options.length < 2) errors.push(`Soal ${n}: minimal 2 "options".`);
 
-    let answer = q?.answer;
-    if (typeof answer === "string") {
-      const letter = answer.trim().toUpperCase();
-      if (/^[A-Z]$/.test(letter)) answer = letter.charCodeAt(0) - 65;
-      else answer = options.indexOf(answer);
-    }
-    if (!Number.isInteger(answer) || answer < 0 || answer >= options.length) {
+    const rawAns = Array.isArray(q?.answer) ? q.answer : [q?.answer];
+    const answers = toAnswerArray(
+      rawAns.map((v) => toOptionIndex(v, options))
+    );
+    const bad = answers.some(
+      (a) => !Number.isInteger(a) || a < 0 || a >= options.length
+    );
+    if (!answers.length || bad) {
       errors.push(`Soal ${n}: "answer" harus index/huruf opsi yang valid.`);
-      answer = 0;
     }
+    const type =
+      q?.type === "multi" || q?.type === "single"
+        ? q.type
+        : answers.length > 1
+          ? "multi"
+          : "single";
 
-    if (prompt && options.length >= 2) items.push({ prompt, options, answer });
+    if (prompt && options.length >= 2 && answers.length && !bad) {
+      items.push({ prompt, options, type, answers });
+    }
   });
 
   if (!items.length && !errors.length) errors.push("Tidak ada soal.");
@@ -178,20 +226,27 @@ export function parseQuestionsJson(text) {
  */
 export async function bulkCreateQuestions(setId, items, startPosition = 0) {
   ensure();
-  const meta = items.map((it, i) => ({
-    id: crypto.randomUUID(),
-    code: randomCode(),
-    answer: it.answer ?? 0,
-    prompt: it.prompt,
-    options: it.options,
-    position: startPosition + i,
-  }));
+  const meta = items.map((it, i) => {
+    const answers = toAnswerArray(it.answers ?? it.answer).length
+      ? toAnswerArray(it.answers ?? it.answer)
+      : [0];
+    return {
+      id: crypto.randomUUID(),
+      code: randomCode(),
+      type: it.type ?? (answers.length > 1 ? "multi" : "single"),
+      answers,
+      prompt: it.prompt,
+      options: it.options,
+      position: startPosition + i,
+    };
+  });
 
   const { error } = await supabase.from("coaching_questions").insert(
     meta.map((m) => ({
       id: m.id,
       set_id: setId,
       code: m.code,
+      type: m.type,
       prompt: m.prompt,
       options: m.options,
       position: m.position,
@@ -199,30 +254,37 @@ export async function bulkCreateQuestions(setId, items, startPosition = 0) {
   );
   if (error) throw error;
 
-  const { error: keyErr } = await supabase
-    .from("coaching_question_keys")
-    .insert(meta.map((m) => ({ question_id: m.id, answer: m.answer })));
+  const { error: keyErr } = await supabase.from("coaching_question_keys").insert(
+    meta.map((m) => ({
+      question_id: m.id,
+      answers: m.answers,
+      answer: m.answers[0],
+    }))
+  );
   if (keyErr) throw keyErr;
 
   return meta.map((m) => ({
     id: m.id,
     code: m.code,
+    type: m.type,
     prompt: m.prompt,
     options: m.options,
-    answer: m.answer,
+    answers: m.answers,
+    answer: m.answers[0],
   }));
 }
 
-export async function updateQuestion(id, { prompt, options, answer }) {
+export async function updateQuestion(id, { prompt, options, type, answers }) {
   ensure();
+  const ans = toAnswerArray(answers).length ? toAnswerArray(answers) : [0];
   const { error } = await supabase
     .from("coaching_questions")
-    .update({ prompt, options })
+    .update({ prompt, options, type: type ?? "single" })
     .eq("id", id);
   if (error) throw error;
   const { error: keyErr } = await supabase
     .from("coaching_question_keys")
-    .upsert({ question_id: id, answer: answer ?? 0 });
+    .upsert({ question_id: id, answers: ans, answer: ans[0] });
   if (keyErr) throw keyErr;
 }
 

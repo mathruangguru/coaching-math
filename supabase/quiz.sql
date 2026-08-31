@@ -27,11 +27,26 @@ update public.coaching_questions
   set code = upper(substr(md5(random()::text || id), 1, 8))
   where code is null;
 
+-- Tipe soal: 'single' (pilihan ganda) / 'multi' (checklist, >1 jawaban benar).
+alter table public.coaching_questions
+  add column if not exists type text not null default 'single';
+alter table public.coaching_questions drop constraint if exists coaching_questions_type_check;
+alter table public.coaching_questions
+  add constraint coaching_questions_type_check check (type in ('single', 'multi'));
+
 -- Kunci jawaban dipisah: murid nggak boleh bisa baca ini lewat API.
 create table if not exists public.coaching_question_keys (
   question_id text primary key references public.coaching_questions (id) on delete cascade,
-  answer      int not null default 0                 -- index opsi yang benar
+  answer      int not null default 0,                -- legacy: index tunggal
+  answers     int[] not null default '{}'::int[]     -- himpunan index opsi yang benar
 );
+
+-- Kolom answers[] ditambahkan belakangan — backfill dari `answer`.
+alter table public.coaching_question_keys
+  add column if not exists answers int[] not null default '{}'::int[];
+update public.coaching_question_keys
+  set answers = array[answer]
+  where cardinality(answers) = 0;
 
 -- Attempt murid: skor + snapshot jawaban. 1x per (user, set).
 create table if not exists public.coaching_quiz_attempts (

@@ -6,8 +6,16 @@ import {
   getQuestionSetAdmin,
   getAllAttempts,
   deleteAttempt,
+  toAnswerArray,
+  sameAnswerSet,
 } from "../../lib/quiz";
 import Skeleton from "../../components/ui/Skeleton";
+
+const keyOf = (q) => q.answers ?? [q.answer ?? 0];
+const letters = (v) =>
+  toAnswerArray(v)
+    .map((i) => String.fromCharCode(65 + i))
+    .join("") || "–";
 
 function fullName(u) {
   return (
@@ -89,20 +97,20 @@ const th =
   "border border-zinc-100 px-2.5 py-1.5 text-xs font-semibold text-zinc-500";
 const td = "border border-zinc-100 px-2.5 py-1.5";
 
-function Cell({ chosen, correct }) {
-  if (chosen == null) {
+function Cell({ chosen, keyArr }) {
+  if (toAnswerArray(chosen).length === 0) {
     return (
       <td className={`${td} bg-zinc-50 text-center text-xs text-zinc-300`}>–</td>
     );
   }
-  const ok = chosen === correct;
+  const ok = sameAnswerSet(chosen, keyArr);
   return (
     <td
       className={`${td} text-center text-xs font-bold ${
         ok ? "bg-teal-50 text-teal-700" : "bg-rose-50 text-rose-700"
       }`}
     >
-      {String.fromCharCode(65 + chosen)}
+      {letters(chosen)}
     </td>
   );
 }
@@ -117,7 +125,9 @@ function ResultTable({
   resetBusyId,
 }) {
   const stats = questions.map((q) => {
-    const correct = attempts.filter((a) => a.answers?.[q.id] === q.answer).length;
+    const correct = attempts.filter((a) =>
+      sameAnswerSet(a.answers?.[q.id], keyOf(q))
+    ).length;
     return attempts.length
       ? Math.round((correct / attempts.length) * 100)
       : 0;
@@ -158,7 +168,7 @@ function ResultTable({
                 key={i}
                 className={`${td} text-center text-xs font-bold text-zinc-600`}
               >
-                {String.fromCharCode(65 + (q.answer ?? 0))}
+                {letters(keyOf(q))}
               </td>
             ))}
             {onReset && <td className={td} />}
@@ -197,7 +207,7 @@ function ResultTable({
                   <ScorePill score={a.score} total={a.total} />
                 </td>
                 {questions.map((q, i) => (
-                  <Cell key={i} chosen={a.answers?.[q.id]} correct={q.answer} />
+                  <Cell key={i} chosen={a.answers?.[q.id]} keyArr={keyOf(q)} />
                 ))}
                 {onReset && (
                   <td className={`${td} whitespace-nowrap`}>
