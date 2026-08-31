@@ -37,6 +37,22 @@ function fullName(u) {
   return [u.first_name, u.last_name].filter(Boolean).join(" ");
 }
 
+function initials(u) {
+  const n = fullName(u) || u.email || "?";
+  return n
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((p) => p[0])
+    .join("")
+    .toUpperCase();
+}
+
+const roleTint = {
+  student: "bg-zinc-100 text-zinc-500",
+  admin: "bg-sky-50 text-sky-600",
+  super_admin: "bg-brand-50 text-brand-600",
+};
+
 function BulkModal({ isSuperAdmin, onClose, onDone }) {
   const [text, setText] = useState("");
   const [parsed, setParsed] = useState(null); // { items, errors }
@@ -224,6 +240,8 @@ export default function AdminUsersPage() {
   const [formOk, setFormOk] = useState("");
   const [rowBusyId, setRowBusyId] = useState(null);
   const [showBulk, setShowBulk] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [q, setQ] = useState("");
 
   const fetchUsers = () =>
     getUsers()
@@ -276,6 +294,7 @@ export default function AdminUsersPage() {
       await createUser({ ...form, role: isSuperAdmin ? form.role : "student" });
       setFormOk(`User ${form.email.trim()} dibuat.`);
       setForm(emptyForm);
+      setShowForm(false);
       await fetchUsers();
     } catch (err) {
       setFormError(err?.message ?? "Gagal membuat user.");
@@ -336,17 +355,48 @@ export default function AdminUsersPage() {
     }
   };
 
+  const needle = q.trim().toLowerCase();
+  const shown =
+    status === "ready"
+      ? users.filter(
+          (u) =>
+            !needle ||
+            fullName(u).toLowerCase().includes(needle) ||
+            (u.email ?? "").toLowerCase().includes(needle) ||
+            (u.branch?.name ?? "").toLowerCase().includes(needle)
+        )
+      : [];
+
   return (
     <div className="flex flex-col gap-5">
-      <div>
-        <h1 className="text-xl font-bold tracking-tight text-zinc-900">
-          Pengguna
-        </h1>
-        <p className="mt-1 text-xs text-zinc-400">
-          {isSuperAdmin
-            ? "Buat akun, atur peran, set password, atau hapus."
-            : "Buat akun murid baru."}
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-bold tracking-tight text-zinc-900">
+            Pengguna
+          </h1>
+          <p className="mt-1 text-xs text-zinc-400">
+            {status === "ready" ? `${users.length} akun · ` : ""}
+            {isSuperAdmin
+              ? "atur peran, set password, hapus."
+              : "buat akun murid baru."}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowForm((v) => !v)}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-brand-500 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-brand-600"
+          >
+            <UserPlus size={14} /> Tambah user
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowBulk(true)}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2.5 py-2 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-50"
+          >
+            <Users size={13} /> Tambah banyak
+          </button>
+        </div>
       </div>
 
       {showBulk && (
@@ -357,104 +407,106 @@ export default function AdminUsersPage() {
         />
       )}
 
-      {/* Tambah user */}
-      <form
-        onSubmit={handleCreate}
-        className="flex flex-col gap-3 rounded-2xl border border-zinc-200 bg-white p-5"
-      >
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-xs font-semibold text-zinc-700">Tambah user</p>
-          <button
-            type="button"
-            onClick={() => setShowBulk(true)}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 px-2.5 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-50"
-          >
-            <Users size={13} /> Tambah banyak
-          </button>
-        </div>
+      {/* Tambah user — collapsible */}
+      {showForm && (
+        <form
+          onSubmit={handleCreate}
+          className="flex flex-col gap-3 rounded-2xl border border-zinc-200 bg-white p-5"
+        >
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block text-xs font-medium text-zinc-600">
+              Nama depan
+              <input
+                required
+                autoComplete="off"
+                value={form.firstName}
+                onChange={(e) => set("firstName", e.target.value)}
+                className={`mt-1 ${inputCls}`}
+              />
+            </label>
+            <label className="block text-xs font-medium text-zinc-600">
+              Nama belakang
+              <input
+                required
+                autoComplete="off"
+                value={form.lastName}
+                onChange={(e) => set("lastName", e.target.value)}
+                className={`mt-1 ${inputCls}`}
+              />
+            </label>
+          </div>
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="block text-xs font-medium text-zinc-600">
-            Nama depan
-            <input
-              required
-              autoComplete="off"
-              value={form.firstName}
-              onChange={(e) => set("firstName", e.target.value)}
-              className={`mt-1 ${inputCls}`}
-            />
-          </label>
-          <label className="block text-xs font-medium text-zinc-600">
-            Nama belakang
-            <input
-              required
-              autoComplete="off"
-              value={form.lastName}
-              onChange={(e) => set("lastName", e.target.value)}
-              className={`mt-1 ${inputCls}`}
-            />
-          </label>
-        </div>
+          <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
+            <label className="block text-xs font-medium text-zinc-600">
+              Email
+              <input
+                type="email"
+                required
+                autoComplete="off"
+                value={form.email}
+                onChange={(e) => set("email", e.target.value)}
+                className={`mt-1 ${inputCls}`}
+              />
+            </label>
+            <label className="block text-xs font-medium text-zinc-600">
+              Password sementara
+              <input
+                type="text"
+                required
+                autoComplete="off"
+                value={form.password}
+                onChange={(e) => set("password", e.target.value)}
+                className={`mt-1 ${inputCls}`}
+              />
+            </label>
+            <label className="block text-xs font-medium text-zinc-600">
+              Role
+              <select
+                value={isSuperAdmin ? form.role : "student"}
+                disabled={!isSuperAdmin}
+                onChange={(e) => set("role", e.target.value)}
+                title={
+                  isSuperAdmin
+                    ? undefined
+                    : "Cuma super admin yang bisa set role"
+                }
+                className={`mt-1 ${inputCls} disabled:bg-zinc-100 disabled:text-zinc-400`}
+              >
+                <option value="student">student</option>
+                {isSuperAdmin && <option value="admin">admin</option>}
+                {isSuperAdmin && (
+                  <option value="super_admin">super admin</option>
+                )}
+              </select>
+            </label>
+          </div>
 
-        <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
-          <label className="block text-xs font-medium text-zinc-600">
-            Email
-            <input
-              type="email"
-              required
-              autoComplete="off"
-              value={form.email}
-              onChange={(e) => set("email", e.target.value)}
-              className={`mt-1 ${inputCls}`}
-            />
-          </label>
-          <label className="block text-xs font-medium text-zinc-600">
-            Password sementara
-            <input
-              type="text"
-              required
-              autoComplete="off"
-              value={form.password}
-              onChange={(e) => set("password", e.target.value)}
-              className={`mt-1 ${inputCls}`}
-            />
-          </label>
-          <label className="block text-xs font-medium text-zinc-600">
-            Role
-            <select
-              value={isSuperAdmin ? form.role : "student"}
-              disabled={!isSuperAdmin}
-              onChange={(e) => set("role", e.target.value)}
-              title={
-                isSuperAdmin ? undefined : "Cuma super admin yang bisa set role"
-              }
-              className={`mt-1 ${inputCls} disabled:bg-zinc-100 disabled:text-zinc-400`}
+          {formError && <p className="text-xs text-rose-600">{formError}</p>}
+          {formOk && <p className="text-xs text-emerald-600">{formOk}</p>}
+
+          <div className="flex gap-2">
+            <button
+              type="submit"
+              disabled={busy}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-brand-500 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-brand-600 disabled:opacity-50"
             >
-              <option value="student">student</option>
-              {isSuperAdmin && <option value="admin">admin</option>}
-              {isSuperAdmin && <option value="super_admin">super admin</option>}
-            </select>
-          </label>
-        </div>
-
-        {formError && <p className="text-xs text-rose-600">{formError}</p>}
-        {formOk && <p className="text-xs text-emerald-600">{formOk}</p>}
-
-        <div>
-          <button
-            type="submit"
-            disabled={busy}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-brand-500 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-brand-600 disabled:opacity-50"
-          >
-            <UserPlus size={14} /> {busy ? "Membuat…" : "Buat user"}
-          </button>
-        </div>
-      </form>
+              <UserPlus size={14} /> {busy ? "Membuat…" : "Buat user"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowForm(false)}
+              className="rounded-lg border border-zinc-200 px-3 py-2 text-xs font-medium text-zinc-500 transition-colors hover:bg-zinc-50"
+            >
+              Batal
+            </button>
+          </div>
+        </form>
+      )}
 
       {/* Daftar user */}
       {status === "loading" && (
         <div className="flex flex-col gap-2">
-          {Array.from({ length: 3 }).map((_, i) => (
+          {Array.from({ length: 4 }).map((_, i) => (
             <Skeleton key={i} className="h-14 w-full rounded-xl" />
           ))}
         </div>
@@ -467,78 +519,105 @@ export default function AdminUsersPage() {
       )}
 
       {status === "ready" && (
-        <ul className="flex flex-col gap-2">
-          {users.map((user) => {
-            const isSelf = user.id === myId;
-            const name = fullName(user);
-            return (
-              <li
-                key={user.id}
-                className="flex flex-wrap items-center gap-3 rounded-xl border border-zinc-200 bg-white px-4 py-3"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-zinc-900">
-                    {name || user.email || user.id}
-                    {isSelf && (
-                      <span className="ml-2 text-xs font-normal text-zinc-400">
-                        (kamu)
-                      </span>
-                    )}
-                  </p>
-                  {name && user.email && (
-                    <p className="truncate text-xs text-zinc-400">
-                      {user.email}
-                    </p>
-                  )}
-                  <p className="truncate text-xs text-zinc-400">
-                    Cabang: {user.branch?.name ?? "—"}
-                  </p>
-                </div>
+        <>
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Cari nama / email / cabang…"
+            className={inputCls}
+          />
 
-                {isSuperAdmin ? (
-                  <>
-                    <button
-                      onClick={() => handleSetPassword(user)}
-                      disabled={rowBusyId === user.id}
-                      className="inline-flex items-center gap-1 rounded-lg border border-zinc-200 px-2.5 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-50 disabled:opacity-50"
-                    >
-                      <KeyRound size={12} /> Set password
-                    </button>
-
-                    <select
-                      value={user.role}
-                      disabled={isSelf || rowBusyId === user.id}
-                      onChange={(e) => handleRoleChange(user, e.target.value)}
-                      title={
-                        isSelf ? "Nggak bisa ganti role sendiri" : undefined
-                      }
-                      className="rounded-lg border border-zinc-300 px-2 py-1 text-xs text-zinc-700 outline-none focus:border-brand-500 disabled:bg-zinc-100 disabled:text-zinc-400"
-                    >
-                      <option value="student">student</option>
-                      <option value="admin">admin</option>
-                      <option value="super_admin">super admin</option>
-                    </select>
-
-                    {!isSelf && (
-                      <button
-                        onClick={() => handleDelete(user)}
-                        disabled={rowBusyId === user.id}
-                        aria-label={`Hapus ${user.email ?? name}`}
-                        className="inline-flex items-center gap-1 rounded-lg border border-rose-200 px-2.5 py-1.5 text-xs font-medium text-rose-600 transition-colors hover:bg-rose-50 disabled:opacity-50"
-                      >
-                        <Trash2 size={12} /> Hapus
-                      </button>
-                    )}
-                  </>
-                ) : (
-                  <span className="rounded-lg border border-zinc-200 px-2.5 py-1 text-xs font-medium text-zinc-500">
-                    {roleLabels[user.role] ?? user.role}
+          <ul className="divide-y divide-zinc-100 overflow-hidden rounded-xl border border-zinc-200 bg-white">
+            {shown.map((user) => {
+              const isSelf = user.id === myId;
+              const name = fullName(user);
+              return (
+                <li
+                  key={user.id}
+                  className="flex flex-wrap items-center gap-3 px-4 py-3"
+                >
+                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-zinc-100 text-xs font-bold text-zinc-500">
+                    {initials(user)}
                   </span>
-                )}
+
+                  <div className="min-w-0 flex-1">
+                    <p className="flex items-center gap-2 truncate text-sm font-medium text-zinc-900">
+                      {name || user.email || user.id}
+                      {isSelf && (
+                        <span className="text-xs font-normal text-zinc-400">
+                          (kamu)
+                        </span>
+                      )}
+                      {user.branch?.name && (
+                        <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-500">
+                          {user.branch.name}
+                        </span>
+                      )}
+                    </p>
+                    {name && user.email && (
+                      <p className="truncate text-xs text-zinc-400">
+                        {user.email}
+                      </p>
+                    )}
+                  </div>
+
+                  {isSuperAdmin ? (
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      <select
+                        value={user.role}
+                        disabled={isSelf || rowBusyId === user.id}
+                        onChange={(e) =>
+                          handleRoleChange(user, e.target.value)
+                        }
+                        title={
+                          isSelf ? "Nggak bisa ganti role sendiri" : "Ganti role"
+                        }
+                        className="rounded-lg border border-zinc-300 px-2 py-1.5 text-xs text-zinc-700 outline-none focus:border-brand-500 disabled:bg-zinc-100 disabled:text-zinc-400"
+                      >
+                        <option value="student">student</option>
+                        <option value="admin">admin</option>
+                        <option value="super_admin">super admin</option>
+                      </select>
+                      <button
+                        onClick={() => handleSetPassword(user)}
+                        disabled={rowBusyId === user.id}
+                        title="Set password"
+                        aria-label={`Set password ${user.email ?? name}`}
+                        className="grid h-8 w-8 place-items-center rounded-lg border border-zinc-200 text-zinc-500 transition-colors hover:bg-zinc-50 disabled:opacity-50"
+                      >
+                        <KeyRound size={13} />
+                      </button>
+                      {!isSelf && (
+                        <button
+                          onClick={() => handleDelete(user)}
+                          disabled={rowBusyId === user.id}
+                          title="Hapus user"
+                          aria-label={`Hapus ${user.email ?? name}`}
+                          className="grid h-8 w-8 place-items-center rounded-lg border border-rose-200 text-rose-500 transition-colors hover:bg-rose-50 disabled:opacity-50"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <span
+                      className={`shrink-0 rounded-lg px-2.5 py-1 text-xs font-semibold ${
+                        roleTint[user.role] ?? "bg-zinc-100 text-zinc-500"
+                      }`}
+                    >
+                      {roleLabels[user.role] ?? user.role}
+                    </span>
+                  )}
+                </li>
+              );
+            })}
+            {shown.length === 0 && (
+              <li className="px-4 py-8 text-center text-xs text-zinc-400">
+                Nggak ada user yang cocok.
               </li>
-            );
-          })}
-        </ul>
+            )}
+          </ul>
+        </>
       )}
     </div>
   );
