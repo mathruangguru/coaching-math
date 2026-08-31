@@ -100,7 +100,10 @@ export default function FormPage() {
         ]);
         if (!alive) return;
         setData({ status: "ready", course, lesson, form });
-        if (lastIso) setLastAt(Date.parse(lastIso));
+        // Reset per-form: jangan bawa cooldown / state kiriman dari form lain.
+        setLastAt(lastIso ? Date.parse(lastIso) : null);
+        setSent(false);
+        setValues({});
       } catch (e) {
         console.error("[FormPage] gagal memuat:", e);
         if (alive) setData({ status: "error" });
