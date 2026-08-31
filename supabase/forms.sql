@@ -15,12 +15,13 @@ create table if not exists public.coaching_forms (
 --   single pilihan tunggal     multi  pilihan ganda
 --   check  checklist pernyataan (tiap opsi = pernyataan; wajib -> centang semua)
 --   name   isian nama  (auto dari akun)   email  isian email (auto dari akun)
---   date   isian tanggal (default hari ini)
+--   date   isian tanggal (auto hari ini, murid nggak bisa ubah)
+--   rating rating bintang 1-5
 create table if not exists public.coaching_form_fields (
   id       text primary key,
   form_id  text not null references public.coaching_forms (id) on delete cascade,
   type     text not null default 'short'
-           check (type in ('short', 'long', 'single', 'multi', 'check', 'name', 'email', 'date')),
+           check (type in ('short', 'long', 'single', 'multi', 'check', 'name', 'email', 'date', 'rating')),
   label    text not null,
   options  jsonb not null default '[]'::jsonb,   -- buat single / multi / check
   required boolean not null default false,
@@ -29,11 +30,11 @@ create table if not exists public.coaching_form_fields (
 create index if not exists coaching_form_fields_form_idx
   on public.coaching_form_fields (form_id, position);
 
--- Tipe field baru (check / name / email) — longgarkan CHECK. Aman diulang.
+-- Tipe field baru (check / name / email / date / rating) — longgarkan CHECK. Aman diulang.
 alter table public.coaching_form_fields drop constraint if exists coaching_form_fields_type_check;
 alter table public.coaching_form_fields
   add constraint coaching_form_fields_type_check
-    check (type in ('short', 'long', 'single', 'multi', 'check', 'name', 'email', 'date'));
+    check (type in ('short', 'long', 'single', 'multi', 'check', 'name', 'email', 'date', 'rating'));
 
 -- Respons murid. Boleh lebih dari 1x per form.
 create table if not exists public.coaching_form_responses (
@@ -41,7 +42,7 @@ create table if not exists public.coaching_form_responses (
   form_id    text not null references public.coaching_forms (id) on delete cascade,
   lesson_id  text references public.coaching_lessons (id) on delete set null,
   user_id    uuid not null references auth.users (id) on delete cascade,
-  answers    jsonb not null default '{}'::jsonb,   -- { fieldId: string | string[] }
+  answers    jsonb not null default '{}'::jsonb,   -- { fieldId: string | string[] | number }
   created_at timestamptz not null default now()
 );
 create index if not exists coaching_form_responses_form_idx
