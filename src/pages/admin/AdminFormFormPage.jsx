@@ -20,7 +20,7 @@ import {
   OPTION_TYPES,
 } from "../../lib/forms";
 
-const autoLabel = { name: "Nama", email: "Email" };
+const autoLabel = { name: "Nama", email: "Email", date: "Tanggal" };
 import Skeleton from "../../components/ui/Skeleton";
 
 const input =
@@ -288,6 +288,11 @@ export default function AdminFormFormPage() {
             {(f.type === "name" || f.type === "email") && (
               <p className="mt-1.5 pl-7 text-xs text-zinc-400">
                 Diisi otomatis dari akun murid — murid nggak bisa ubah.
+              </p>
+            )}
+            {f.type === "date" && (
+              <p className="mt-1.5 pl-7 text-xs text-zinc-400">
+                Default tanggal hari itu — murid masih bisa ganti.
               </p>
             )}
 

@@ -18,6 +18,7 @@ export const fieldTypeLabels = {
   check: "Checklist pernyataan",
   name: "Nama (auto)",
   email: "Email (auto)",
+  date: "Tanggal (auto hari ini)",
 };
 export const FIELD_TYPES = Object.keys(fieldTypeLabels);
 
