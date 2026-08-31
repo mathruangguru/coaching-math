@@ -91,6 +91,12 @@ export default function AdminFormFormPage() {
       updateForm(form.id, { title: form.title, description: form.description })
     );
 
+  const toggleOpen = () => {
+    const open = !form.open;
+    setForm((s) => ({ ...s, open }));
+    run(() => updateForm(form.id, { open }));
+  };
+
   const saveField = (f) =>
     run(() =>
       updateField(f.id, {
@@ -194,6 +200,34 @@ export default function AdminFormFormPage() {
             className={`mt-1.5 ${input} resize-y`}
           />
         </label>
+
+        <div className="mt-4 flex items-center justify-between gap-3 border-t border-zinc-100 pt-3">
+          <div>
+            <p className="text-sm font-medium text-zinc-900">
+              {form.open ? "Menerima respons" : "Ditutup"}
+            </p>
+            <p className="text-xs text-zinc-400">
+              {form.open
+                ? "Murid bisa isi form ini."
+                : "Murid nggak bisa submit — lihat pesan “form ditutup”."}
+            </p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={form.open}
+            onClick={toggleOpen}
+            className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
+              form.open ? "bg-brand-500" : "bg-zinc-300"
+            }`}
+          >
+            <span
+              className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+                form.open ? "translate-x-5" : "translate-x-0.5"
+              }`}
+            />
+          </button>
+        </div>
       </div>
 
       {/* Fields */}

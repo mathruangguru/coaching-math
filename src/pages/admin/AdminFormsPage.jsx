@@ -105,8 +105,13 @@ export default function AdminFormsPage() {
                 <ClipboardList size={17} />
               </span>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-zinc-900">
+                <p className="flex items-center gap-2 truncate text-sm font-semibold text-zinc-900">
                   {form.title}
+                  {form.open === false && (
+                    <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-500">
+                      Ditutup
+                    </span>
+                  )}
                 </p>
                 {form.description && (
                   <p className="truncate text-xs text-zinc-400">

@@ -7,8 +7,13 @@ create table if not exists public.coaching_forms (
   id          text primary key,
   title       text not null,
   description text,
+  open        boolean not null default true,   -- false = tutup, murid nggak bisa submit
   created_at  timestamptz not null default now()
 );
+
+-- Kolom `open` ditambahkan belakangan. Aman diulang.
+alter table public.coaching_forms
+  add column if not exists open boolean not null default true;
 
 -- type:
 --   short  isian pendek        long   isian panjang
@@ -86,10 +91,17 @@ create policy "coaching_form_fields write admin"
   using (public.is_admin()) with check (public.is_admin());
 
 -- Respons: murid insert & baca miliknya; admin baca & hapus semua.
+-- Murid cuma boleh submit ke form yang masih `open`.
 drop policy if exists "coaching_form_responses insert own" on public.coaching_form_responses;
 create policy "coaching_form_responses insert own"
   on public.coaching_form_responses for insert
-  with check (auth.uid() = user_id);
+  with check (
+    auth.uid() = user_id
+    and exists (
+      select 1 from public.coaching_forms f
+      where f.id = form_id and f.open
+    )
+  );
 
 drop policy if exists "coaching_form_responses select own" on public.coaching_form_responses;
 create policy "coaching_form_responses select own"
