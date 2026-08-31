@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, Check, Star } from "lucide-react";
 import { getCourse } from "../lib/courses";
 import { getForm, submitFormResponse } from "../lib/forms";
+import { supabase, hasSupabase } from "../lib/supabase";
 import { useAuth } from "../context/auth-context";
 import Skeleton from "../components/ui/Skeleton";
 
@@ -91,6 +92,38 @@ export default function FormPage() {
       alive = false;
     };
   }, [courseId, lessonId]);
+
+  const formId = data.status === "ready" && data.form ? data.form.id : null;
+
+  // Ikuti perubahan buka/tutup form secara live — admin nutup, halaman ini
+  // langsung pindah ke state "Form ini sedang ditutup." tanpa reload.
+  useEffect(() => {
+    if (!formId || !hasSupabase) return;
+    const channel = supabase
+      .channel(`coaching_form:${formId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "coaching_forms",
+          filter: `id=eq.${formId}`,
+        },
+        (payload) => {
+          const open = payload.new?.open;
+          if (typeof open !== "boolean") return;
+          setData((d) =>
+            d.status === "ready" && d.form && d.form.id === formId
+              ? { ...d, form: { ...d.form, open } }
+              : d
+          );
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [formId]);
 
   const backLink = (
     <Link
@@ -229,7 +262,17 @@ export default function FormPage() {
       await submitFormResponse(form.id, lessonId, payload);
       setSent(true);
     } catch (e2) {
-      setErr(e2?.message ?? "Gagal mengirim.");
+      const msg = e2?.message ?? "";
+      // RLS nolak insert kalau form-nya sudah ditutup — pindah ke state "ditutup".
+      if (/row-level security|violates row-level/i.test(msg)) {
+        setData((d) =>
+          d.status === "ready" && d.form
+            ? { ...d, form: { ...d.form, open: false } }
+            : d
+        );
+        return;
+      }
+      setErr(msg || "Gagal mengirim.");
     } finally {
       setBusy(false);
     }
