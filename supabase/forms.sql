@@ -118,3 +118,14 @@ drop policy if exists "coaching_form_responses admin delete" on public.coaching_
 create policy "coaching_form_responses admin delete"
   on public.coaching_form_responses for delete
   using (public.is_admin());
+
+-- ── Realtime ───────────────────────────────────────────────────────
+-- Halaman isi form murid subscribe ke row coaching_forms, jadi kalau
+-- admin nutup form, halaman langsung pindah ke "Form ini sedang ditutup.".
+-- RLS "coaching_forms read" (using true) tetap berlaku buat stream ini.
+do $$
+begin
+  alter publication supabase_realtime add table public.coaching_forms;
+exception
+  when duplicate_object then null;
+end $$;
