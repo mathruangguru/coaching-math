@@ -20,7 +20,7 @@ export default function ProfilePage() {
         <p className="mt-1 text-xs text-zinc-400">{profile?.email}</p>
       </div>
 
-      <NameForm profile={profile} onSaved={refreshProfile} />
+      <NameForm profile={profile} />
       <BranchForm profile={profile} onSaved={refreshProfile} />
       <PasswordForm />
     </div>
@@ -94,65 +94,28 @@ function BranchForm({ profile, onSaved }) {
   );
 }
 
-function NameForm({ profile, onSaved }) {
-  const [firstName, setFirstName] = useState(profile?.first_name ?? "");
-  const [lastName, setLastName] = useState(profile?.last_name ?? "");
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState(null); // { ok, text }
-
-  const submit = async (e) => {
-    e.preventDefault();
-    setBusy(true);
-    setMsg(null);
-    try {
-      await updateMyProfile({ firstName, lastName });
-      await onSaved?.();
-      setMsg({ ok: true, text: "Nama tersimpan." });
-    } catch (err) {
-      setMsg({ ok: false, text: err?.message ?? "Gagal menyimpan." });
-    } finally {
-      setBusy(false);
-    }
-  };
+function NameForm({ profile }) {
+  const roInput = `${inputCls} cursor-not-allowed bg-zinc-50 text-zinc-500`;
 
   return (
-    <form onSubmit={submit} className={card}>
+    <div className={card}>
       <p className="text-sm font-bold tracking-tight text-zinc-900">Nama</p>
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <label className="block text-xs font-medium text-zinc-600">
           Nama depan
-          <input
-            value={firstName}
-            onChange={(e) => setFirstName(e.target.value)}
-            required
-            className={inputCls}
-          />
+          <input value={profile?.first_name ?? ""} readOnly className={roInput} />
         </label>
         <label className="block text-xs font-medium text-zinc-600">
           Nama belakang
-          <input
-            value={lastName}
-            onChange={(e) => setLastName(e.target.value)}
-            required
-            className={inputCls}
-          />
+          <input value={profile?.last_name ?? ""} readOnly className={roInput} />
         </label>
       </div>
 
-      {msg && (
-        <p
-          className={`mt-3 text-xs ${
-            msg.ok ? "text-emerald-600" : "text-rose-600"
-          }`}
-        >
-          {msg.text}
-        </p>
-      )}
-
-      <button type="submit" disabled={busy} className={`mt-4 ${btn}`}>
-        {busy ? "Menyimpan…" : "Simpan"}
-      </button>
-    </form>
+      <p className="mt-3 text-xs text-zinc-400">
+        Nama nggak bisa diubah sendiri. Hubungi SE Matematika kalau ada yang
+        salah.
+      </p>
+    </div>
   );
 }
 
