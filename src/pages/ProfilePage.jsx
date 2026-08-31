@@ -112,8 +112,7 @@ function NameForm({ profile }) {
       </div>
 
       <p className="mt-3 text-xs text-zinc-400">
-        Nama nggak bisa diubah sendiri. Hubungi SE Matematika kalau ada yang
-        salah.
+        Jika ada kesalahan nama, hubungi SE untuk melakukan perubahan.
       </p>
     </div>
   );
