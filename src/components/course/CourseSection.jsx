@@ -32,6 +32,10 @@ function CardInner({ item, clickable }) {
             {lessonTypeLabels[item.type]}
             {item.duration ? ` · ${item.duration}` : ""}
             {item.type === "soal" && !item.question_set_id && " · segera"}
+            {item.type === "form" &&
+              !item.form_id &&
+              !item.url &&
+              " · segera"}
           </span>
           {item.publish_status && item.publish_status !== "all" && (
             <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-500">
@@ -80,8 +84,11 @@ export default function CourseSection({ section, courseId }) {
       {open && (
         <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {section.items.map((item) => {
+            const inAppForm = item.type === "form" && item.form_id;
             const external =
-              (item.type === "meet" || item.type === "form") && item.url;
+              (item.type === "meet" || item.type === "form") &&
+              item.url &&
+              !inAppForm;
             const recording = item.type === "recording" && item.url;
             const quiz = item.type === "soal" && item.question_set_id;
 
@@ -98,10 +105,12 @@ export default function CourseSection({ section, courseId }) {
                 </a>
               );
             }
-            if (recording || quiz) {
+            if (recording || quiz || inAppForm) {
               const to = recording
                 ? `/course/${courseId}/recording/${item.id}`
-                : `/course/${courseId}/soal/${item.id}`;
+                : inAppForm
+                  ? `/course/${courseId}/form/${item.id}`
+                  : `/course/${courseId}/soal/${item.id}`;
               return (
                 <Link key={item.id} to={to} className={cardCls + clickableCls}>
                   <CardInner item={item} clickable="internal" />

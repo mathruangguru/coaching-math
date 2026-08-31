@@ -13,6 +13,7 @@ import {
   X,
   BookOpen,
   ListChecks,
+  ClipboardList,
   BarChart3,
   Users,
   Building2,
@@ -24,6 +25,7 @@ import { signOut } from "../../lib/auth";
 const nav = [
   { to: "/admin", label: "Course", icon: BookOpen, end: true },
   { to: "/admin/set-soal", label: "Set Soal", icon: ListChecks },
+  { to: "/admin/forms", label: "Form", icon: ClipboardList },
   { to: "/admin/quiz-results", label: "Hasil Soal", icon: BarChart3 },
   { to: "/admin/users", label: "Pengguna", icon: Users },
   { to: "/admin/branches", label: "Cabang", icon: Building2 },

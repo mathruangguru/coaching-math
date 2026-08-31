@@ -164,6 +164,16 @@ Jalankan `branches.sql` (setelah `admin.sql`). Bikin `coaching_branches`
 atur daftarnya di `/admin/branches` (tambah satuan / bulk 1 nama per
 baris — yang dobel diabaikan). Murid pilih cabang di `/profile`.
 
+## Form (survei in-app)
+
+Jalankan `forms.sql` (setelah `admin.sql`). Bikin `coaching_forms` /
+`coaching_form_fields` (tipe field: `short` / `long` / `single` / `multi`)
+/ `coaching_form_responses` + kolom `coaching_lessons.form_id`. Admin
+bikin form di `/admin/forms`, pasang ke lesson tipe **Form** (dropdown di
+editor kurikulum). Murid isi di `/course/:id/form/:lessonId` — boleh
+berkali-kali. Rekap + CSV di `/admin/forms/:id/responses`. Lesson Form
+tanpa `form_id` tapi punya `url` tetap buka link eksternal.
+
 ## Isi
 
 | File | |
@@ -173,6 +183,7 @@ baris — yang dobel diabaikan). Murid pilih cabang di `/profile`.
 | `quiz.sql` | `coaching_question_sets` / `_questions` / `_question_keys` / `_quiz_attempts` + RLS |
 | `enroll.sql` | `coaching_enrollments` (murid ↔ course) + RLS (enroll/lihat milik sendiri, admin baca semua) |
 | `branches.sql` | `coaching_branches` + `coaching_profiles.branch_id` + RLS (baca semua, tulis admin) |
+| `forms.sql` | `coaching_forms` / `_form_fields` / `_form_responses` + `coaching_lessons.form_id` + RLS |
 | `seed.sql` | data awal PATOM (mirror `src/data/mock.js`) |
 | `functions/admin-users/` | Edge Function: admin create / set-password / delete user |
 | `functions/quiz-submit/` | Edge Function: nilai & simpan attempt kuis murid |

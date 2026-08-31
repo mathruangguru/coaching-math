@@ -8,6 +8,7 @@ import CourseLobbyPage from "./pages/CourseLobbyPage";
 import CourseMateriPage from "./pages/CourseMateriPage";
 import RecordingPage from "./pages/RecordingPage";
 import QuizPage from "./pages/QuizPage";
+import FormPage from "./pages/FormPage";
 import ProfilePage from "./pages/ProfilePage";
 import RequireAdmin from "./components/admin/RequireAdmin";
 import AdminLayout from "./components/admin/AdminLayout";
@@ -19,6 +20,9 @@ import AdminBranchesPage from "./pages/admin/AdminBranchesPage";
 import CourseFormPage from "./pages/admin/CourseFormPage";
 import SetSoalPage from "./pages/admin/SetSoalPage";
 import SetSoalFormPage from "./pages/admin/SetSoalFormPage";
+import AdminFormsPage from "./pages/admin/AdminFormsPage";
+import AdminFormFormPage from "./pages/admin/AdminFormFormPage";
+import AdminFormResponsesPage from "./pages/admin/AdminFormResponsesPage";
 
 export default function App() {
   return (
@@ -45,6 +49,10 @@ export default function App() {
             path="course/:courseId/soal/:lessonId"
             element={<QuizPage />}
           />
+          <Route
+            path="course/:courseId/form/:lessonId"
+            element={<FormPage />}
+          />
           <Route path="profile" element={<ProfilePage />} />
         </Route>
       </Route>
@@ -59,6 +67,12 @@ export default function App() {
           <Route path="quiz-results" element={<AdminQuizResultsPage />} />
           <Route path="set-soal" element={<SetSoalPage />} />
           <Route path="set-soal/:setId" element={<SetSoalFormPage />} />
+          <Route path="forms" element={<AdminFormsPage />} />
+          <Route path="forms/:formId" element={<AdminFormFormPage />} />
+          <Route
+            path="forms/:formId/responses"
+            element={<AdminFormResponsesPage />}
+          />
           <Route path="course/new" element={<CourseFormPage />} />
           <Route path="course/:courseId" element={<CourseFormPage />} />
         </Route>
