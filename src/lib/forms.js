@@ -32,7 +32,7 @@ export async function getForms() {
   if (!hasSupabase) return [];
   const { data, error } = await supabase
     .from("coaching_forms")
-    .select("id, title, description, created_at")
+    .select("id, title, description, open, created_at")
     .order("created_at");
   if (error) throw error;
   return data;
@@ -44,7 +44,7 @@ export async function getForm(id) {
   const { data, error } = await supabase
     .from("coaching_forms")
     .select(
-      `id, title, description,
+      `id, title, description, open,
        fields:coaching_form_fields ( id, type, label, options, required, position )`
     )
     .eq("id", id)
@@ -71,14 +71,16 @@ export async function createForm({ title, description }) {
   return data;
 }
 
-export async function updateForm(id, { title, description }) {
+export async function updateForm(id, patch) {
   ensure();
+  const fields = {};
+  if ("title" in patch) fields.title = patch.title?.trim() || "Form baru";
+  if ("description" in patch)
+    fields.description = patch.description?.trim() || null;
+  if ("open" in patch) fields.open = !!patch.open;
   const { error } = await supabase
     .from("coaching_forms")
-    .update({
-      title: title?.trim() || "Form baru",
-      description: description?.trim() || null,
-    })
+    .update(fields)
     .eq("id", id);
   if (error) throw error;
 }
