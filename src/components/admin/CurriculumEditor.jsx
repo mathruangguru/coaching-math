@@ -23,6 +23,7 @@ import {
   reorderLessons,
 } from "../../lib/courses";
 import { getQuestionSets } from "../../lib/quiz";
+import { getForms } from "../../lib/forms";
 import { lessonTypeLabels } from "../../lib/lessonTypes";
 import LessonIcon from "../ui/LessonIcon";
 
@@ -122,6 +123,7 @@ export default function CurriculumEditor({ courseId }) {
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [questionSets, setQuestionSets] = useState([]);
+  const [forms, setForms] = useState([]);
 
   const closeModal = useCallback(() => setEditingId(null), []);
 
@@ -130,6 +132,9 @@ export default function CurriculumEditor({ courseId }) {
     getQuestionSets()
       .then((d) => alive && setQuestionSets(d))
       .catch((err) => console.error("[admin] gagal memuat set soal:", err));
+    getForms()
+      .then((d) => alive && setForms(d))
+      .catch((err) => console.error("[admin] gagal memuat form:", err));
     return () => {
       alive = false;
     };
@@ -258,6 +263,7 @@ export default function CurriculumEditor({ courseId }) {
         duration: lesson.duration,
         url: lesson.url ?? null,
         question_set_id: lesson.question_set_id ?? null,
+        form_id: lesson.form_id ?? null,
         publish_status: lesson.publish_status ?? "none",
       }),
     );
@@ -601,6 +607,33 @@ export default function CurriculumEditor({ courseId }) {
                             {questionSets.map((qs) => (
                               <option key={qs.id} value={qs.id}>
                                 {qs.title}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
+                      {lesson.type === "form" && (
+                        <div className="mt-1.5 flex items-center gap-1.5 pl-9">
+                          <ListChecks
+                            size={12}
+                            className="shrink-0 text-zinc-400"
+                          />
+                          <select
+                            value={lesson.form_id ?? ""}
+                            onChange={(e) => {
+                              const v = e.target.value || null;
+                              patchLessonLocal(editing.id, lesson.id, {
+                                form_id: v,
+                              });
+                              saveLesson({ ...lesson, form_id: v });
+                            }}
+                            className={`${cell} flex-1 text-xs`}
+                          >
+                            <option value="">— form in-app (opsional) —</option>
+                            {forms.map((fm) => (
+                              <option key={fm.id} value={fm.id}>
+                                {fm.title}
                               </option>
                             ))}
                           </select>
