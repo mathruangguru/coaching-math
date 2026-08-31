@@ -92,7 +92,9 @@ create policy "coaching_form_fields write admin"
   using (public.is_admin()) with check (public.is_admin());
 
 -- Respons: murid insert & baca miliknya; admin baca & hapus semua.
--- Murid cuma boleh submit ke form yang masih `open`.
+-- Murid cuma boleh submit ke form yang masih `open`, dan minimal 5 menit
+-- sejak respons terakhirnya di form yang sama (selaras dgn COOLDOWN_MIN
+-- di src/pages/FormPage.jsx).
 drop policy if exists "coaching_form_responses insert own" on public.coaching_form_responses;
 create policy "coaching_form_responses insert own"
   on public.coaching_form_responses for insert
@@ -101,6 +103,12 @@ create policy "coaching_form_responses insert own"
     and exists (
       select 1 from public.coaching_forms f
       where f.id = form_id and f.open
+    )
+    and not exists (
+      select 1 from public.coaching_form_responses r
+      where r.form_id = form_id
+        and r.user_id = auth.uid()
+        and r.created_at > now() - interval '5 minutes'
     )
   );
 
