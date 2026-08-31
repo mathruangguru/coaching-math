@@ -4,7 +4,8 @@ import RequireAuth from "./components/auth/RequireAuth";
 import LoginPage from "./pages/LoginPage";
 import DashboardPage from "./pages/DashboardPage";
 import CoursePage from "./pages/CoursePage";
-import CourseDetailPage from "./pages/CourseDetailPage";
+import CourseLobbyPage from "./pages/CourseLobbyPage";
+import CourseMateriPage from "./pages/CourseMateriPage";
 import RecordingPage from "./pages/RecordingPage";
 import QuizPage from "./pages/QuizPage";
 import ProfilePage from "./pages/ProfilePage";
@@ -31,7 +32,11 @@ export default function App() {
         <Route element={<AppLayout />}>
           <Route index element={<DashboardPage />} />
           <Route path="course" element={<CoursePage />} />
-          <Route path="course/:courseId" element={<CourseDetailPage />} />
+          <Route path="course/:courseId" element={<CourseLobbyPage />} />
+          <Route
+            path="course/:courseId/materi"
+            element={<CourseMateriPage />}
+          />
           <Route
             path="course/:courseId/recording/:lessonId"
             element={<RecordingPage />}

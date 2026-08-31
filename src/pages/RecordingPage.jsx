@@ -41,10 +41,10 @@ export default function RecordingPage() {
 
   const backLink = (
     <Link
-      to={`/course/${courseId}`}
+      to={`/course/${courseId}/materi`}
       className="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-500 transition-colors hover:text-zinc-800"
     >
-      <ArrowLeft size={14} /> Kembali ke course
+      <ArrowLeft size={14} /> Kembali ke materi
     </Link>
   );
 
