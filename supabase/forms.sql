@@ -102,11 +102,14 @@ create policy "coaching_form_responses insert own"
     auth.uid() = user_id
     and exists (
       select 1 from public.coaching_forms f
-      where f.id = form_id and f.open
+      where f.id = coaching_form_responses.form_id and f.open
     )
+    -- Cooldown per-form: `form_id` di dalam subquery ke-shadow sama alias `r`,
+    -- jadi WAJIB qualified ke tabel target biar nggak jadi `r.form_id = r.form_id`
+    -- (yang bikin cooldown lintas semua form).
     and not exists (
       select 1 from public.coaching_form_responses r
-      where r.form_id = form_id
+      where r.form_id = coaching_form_responses.form_id
         and r.user_id = auth.uid()
         and r.created_at > now() - interval '5 minutes'
     )
