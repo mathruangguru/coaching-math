@@ -10,18 +10,29 @@ create table if not exists public.coaching_forms (
   created_at  timestamptz not null default now()
 );
 
+-- type:
+--   short  isian pendek        long   isian panjang
+--   single pilihan tunggal     multi  pilihan ganda
+--   check  checklist pernyataan (tiap opsi = pernyataan; wajib -> centang semua)
+--   name   isian nama  (auto dari akun)   email  isian email (auto dari akun)
 create table if not exists public.coaching_form_fields (
   id       text primary key,
   form_id  text not null references public.coaching_forms (id) on delete cascade,
   type     text not null default 'short'
-           check (type in ('short', 'long', 'single', 'multi')),
+           check (type in ('short', 'long', 'single', 'multi', 'check', 'name', 'email')),
   label    text not null,
-  options  jsonb not null default '[]'::jsonb,   -- buat single / multi
+  options  jsonb not null default '[]'::jsonb,   -- buat single / multi / check
   required boolean not null default false,
   position int not null default 0
 );
 create index if not exists coaching_form_fields_form_idx
   on public.coaching_form_fields (form_id, position);
+
+-- Tipe field baru (check / name / email) — longgarkan CHECK. Aman diulang.
+alter table public.coaching_form_fields drop constraint if exists coaching_form_fields_type_check;
+alter table public.coaching_form_fields
+  add constraint coaching_form_fields_type_check
+    check (type in ('short', 'long', 'single', 'multi', 'check', 'name', 'email'));
 
 -- Respons murid. Boleh lebih dari 1x per form.
 create table if not exists public.coaching_form_responses (

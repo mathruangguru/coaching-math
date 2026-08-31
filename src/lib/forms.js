@@ -15,8 +15,14 @@ export const fieldTypeLabels = {
   long: "Isian panjang",
   single: "Pilihan tunggal",
   multi: "Pilihan ganda",
+  check: "Checklist pernyataan",
+  name: "Nama (auto)",
+  email: "Email (auto)",
 };
 export const FIELD_TYPES = Object.keys(fieldTypeLabels);
+
+// Field yang punya daftar opsi/pernyataan.
+export const OPTION_TYPES = ["single", "multi", "check"];
 
 // ── Forms ──────────────────────────────────────────────────────────
 

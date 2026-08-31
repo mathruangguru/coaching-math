@@ -3,13 +3,18 @@ import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, Check } from "lucide-react";
 import { getCourse } from "../lib/courses";
 import { getForm, submitFormResponse } from "../lib/forms";
+import { useAuth } from "../context/auth-context";
 import Skeleton from "../components/ui/Skeleton";
 
 const inputCls =
   "mt-1.5 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none transition-colors focus:border-brand-500";
 
+const profileFullName = (p) =>
+  [p?.first_name, p?.last_name].filter(Boolean).join(" ");
+
 export default function FormPage() {
   const { courseId, lessonId } = useParams();
+  const { profile } = useAuth();
   const [data, setData] = useState({ status: "loading" });
   const [values, setValues] = useState({}); // { fieldId: string | string[] }
   const [busy, setBusy] = useState(false);
@@ -124,21 +129,29 @@ export default function FormPage() {
       </div>
     );
 
+  // Nilai efektif: name/email auto dari profil kalau belum diisi.
+  const valueFor = (f) => {
+    if (f.id in values) return values[f.id];
+    if (f.type === "name") return profileFullName(profile);
+    if (f.type === "email") return profile?.email ?? "";
+    return f.type === "multi" || f.type === "check" ? [] : "";
+  };
+
   const setVal = (id, v) => setValues((s) => ({ ...s, [id]: v }));
-  const toggleMulti = (id, opt) =>
+  const toggleInArray = (id, opt) =>
     setValues((s) => {
       const cur = Array.isArray(s[id]) ? s[id] : [];
       return {
         ...s,
-        [id]: cur.includes(opt)
-          ? cur.filter((x) => x !== opt)
-          : [...cur, opt],
+        [id]: cur.includes(opt) ? cur.filter((x) => x !== opt) : [...cur, opt],
       };
     });
 
   const missing = form.fields.filter((f) => {
     if (!f.required) return false;
-    const v = values[f.id];
+    const v = valueFor(f);
+    if (f.type === "check")
+      return (f.options ?? []).some((opt) => !v.includes(opt));
     return Array.isArray(v) ? v.length === 0 : !String(v ?? "").trim();
   });
 
@@ -146,12 +159,14 @@ export default function FormPage() {
     e.preventDefault();
     setErr("");
     if (missing.length) {
-      setErr(`Masih ada ${missing.length} isian wajib yang kosong.`);
+      setErr(`Masih ada ${missing.length} isian wajib yang belum lengkap.`);
       return;
     }
     setBusy(true);
     try {
-      await submitFormResponse(form.id, lessonId, values);
+      const payload = {};
+      for (const f of form.fields) payload[f.id] = valueFor(f);
+      await submitFormResponse(form.id, lessonId, payload);
       setSent(true);
     } catch (e2) {
       setErr(e2?.message ?? "Gagal mengirim.");
@@ -175,9 +190,17 @@ export default function FormPage() {
             {f.required && <span className="text-rose-500"> *</span>}
           </p>
 
-          {f.type === "short" && (
+          {(f.type === "short" || f.type === "name") && (
             <input
-              value={values[f.id] ?? ""}
+              value={valueFor(f)}
+              onChange={(e) => setVal(f.id, e.target.value)}
+              className={inputCls}
+            />
+          )}
+          {f.type === "email" && (
+            <input
+              type="email"
+              value={valueFor(f)}
               onChange={(e) => setVal(f.id, e.target.value)}
               className={inputCls}
             />
@@ -185,7 +208,7 @@ export default function FormPage() {
           {f.type === "long" && (
             <textarea
               rows={3}
-              value={values[f.id] ?? ""}
+              value={valueFor(f)}
               onChange={(e) => setVal(f.id, e.target.value)}
               className={`${inputCls} resize-y`}
             />
@@ -200,7 +223,7 @@ export default function FormPage() {
                   <input
                     type="radio"
                     name={f.id}
-                    checked={values[f.id] === opt}
+                    checked={valueFor(f) === opt}
                     onChange={() => setVal(f.id, opt)}
                   />
                   {opt}
@@ -208,19 +231,18 @@ export default function FormPage() {
               ))}
             </div>
           )}
-          {f.type === "multi" && (
-            <div className="mt-2 flex flex-col gap-1.5">
+          {(f.type === "multi" || f.type === "check") && (
+            <div className="mt-2 flex flex-col gap-2">
               {(f.options ?? []).map((opt, oi) => (
                 <label
                   key={oi}
-                  className="flex cursor-pointer items-center gap-2 text-sm text-zinc-700"
+                  className="flex cursor-pointer items-start gap-2 text-sm text-zinc-700"
                 >
                   <input
                     type="checkbox"
-                    checked={
-                      Array.isArray(values[f.id]) && values[f.id].includes(opt)
-                    }
-                    onChange={() => toggleMulti(f.id, opt)}
+                    className="mt-0.5"
+                    checked={valueFor(f).includes(opt)}
+                    onChange={() => toggleInArray(f.id, opt)}
                   />
                   {opt}
                 </label>

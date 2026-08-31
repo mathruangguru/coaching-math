@@ -17,7 +17,10 @@ import {
   reorderFields,
   fieldTypeLabels,
   FIELD_TYPES,
+  OPTION_TYPES,
 } from "../../lib/forms";
+
+const autoLabel = { name: "Nama", email: "Email" };
 import Skeleton from "../../components/ui/Skeleton";
 
 const input =
@@ -144,7 +147,7 @@ export default function AdminFormFormPage() {
       </p>
     );
 
-  const hasOptions = (t) => t === "single" || t === "multi";
+  const hasOptions = (t) => OPTION_TYPES.includes(t);
 
   return (
     <div className="flex flex-col gap-5">
@@ -244,6 +247,8 @@ export default function AdminFormFormPage() {
                         : ["", ""]
                       : [],
                   };
+                  if (autoLabel[type] && !f.label.trim())
+                    next.label = autoLabel[type];
                   patchField(f.id, next);
                   saveField({ ...f, ...next });
                 }}
@@ -278,12 +283,18 @@ export default function AdminFormFormPage() {
               </button>
             </div>
 
+            {(f.type === "name" || f.type === "email") && (
+              <p className="mt-1.5 pl-7 text-xs text-zinc-400">
+                Diisi otomatis dari akun murid (masih bisa diedit murid).
+              </p>
+            )}
+
             {hasOptions(f.type) && (
               <div className="mt-2 flex flex-col gap-1.5 pl-7">
                 {(f.options ?? []).map((opt, oi) => (
                   <div key={oi} className="flex items-center gap-2">
                     <span className="text-xs text-zinc-400">
-                      {String.fromCharCode(65 + oi)}.
+                      {f.type === "check" ? "•" : `${String.fromCharCode(65 + oi)}.`}
                     </span>
                     <input
                       value={opt}
@@ -293,7 +304,11 @@ export default function AdminFormFormPage() {
                         patchField(f.id, { options });
                       }}
                       onBlur={() => saveField(f)}
-                      placeholder={`Opsi ${oi + 1}`}
+                      placeholder={
+                        f.type === "check"
+                          ? `Pernyataan ${oi + 1}`
+                          : `Opsi ${oi + 1}`
+                      }
                       className={`${input} py-1 text-xs`}
                     />
                     <button
@@ -319,7 +334,8 @@ export default function AdminFormFormPage() {
                   }}
                   className="inline-flex w-fit items-center gap-1 text-xs font-semibold text-brand-600 hover:text-brand-700"
                 >
-                  <Plus size={11} /> Tambah opsi
+                  <Plus size={11} />{" "}
+                  {f.type === "check" ? "Tambah pernyataan" : "Tambah opsi"}
                 </button>
               </div>
             )}
