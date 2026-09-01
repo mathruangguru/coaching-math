@@ -23,6 +23,8 @@ import SetSoalFormPage from "./pages/admin/SetSoalFormPage";
 import AdminFormsPage from "./pages/admin/AdminFormsPage";
 import AdminFormFormPage from "./pages/admin/AdminFormFormPage";
 import AdminFormResponsesPage from "./pages/admin/AdminFormResponsesPage";
+import AdminUtilitiesPage from "./pages/admin/AdminUtilitiesPage";
+import AdminSpinwheelPage from "./pages/admin/AdminSpinwheelPage";
 
 export default function App() {
   return (
@@ -73,6 +75,8 @@ export default function App() {
             path="forms/:formId/responses"
             element={<AdminFormResponsesPage />}
           />
+          <Route path="utilitas" element={<AdminUtilitiesPage />} />
+          <Route path="utilitas/spinwheel" element={<AdminSpinwheelPage />} />
           <Route path="course/new" element={<CourseFormPage />} />
           <Route path="course/:courseId" element={<CourseFormPage />} />
         </Route>
