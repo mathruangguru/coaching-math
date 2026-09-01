@@ -25,6 +25,7 @@ import AdminFormFormPage from "./pages/admin/AdminFormFormPage";
 import AdminFormResponsesPage from "./pages/admin/AdminFormResponsesPage";
 import AdminUtilitiesPage from "./pages/admin/AdminUtilitiesPage";
 import AdminSpinwheelPage from "./pages/admin/AdminSpinwheelPage";
+import AdminTimerPage from "./pages/admin/AdminTimerPage";
 
 export default function App() {
   return (
@@ -77,6 +78,7 @@ export default function App() {
           />
           <Route path="utilitas" element={<AdminUtilitiesPage />} />
           <Route path="utilitas/spinwheel" element={<AdminSpinwheelPage />} />
+          <Route path="utilitas/timer" element={<AdminTimerPage />} />
           <Route path="course/new" element={<CourseFormPage />} />
           <Route path="course/:courseId" element={<CourseFormPage />} />
         </Route>
