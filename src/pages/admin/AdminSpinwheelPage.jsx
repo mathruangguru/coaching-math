@@ -14,17 +14,6 @@ const COLORS = [
   "#f87171",
 ];
 
-// Teks gelap di slice terang, putih di slice gelap — plus halo warna lawan.
-function textOn(hex) {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  const L = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  return L > 0.58
-    ? { fill: "#1f2937", stroke: "rgba(255,255,255,0.6)" }
-    : { fill: "#fff", stroke: "rgba(15,23,42,0.4)" };
-}
-
 const CX = 160;
 const CY = 160;
 const R = 150;
@@ -149,11 +138,6 @@ export default function AdminSpinwheelPage() {
     setWinner(null);
   };
 
-  const haloText = {
-    strokeLinejoin: "round",
-    style: { paintOrder: "stroke" },
-  };
-
   return (
     <div className="flex flex-col gap-5">
       <div>
@@ -272,10 +256,7 @@ export default function AdminSpinwheelPage() {
                     dominantBaseline="middle"
                     fontSize="16"
                     fontWeight="700"
-                    strokeWidth="3"
-                    fill={textOn(COLORS[0]).fill}
-                    stroke={textOn(COLORS[0]).stroke}
-                    {...haloText}
+                    fill="#fff"
                   >
                     {trunc(names[0], 18)}
                   </text>
@@ -285,7 +266,6 @@ export default function AdminSpinwheelPage() {
               {n > 1 &&
                 names.map((name, i) => {
                   const mid = i * seg;
-                  const t = textOn(COLORS[i % COLORS.length]);
                   return (
                     <g key={i}>
                       <path
@@ -305,10 +285,7 @@ export default function AdminSpinwheelPage() {
                             dominantBaseline="middle"
                             fontSize={fontSize}
                             fontWeight="700"
-                            fill={t.fill}
-                            stroke={t.stroke}
-                            strokeWidth={Math.max(2, fontSize * 0.28)}
-                            {...haloText}
+                            fill="#fff"
                           >
                             {trunc(name, maxChars)}
                           </text>
