@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { FerrisWheel } from "lucide-react";
+import { FerrisWheel, Timer } from "lucide-react";
 
 const utils = [
   {
@@ -8,6 +8,13 @@ const utils = [
     desc: "Roda putar buat milih nama/opsi secara acak.",
     icon: FerrisWheel,
     tint: "bg-violet-50 text-violet-600",
+  },
+  {
+    to: "/admin/utilitas/timer",
+    label: "Timer",
+    desc: "Hitung mundur buat latihan atau kuis.",
+    icon: Timer,
+    tint: "bg-sky-50 text-sky-600",
   },
 ];
 

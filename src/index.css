@@ -86,7 +86,9 @@ body {
     animation: none;
   }
 }
-.spinwheel-panel:fullscreen {
+/* Panel utilitas yang isi layar saat fullscreen */
+.spinwheel-panel:fullscreen,
+.timer-panel:fullscreen {
   width: 100vw;
   height: 100vh;
   overflow: auto;
