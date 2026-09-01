@@ -1,6 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, RotateCw, Users, Volume2, VolumeX, X } from "lucide-react";
+import {
+  ArrowLeft,
+  Maximize,
+  Minimize,
+  RotateCw,
+  Users,
+  Volume2,
+  VolumeX,
+  X,
+} from "lucide-react";
 import { getUsers } from "../../lib/users";
 
 const COLORS = [
@@ -45,12 +54,14 @@ export default function AdminSpinwheelPage() {
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [msg, setMsg] = useState("");
   const [muted, setMuted] = useState(false);
+  const [isFs, setIsFs] = useState(false);
 
   const pendingRef = useRef(null);
   const timerRef = useRef(null);
   const tickTimersRef = useRef([]);
   const audioCtxRef = useRef(null);
   const mutedRef = useRef(false);
+  const panelRef = useRef(null);
 
   const names = useMemo(
     () =>
@@ -155,6 +166,26 @@ export default function AdminSpinwheelPage() {
     const v = !mutedRef.current;
     mutedRef.current = v;
     setMuted(v);
+  };
+
+  useEffect(() => {
+    const onFs = () => setIsFs(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", onFs);
+    return () => document.removeEventListener("fullscreenchange", onFs);
+  }, []);
+
+  const toggleFullscreen = async () => {
+    try {
+      if (document.fullscreenElement) {
+        await (document.exitFullscreen?.() ??
+          document.webkitExitFullscreen?.());
+      } else {
+        const el = panelRef.current;
+        await (el?.requestFullscreen?.() ?? el?.webkitRequestFullscreen?.());
+      }
+    } catch {
+      /* dibatalin / ditolak — abaikan */
+    }
   };
 
   const fillFromUsers = async () => {
@@ -310,17 +341,36 @@ export default function AdminSpinwheelPage() {
         </div>
 
         {/* Wheel */}
-        <div className="relative flex flex-col items-center gap-5 rounded-2xl border border-zinc-200 bg-white p-5">
-          <button
-            type="button"
-            onClick={toggleMute}
-            aria-label={muted ? "Nyalakan suara" : "Matikan suara"}
-            className="absolute right-3 top-3 z-10 grid h-8 w-8 place-items-center rounded-lg text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600"
-          >
-            {muted ? <VolumeX size={16} /> : <Volume2 size={16} />}
-          </button>
+        <div
+          ref={panelRef}
+          className={`spinwheel-panel relative flex flex-col items-center gap-5 border border-zinc-200 bg-white p-5 ${
+            isFs ? "justify-center rounded-none" : "rounded-2xl"
+          }`}
+        >
+          <div className="absolute right-3 top-3 z-10 flex items-center gap-1">
+            <button
+              type="button"
+              onClick={toggleMute}
+              aria-label={muted ? "Nyalakan suara" : "Matikan suara"}
+              className="grid h-8 w-8 place-items-center rounded-lg text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600"
+            >
+              {muted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+            </button>
+            <button
+              type="button"
+              onClick={toggleFullscreen}
+              aria-label={isFs ? "Keluar layar penuh" : "Layar penuh"}
+              className="grid h-8 w-8 place-items-center rounded-lg text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600"
+            >
+              {isFs ? <Minimize size={16} /> : <Maximize size={16} />}
+            </button>
+          </div>
 
-          <div className="relative w-full max-w-[380px]">
+          <div
+            className={`relative w-full ${
+              isFs ? "max-w-[min(78vh,760px)]" : "max-w-[380px]"
+            }`}
+          >
             {/* Pointer */}
             <div className="pointer-events-none absolute left-1/2 top-0 z-10 -translate-x-1/2">
               <div className="h-0 w-0 border-x-[15px] border-t-[26px] border-x-transparent border-t-slate-800 drop-shadow-[0_3px_2px_rgba(0,0,0,0.25)]" />
@@ -451,13 +501,25 @@ export default function AdminSpinwheelPage() {
           {/* Pemenang — grande */}
           {winner && (
             <div
-              className="spinwheel-pop absolute inset-0 z-20 flex flex-col items-center justify-center gap-5 rounded-2xl bg-white/95 p-6 text-center backdrop-blur-sm"
+              className={`spinwheel-pop absolute inset-0 z-20 flex flex-col items-center justify-center gap-5 bg-white/95 p-6 text-center backdrop-blur-sm ${
+                isFs ? "rounded-none" : "rounded-2xl"
+              }`}
               aria-live="polite"
             >
-              <p className="text-xs font-bold uppercase tracking-[0.22em] text-emerald-500">
+              <p
+                className={`font-bold uppercase tracking-[0.22em] text-emerald-500 ${
+                  isFs ? "text-base" : "text-xs"
+                }`}
+              >
                 🎉 Pemenangnya 🎉
               </p>
-              <p className="max-w-full break-words text-4xl font-extrabold leading-tight text-emerald-700 sm:text-6xl">
+              <p
+                className={`max-w-full break-words font-extrabold leading-tight text-emerald-700 ${
+                  isFs
+                    ? "text-6xl sm:text-7xl lg:text-8xl"
+                    : "text-4xl sm:text-6xl"
+                }`}
+              >
                 {winner}
               </p>
               <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
