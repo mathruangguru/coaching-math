@@ -18,6 +18,7 @@ import {
   Users,
   Building2,
   GraduationCap,
+  Wrench,
 } from "lucide-react";
 import { useAuth } from "../../context/auth-context";
 import { signOut } from "../../lib/auth";
@@ -30,6 +31,7 @@ const nav = [
   { to: "/admin/users", label: "Pengguna", icon: Users },
   { to: "/admin/branches", label: "Cabang", icon: Building2 },
   { to: "/admin/enrollments", label: "Enrollment", icon: GraduationCap },
+  { to: "/admin/utilitas", label: "Utilitas", icon: Wrench },
 ];
 
 function navItemClass({ isActive }) {
