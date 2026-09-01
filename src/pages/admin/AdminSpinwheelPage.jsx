@@ -14,6 +14,17 @@ const COLORS = [
   "#f87171",
 ];
 
+// Teks gelap di slice terang, putih di slice gelap — plus halo warna lawan.
+function textOn(hex) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  const L = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return L > 0.58
+    ? { fill: "#1f2937", stroke: "rgba(255,255,255,0.6)" }
+    : { fill: "#fff", stroke: "rgba(15,23,42,0.4)" };
+}
+
 const CX = 160;
 const CY = 160;
 const R = 150;
@@ -31,7 +42,7 @@ function sectorPath(startDeg, endDeg) {
   return `M ${CX} ${CY} L ${x1} ${y1} A ${R} ${R} 0 ${large} 1 ${x2} ${y2} Z`;
 }
 
-const trunc = (s, n = 16) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
+const trunc = (s, n) => (s.length > n ? `${s.slice(0, Math.max(1, n - 1))}…` : s);
 
 const prefersReducedMotion = () =>
   typeof window !== "undefined" &&
@@ -57,6 +68,14 @@ export default function AdminSpinwheelPage() {
   );
   const n = names.length;
   const seg = n ? 360 / n : 0;
+
+  // Label radial: dari deket hub ke arah pelek. Makin banyak nama, mulai
+  // agak lebih jauh dari hub biar nggak numpuk.
+  const hubGap = n ? Math.min(44, Math.max(22, n * 2)) : 22;
+  const fontSize = n ? Math.max(9, Math.min(14, 150 / n + 4)) : 13;
+  const maxChars = n
+    ? Math.max(5, Math.floor((R - hubGap - 8) / (fontSize * 0.58)))
+    : 20;
 
   const fillFromUsers = async () => {
     setLoadingUsers(true);
@@ -102,10 +121,12 @@ export default function AdminSpinwheelPage() {
     const w = Math.floor(Math.random() * n);
     pendingRef.current = w;
 
-    const desired = (360 - ((w * seg + seg / 2) % 360)) % 360;
+    // Sektor i berpusat di deg = i*seg (sektor digambar dari -seg/2), jadi
+    // rotasi yang naruh pemenang di pointer atas = -w*seg.
+    const desired = ((-(w * seg) % 360) + 360) % 360;
     const current = ((rotation % 360) + 360) % 360;
     const delta = (desired - current + 360) % 360;
-    const jitter = (Math.random() - 0.5) * seg * 0.6;
+    const jitter = (Math.random() - 0.5) * seg * 0.55;
     const next = rotation + 360 * 6 + delta + jitter;
 
     if (prefersReducedMotion()) {
@@ -126,6 +147,11 @@ export default function AdminSpinwheelPage() {
     if (i === -1) return;
     setText(names.slice(0, i).concat(names.slice(i + 1)).join("\n"));
     setWinner(null);
+  };
+
+  const haloText = {
+    strokeLinejoin: "round",
+    style: { paintOrder: "stroke" },
   };
 
   return (
@@ -182,7 +208,7 @@ export default function AdminSpinwheelPage() {
                   setWinner(null);
                   setMsg("");
                 }}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 px-2.5 py-2 text-xs font-medium text-zinc-500 transition-colors hover:bg-zinc-50"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 px-2.5 py-2 text-xs font-medium text-zinc-500 transition-colors hover:bg-zinc-50 disabled:opacity-50"
               >
                 <X size={13} /> Kosongkan
               </button>
@@ -192,14 +218,16 @@ export default function AdminSpinwheelPage() {
         </div>
 
         {/* Wheel */}
-        <div className="flex flex-col items-center gap-4 rounded-2xl border border-zinc-200 bg-white p-5">
-          <div className="relative w-full max-w-[360px]">
-            <div className="absolute left-1/2 top-0 z-10 -translate-x-1/2 -translate-y-px">
-              <div className="h-0 w-0 border-x-[10px] border-t-[18px] border-x-transparent border-t-brand-600" />
+        <div className="flex flex-col items-center gap-5 rounded-2xl border border-zinc-200 bg-white p-5">
+          <div className="relative w-full max-w-[380px]">
+            {/* Pointer */}
+            <div className="pointer-events-none absolute left-1/2 top-0 z-10 -translate-x-1/2">
+              <div className="h-0 w-0 border-x-[15px] border-t-[26px] border-x-transparent border-t-slate-800 drop-shadow-[0_3px_2px_rgba(0,0,0,0.25)]" />
             </div>
+
             <svg
               viewBox="0 0 320 320"
-              className="w-full drop-shadow-sm"
+              className="w-full drop-shadow-md"
               style={{
                 transform: `rotate(${rotation}deg)`,
                 transition: spinning
@@ -208,14 +236,16 @@ export default function AdminSpinwheelPage() {
               }}
               onTransitionEnd={settle}
             >
+              {/* Bezel */}
               <circle
                 cx={CX}
                 cy={CY}
-                r={R + 4}
-                fill="none"
+                r={R + 7}
+                fill="#fff"
                 stroke="#e4e4e7"
-                strokeWidth="3"
+                strokeWidth="5"
               />
+
               {n === 0 && (
                 <>
                   <circle cx={CX} cy={CY} r={R} fill="#f4f4f5" />
@@ -240,46 +270,47 @@ export default function AdminSpinwheelPage() {
                     y={CY}
                     textAnchor="middle"
                     dominantBaseline="middle"
-                    fill="#fff"
-                    fontSize="15"
+                    fontSize="16"
                     fontWeight="700"
+                    strokeWidth="3"
+                    fill={textOn(COLORS[0]).fill}
+                    stroke={textOn(COLORS[0]).stroke}
+                    {...haloText}
                   >
-                    {trunc(names[0])}
+                    {trunc(names[0], 18)}
                   </text>
                 </>
               )}
 
               {n > 1 &&
                 names.map((name, i) => {
-                  const start = i * seg;
-                  const mid = start + seg / 2;
-                  const flip = mid > 90 && mid < 270;
-                  const ty = CY - R * 0.58;
-                  const fs = Math.max(8, Math.min(13, 150 / n + 3));
+                  const mid = i * seg;
+                  const t = textOn(COLORS[i % COLORS.length]);
                   return (
                     <g key={i}>
                       <path
-                        d={sectorPath(start, start + seg)}
+                        d={sectorPath(mid - seg / 2, mid + seg / 2)}
                         fill={COLORS[i % COLORS.length]}
                         stroke="#fff"
-                        strokeWidth="1.5"
+                        strokeWidth="2"
                       />
-                      {n <= 24 && (
-                        <g
-                          transform={`rotate(${mid} ${CX} ${CY})${
-                            flip ? ` rotate(180 ${CX} ${ty})` : ""
-                          }`}
-                        >
+                      {n <= 16 && (
+                        <g transform={`rotate(${mid} ${CX} ${CY})`}>
                           <text
                             x={CX}
-                            y={ty}
-                            textAnchor="middle"
+                            y={CY}
+                            dx={hubGap}
+                            transform={`rotate(-90 ${CX} ${CY})`}
+                            textAnchor="start"
                             dominantBaseline="middle"
-                            fill="#fff"
-                            fontSize={fs}
-                            fontWeight="600"
+                            fontSize={fontSize}
+                            fontWeight="700"
+                            fill={t.fill}
+                            stroke={t.stroke}
+                            strokeWidth={Math.max(2, fontSize * 0.28)}
+                            {...haloText}
                           >
-                            {trunc(name)}
+                            {trunc(name, maxChars)}
                           </text>
                         </g>
                       )}
@@ -287,7 +318,29 @@ export default function AdminSpinwheelPage() {
                   );
                 })}
 
-              {n > 0 && <circle cx={CX} cy={CY} r="11" fill="#fff" />}
+              {/* Tepi + hub */}
+              {n > 0 && (
+                <>
+                  <circle
+                    cx={CX}
+                    cy={CY}
+                    r={R}
+                    fill="none"
+                    stroke="#fff"
+                    strokeWidth="3"
+                  />
+                  <circle cx={CX} cy={CY} r="16" fill="#fff" />
+                  <circle
+                    cx={CX}
+                    cy={CY}
+                    r="16"
+                    fill="none"
+                    stroke="#e4e4e7"
+                    strokeWidth="2"
+                  />
+                  <circle cx={CX} cy={CY} r="4.5" fill="#94a3b8" />
+                </>
+              )}
             </svg>
           </div>
 
@@ -295,22 +348,31 @@ export default function AdminSpinwheelPage() {
             type="button"
             onClick={spin}
             disabled={spinning || n < 1}
-            className="inline-flex items-center gap-2 rounded-xl bg-brand-500 px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-600 disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-xl bg-brand-500 px-7 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand-600 disabled:opacity-50"
           >
             <RotateCw size={16} className={spinning ? "animate-spin" : ""} />
             {spinning ? "Muter…" : "Putar"}
           </button>
 
-          <div aria-live="polite" className="min-h-[2.25rem] text-center">
+          <div
+            aria-live="polite"
+            className="min-h-[6rem] w-full max-w-[380px] text-center"
+          >
             {winner && (
-              <div className="flex flex-wrap items-center justify-center gap-2">
-                <span className="rounded-lg bg-emerald-50 px-3 py-1.5 text-sm font-bold text-emerald-700">
-                  🎉 {winner}
-                </span>
+              <div
+                key={winner}
+                className="spinwheel-pop rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-5"
+              >
+                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-emerald-500">
+                  Pemenangnya
+                </p>
+                <p className="mt-1.5 break-words text-3xl font-extrabold leading-tight text-emerald-800 sm:text-4xl">
+                  {winner}
+                </p>
                 <button
                   type="button"
                   onClick={dropWinner}
-                  className="rounded-lg border border-zinc-200 px-2 py-1.5 text-xs font-medium text-zinc-500 transition-colors hover:bg-zinc-50"
+                  className="mt-4 rounded-lg border border-emerald-300 bg-white px-3 py-1.5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100"
                 >
                   Buang dari daftar
                 </button>
