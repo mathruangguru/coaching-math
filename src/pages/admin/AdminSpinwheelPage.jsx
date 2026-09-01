@@ -1,6 +1,15 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, RotateCw, Users, X } from "lucide-react";
+import {
+  ArrowLeft,
+  Maximize,
+  Minimize,
+  RotateCw,
+  Users,
+  Volume2,
+  VolumeX,
+  X,
+} from "lucide-react";
 import { getUsers } from "../../lib/users";
 
 const COLORS = [
@@ -44,8 +53,15 @@ export default function AdminSpinwheelPage() {
   const [winner, setWinner] = useState(null);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [msg, setMsg] = useState("");
+  const [muted, setMuted] = useState(false);
+  const [isFs, setIsFs] = useState(false);
+
   const pendingRef = useRef(null);
   const timerRef = useRef(null);
+  const tickTimersRef = useRef([]);
+  const audioCtxRef = useRef(null);
+  const mutedRef = useRef(false);
+  const panelRef = useRef(null);
 
   const names = useMemo(
     () =>
@@ -65,6 +81,112 @@ export default function AdminSpinwheelPage() {
   const maxChars = n
     ? Math.max(5, Math.floor((R - hubGap - 8) / (fontSize * 0.58)))
     : 20;
+
+  // ── SFX (Web Audio, tanpa file) ──────────────────────────────────
+  const getCtx = () => {
+    if (mutedRef.current || typeof window === "undefined") return null;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return null;
+    if (!audioCtxRef.current) {
+      try {
+        audioCtxRef.current = new AC();
+      } catch {
+        return null;
+      }
+    }
+    if (audioCtxRef.current.state === "suspended") audioCtxRef.current.resume();
+    return audioCtxRef.current;
+  };
+
+  const playTick = () => {
+    const ctx = audioCtxRef.current;
+    if (!ctx || ctx.state !== "running" || mutedRef.current) return;
+    const t = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = "square";
+    osc.frequency.setValueAtTime(1150, t);
+    osc.frequency.exponentialRampToValueAtTime(520, t + 0.025);
+    g.gain.setValueAtTime(0.12, t);
+    g.gain.exponentialRampToValueAtTime(0.0005, t + 0.045);
+    osc.connect(g).connect(ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.05);
+  };
+
+  const playFanfare = () => {
+    const ctx = getCtx();
+    if (!ctx || ctx.state !== "running" || mutedRef.current) return;
+    const t0 = ctx.currentTime + 0.03;
+    const notes = [523.25, 659.25, 783.99, 1046.5, 1318.5];
+    notes.forEach((f, i) => {
+      const t = t0 + i * 0.1;
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      osc.type = "triangle";
+      osc.frequency.setValueAtTime(f, t);
+      g.gain.setValueAtTime(0.0006, t);
+      g.gain.exponentialRampToValueAtTime(0.26, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0005, t + 0.5);
+      osc.connect(g).connect(ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.55);
+    });
+    const tEnd = t0 + notes.length * 0.1;
+    for (let i = 0; i < 8; i++) {
+      const t = tEnd + i * 0.045;
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(1400 + Math.random() * 1800, t);
+      g.gain.setValueAtTime(0.0006, t);
+      g.gain.exponentialRampToValueAtTime(0.09, t + 0.008);
+      g.gain.exponentialRampToValueAtTime(0.0004, t + 0.15);
+      osc.connect(g).connect(ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.16);
+    }
+  };
+
+  const clearTicks = () => {
+    tickTimersRef.current.forEach(clearTimeout);
+    tickTimersRef.current = [];
+  };
+
+  useEffect(
+    () => () => {
+      clearTicks();
+      clearTimeout(timerRef.current);
+      audioCtxRef.current?.close?.();
+    },
+    []
+  );
+
+  const toggleMute = () => {
+    const v = !mutedRef.current;
+    mutedRef.current = v;
+    setMuted(v);
+  };
+
+  useEffect(() => {
+    const onFs = () => setIsFs(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", onFs);
+    return () => document.removeEventListener("fullscreenchange", onFs);
+  }, []);
+
+  const toggleFullscreen = async () => {
+    try {
+      if (document.fullscreenElement) {
+        await (document.exitFullscreen?.() ??
+          document.webkitExitFullscreen?.());
+      } else {
+        const el = panelRef.current;
+        await (el?.requestFullscreen?.() ?? el?.webkitRequestFullscreen?.());
+      }
+    } catch {
+      /* dibatalin / ditolak — abaikan */
+    }
+  };
 
   const fillFromUsers = async () => {
     setLoadingUsers(true);
@@ -98,15 +220,29 @@ export default function AdminSpinwheelPage() {
   const settle = () => {
     if (pendingRef.current == null) return;
     clearTimeout(timerRef.current);
+    clearTicks();
     setWinner(names[pendingRef.current] ?? null);
     pendingRef.current = null;
     setSpinning(false);
+    playFanfare();
+  };
+
+  const startTicking = () => {
+    let gap = 42;
+    const loop = () => {
+      if (pendingRef.current == null) return;
+      playTick();
+      gap *= 1.135;
+      if (gap < 640) tickTimersRef.current.push(setTimeout(loop, gap));
+    };
+    tickTimersRef.current.push(setTimeout(loop, gap));
   };
 
   const spin = () => {
     if (spinning || n < 1) return;
     setWinner(null);
     setMsg("");
+    getCtx(); // resume audio dalam gesture user
     const w = Math.floor(Math.random() * n);
     pendingRef.current = w;
 
@@ -122,20 +258,23 @@ export default function AdminSpinwheelPage() {
       setRotation(next);
       setWinner(names[w] ?? null);
       pendingRef.current = null;
+      playFanfare();
       return;
     }
     setSpinning(true);
     setRotation(next);
     clearTimeout(timerRef.current);
     timerRef.current = setTimeout(settle, SPIN_MS + 600);
+    clearTicks();
+    startTicking();
   };
 
   const dropWinner = () => {
     if (!winner) return;
     const i = names.findIndex((x) => x === winner);
+    setWinner(null);
     if (i === -1) return;
     setText(names.slice(0, i).concat(names.slice(i + 1)).join("\n"));
-    setWinner(null);
   };
 
   return (
@@ -202,8 +341,36 @@ export default function AdminSpinwheelPage() {
         </div>
 
         {/* Wheel */}
-        <div className="flex flex-col items-center gap-5 rounded-2xl border border-zinc-200 bg-white p-5">
-          <div className="relative w-full max-w-[380px]">
+        <div
+          ref={panelRef}
+          className={`spinwheel-panel relative flex flex-col items-center gap-5 border border-zinc-200 bg-white p-5 ${
+            isFs ? "justify-center rounded-none" : "rounded-2xl"
+          }`}
+        >
+          <div className="absolute right-3 top-3 z-10 flex items-center gap-1">
+            <button
+              type="button"
+              onClick={toggleMute}
+              aria-label={muted ? "Nyalakan suara" : "Matikan suara"}
+              className="grid h-8 w-8 place-items-center rounded-lg text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600"
+            >
+              {muted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+            </button>
+            <button
+              type="button"
+              onClick={toggleFullscreen}
+              aria-label={isFs ? "Keluar layar penuh" : "Layar penuh"}
+              className="grid h-8 w-8 place-items-center rounded-lg text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600"
+            >
+              {isFs ? <Minimize size={16} /> : <Maximize size={16} />}
+            </button>
+          </div>
+
+          <div
+            className={`relative w-full ${
+              isFs ? "max-w-[min(78vh,760px)]" : "max-w-[380px]"
+            }`}
+          >
             {/* Pointer */}
             <div className="pointer-events-none absolute left-1/2 top-0 z-10 -translate-x-1/2">
               <div className="h-0 w-0 border-x-[15px] border-t-[26px] border-x-transparent border-t-slate-800 drop-shadow-[0_3px_2px_rgba(0,0,0,0.25)]" />
@@ -331,31 +498,58 @@ export default function AdminSpinwheelPage() {
             {spinning ? "Muter…" : "Putar"}
           </button>
 
-          <div
-            aria-live="polite"
-            className="min-h-[6rem] w-full max-w-[380px] text-center"
-          >
-            {winner && (
-              <div
-                key={winner}
-                className="spinwheel-pop rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-5"
+          {/* Pemenang — grande */}
+          {winner && (
+            <div
+              className={`spinwheel-pop absolute inset-0 z-20 flex flex-col items-center justify-center gap-5 bg-white/95 p-6 text-center backdrop-blur-sm ${
+                isFs ? "rounded-none" : "rounded-2xl"
+              }`}
+              aria-live="polite"
+            >
+              <p
+                className={`font-bold uppercase tracking-[0.22em] text-emerald-500 ${
+                  isFs ? "text-base" : "text-xs"
+                }`}
               >
-                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-emerald-500">
-                  Pemenangnya
-                </p>
-                <p className="mt-1.5 break-words text-3xl font-extrabold leading-tight text-emerald-800 sm:text-4xl">
-                  {winner}
-                </p>
+                🎉 Pemenangnya 🎉
+              </p>
+              <p
+                className={`max-w-full break-words font-extrabold leading-tight text-emerald-700 ${
+                  isFs
+                    ? "text-6xl sm:text-7xl lg:text-8xl"
+                    : "text-4xl sm:text-6xl"
+                }`}
+              >
+                {winner}
+              </p>
+              <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setWinner(null);
+                    spin();
+                  }}
+                  className="inline-flex items-center gap-2 rounded-xl bg-brand-500 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand-600"
+                >
+                  <RotateCw size={16} /> Putar lagi
+                </button>
                 <button
                   type="button"
                   onClick={dropWinner}
-                  className="mt-4 rounded-lg border border-emerald-300 bg-white px-3 py-1.5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100"
+                  className="rounded-xl border border-emerald-300 bg-white px-4 py-2.5 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-50"
                 >
-                  Buang dari daftar
+                  Buang &amp; lanjut
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setWinner(null)}
+                  className="rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-500 transition-colors hover:bg-zinc-50"
+                >
+                  Tutup
                 </button>
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
