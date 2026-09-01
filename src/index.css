@@ -86,3 +86,9 @@ body {
     animation: none;
   }
 }
+.spinwheel-panel:fullscreen {
+  width: 100vw;
+  height: 100vh;
+  overflow: auto;
+  background: #fff;
+}
