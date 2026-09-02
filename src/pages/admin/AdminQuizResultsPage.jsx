@@ -155,6 +155,7 @@ function ResultTable({
           <tr className="bg-zinc-50 text-left">
             {showStudent && <th className={th}>Murid</th>}
             <th className={th}>Tgl</th>
+            <th className={th}>Waktu</th>
             <th className={th}>Skor</th>
             {questions.map((_, i) => (
               <th key={i} className={`${th} text-center`}>
@@ -166,7 +167,7 @@ function ResultTable({
           <tr className="bg-zinc-100/70 text-left">
             <th
               className={`${th} font-bold text-zinc-600`}
-              colSpan={showStudent ? 3 : 2}
+              colSpan={showStudent ? 4 : 3}
             >
               Kunci
             </th>
@@ -181,7 +182,7 @@ function ResultTable({
             {onReset && <td className={td} />}
           </tr>
           <tr className="bg-white text-left">
-            <th className={`${th} font-semibold`} colSpan={showStudent ? 3 : 2}>
+            <th className={`${th} font-semibold`} colSpan={showStudent ? 4 : 3}>
               % benar
             </th>
             {stats.map((s, i) => (
@@ -209,9 +210,13 @@ function ResultTable({
                 )}
                 <td className={`${td} whitespace-nowrap text-xs text-zinc-400`}>
                   {fmtDate(a.created_at)}
-                  {a.duration_sec != null && (
-                    <span className="text-zinc-300"> · {fmtDur(a.duration_sec)}</span>
-                  )}
+                </td>
+                <td
+                  className={`${td} whitespace-nowrap text-xs ${
+                    a.duration_sec != null ? "text-zinc-600" : "text-zinc-300"
+                  }`}
+                >
+                  {a.duration_sec != null ? fmtDur(a.duration_sec) : "—"}
                 </td>
                 <td className={`${td} whitespace-nowrap`}>
                   <ScorePill score={a.score} total={a.total} />
@@ -259,7 +264,7 @@ function PlainRows({ attempts, usersById, showStudent }) {
               </span>
             )}
             {a.duration_sec != null && (
-              <span className="shrink-0 text-xs text-zinc-300">
+              <span className="shrink-0 text-xs font-medium text-zinc-500">
                 {fmtDur(a.duration_sec)}
               </span>
             )}
