@@ -38,6 +38,7 @@ function CardInner({ item, clickable }) {
               !item.form_id &&
               !item.url &&
               " · segera"}
+            {item.type === "refleksi" && !item.form_id && " · segera"}
           </span>
           {item.publish_status && item.publish_status !== "all" && (
             <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-500">
@@ -86,15 +87,16 @@ export default function CourseSection({ section, courseId }) {
       {open && (
         <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {section.items.map((item) => {
-            const inAppForm = item.type === "form" && item.form_id;
+            const inAppForm =
+              (item.type === "form" || item.type === "refleksi") &&
+              item.form_id;
             const external =
               (item.type === "meet" || item.type === "form") &&
               item.url &&
               !inAppForm;
             const recording = item.type === "recording" && item.url;
             const quiz = item.type === "soal" && item.question_set_id;
-            const session =
-              item.type === "presensi" || item.type === "refleksi";
+            const presensi = item.type === "presensi";
 
             if (external) {
               return (
@@ -109,12 +111,12 @@ export default function CourseSection({ section, courseId }) {
                 </a>
               );
             }
-            if (recording || quiz || inAppForm || session) {
+            if (recording || quiz || inAppForm || presensi) {
               const to = recording
                 ? `/course/${courseId}/recording/${item.id}`
-                : inAppForm
-                  ? `/course/${courseId}/form/${item.id}`
-                  : session
+                : presensi
+                  ? `/course/${courseId}/presensi/${item.id}`
+                  : inAppForm
                     ? `/course/${courseId}/${item.type}/${item.id}`
                     : `/course/${courseId}/soal/${item.id}`;
               return (

@@ -85,35 +85,8 @@ exception when duplicate_object then null;
 end $$;
 
 -- ── Refleksi ──────────────────────────────────────────────────────
-create table if not exists public.coaching_reflections (
-  lesson_id  text not null references public.coaching_lessons (id) on delete cascade,
-  user_id    uuid not null references auth.users (id) on delete cascade,
-  body       text not null default '',
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  primary key (lesson_id, user_id)
-);
-create index if not exists coaching_reflections_lesson_idx
-  on public.coaching_reflections (lesson_id, updated_at desc);
-
-grant select, insert, update on public.coaching_reflections to authenticated;
-grant all on public.coaching_reflections to service_role;
-
-alter table public.coaching_reflections enable row level security;
-
-drop policy if exists "coaching_reflections own" on public.coaching_reflections;
-create policy "coaching_reflections own"
-  on public.coaching_reflections for all
-  using (auth.uid() = user_id) with check (auth.uid() = user_id);
-
-drop policy if exists "coaching_reflections admin read" on public.coaching_reflections;
-create policy "coaching_reflections admin read"
-  on public.coaching_reflections for select
-  using (public.is_admin());
-
--- Realtime: rekap refleksi admin update pas murid submit.
-do $$
-begin
-  alter publication supabase_realtime add table public.coaching_reflections;
-exception when duplicate_object then null;
-end $$;
+-- Lesson tipe 'refleksi' nunjuk ke sebuah Form in-app lewat
+-- coaching_lessons.form_id (kolom `form_id` udah ada dari forms.sql).
+-- Ngerjain & rekapnya lewat sistem Form — nggak ada tabel khusus.
+-- (Tabel coaching_reflections dari versi lama nggak dipakai lagi;
+--  drop kalau mau bersih:  drop table if exists public.coaching_reflections;)

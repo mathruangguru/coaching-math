@@ -616,7 +616,8 @@ export default function CurriculumEditor({ courseId }) {
                         </div>
                       )}
 
-                      {lesson.type === "form" && (
+                      {(lesson.type === "form" ||
+                        lesson.type === "refleksi") && (
                         <div className="mt-1.5 flex items-center gap-1.5 pl-9">
                           <ListChecks
                             size={12}
@@ -633,36 +634,17 @@ export default function CurriculumEditor({ courseId }) {
                             }}
                             className={`${cell} flex-1 text-xs`}
                           >
-                            <option value="">— form in-app (opsional) —</option>
+                            <option value="">
+                              {lesson.type === "refleksi"
+                                ? "— pilih form —"
+                                : "— form in-app (opsional) —"}
+                            </option>
                             {forms.map((fm) => (
                               <option key={fm.id} value={fm.id}>
                                 {fm.title}
                               </option>
                             ))}
                           </select>
-                        </div>
-                      )}
-
-                      {lesson.type === "refleksi" && (
-                        <div className="mt-1.5 flex items-center gap-1.5 pl-9">
-                          <Pencil
-                            size={12}
-                            className="shrink-0 text-zinc-400"
-                          />
-                          <input
-                            value={lesson.prompt ?? ""}
-                            onChange={(e) =>
-                              patchLessonLocal(editing.id, lesson.id, {
-                                prompt: e.target.value,
-                              })
-                            }
-                            onBlur={() => saveLesson(lesson)}
-                            onKeyDown={(e) =>
-                              e.key === "Enter" && e.currentTarget.blur()
-                            }
-                            placeholder="Pertanyaan refleksi…"
-                            className={`${cell} flex-1 text-xs`}
-                          />
                         </div>
                       )}
 

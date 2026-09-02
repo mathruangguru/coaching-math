@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   ChevronDown,
   UserCheck,
@@ -15,7 +16,6 @@ import {
   createRound,
   setRoundOpen,
   deleteRound,
-  getLessonReflections,
 } from "../../lib/sessions";
 import Skeleton from "../ui/Skeleton";
 
@@ -263,116 +263,27 @@ function PresensiRow({ lesson, usersById }) {
   );
 }
 
-function RefleksiRow({ lesson, usersById }) {
-  const [open, setOpen] = useState(false);
-  const [rows, setRows] = useState(null);
-  const [failed, setFailed] = useState(false);
-  const loadedRef = useRef(false);
-
-  const load = useCallback(() => {
-    getLessonReflections(lesson.id)
-      .then((d) => {
-        setRows(d);
-        setFailed(false);
-      })
-      .catch((err) => {
-        console.error("[admin] gagal memuat refleksi:", err);
-        loadedRef.current = false;
-        setFailed(true);
-      });
-  }, [lesson.id]);
-
-  useEffect(() => {
-    if (!open || loadedRef.current) return;
-    loadedRef.current = true;
-    load();
-  }, [open, load]);
-
-  // Realtime: murid submit / edit refleksi -> refresh.
-  useEffect(() => {
-    if (!open || !hasSupabase) return;
-    let t;
-    const channel = supabase
-      .channel(`refl:${lesson.id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "coaching_reflections",
-          filter: `lesson_id=eq.${lesson.id}`,
-        },
-        () => {
-          clearTimeout(t);
-          t = setTimeout(load, 400);
-        }
-      )
-      .subscribe();
-    return () => {
-      clearTimeout(t);
-      supabase.removeChannel(channel);
-    };
-  }, [open, load, lesson.id]);
-
+function RefleksiRow({ lesson }) {
   return (
-    <li>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-zinc-50"
-      >
-        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-rose-50 text-rose-600">
-          <NotebookPen size={15} />
+    <li className="flex items-center gap-3 px-4 py-2.5">
+      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-rose-50 text-rose-600">
+        <NotebookPen size={15} />
+      </span>
+      <span className="min-w-0 flex-1 truncate text-sm font-medium text-zinc-800">
+        {lesson.title}
+        <span className="ml-1.5 text-xs font-normal text-zinc-400">
+          Refleksi
         </span>
-        <span className="min-w-0 flex-1 truncate text-sm font-medium text-zinc-800">
-          {lesson.title}
-          <span className="ml-1.5 text-xs font-normal text-zinc-400">
-            Refleksi
-          </span>
-        </span>
-        {rows && (
-          <span className="shrink-0 rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold text-zinc-500">
-            {rows.length}
-          </span>
-        )}
-        <ChevronDown
-          size={15}
-          className={`shrink-0 text-zinc-400 transition-transform ${
-            open ? "" : "-rotate-90"
-          }`}
-        />
-      </button>
-
-      {open && (
-        <div className="border-t border-zinc-100 bg-zinc-50/50 px-4 py-3">
-          {!rows && !failed && <Skeleton className="h-10 w-full rounded" />}
-          {failed && <p className="text-xs text-rose-500">Gagal memuat.</p>}
-          {rows && rows.length === 0 && (
-            <p className="text-xs text-zinc-400">Belum ada.</p>
-          )}
-          {rows && rows.length > 0 && (
-            <ul className="flex flex-col gap-2">
-              {rows.map((r) => {
-                const u = usersById.get(r.user_id);
-                return (
-                  <li key={r.user_id} className="text-sm">
-                    <div className="flex items-baseline justify-between gap-3">
-                      <span className="font-medium text-zinc-800">
-                        {u ? fullName(u) : r.user_id}
-                      </span>
-                      <span className="shrink-0 text-xs text-zinc-400">
-                        {fmt(r.updated_at)}
-                      </span>
-                    </div>
-                    <p className="mt-0.5 whitespace-pre-wrap text-xs text-zinc-600">
-                      {r.body}
-                    </p>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </div>
+      </span>
+      {lesson.form_id ? (
+        <Link
+          to={`/admin/forms/${lesson.form_id}/responses`}
+          className="shrink-0 text-xs font-semibold text-brand-600 hover:text-brand-700"
+        >
+          Lihat respons →
+        </Link>
+      ) : (
+        <span className="shrink-0 text-xs text-zinc-400">belum ada form</span>
       )}
     </li>
   );
@@ -447,7 +358,7 @@ export default function CourseSessionRecap({ courseId, only }) {
               l.type === "presensi" ? (
                 <PresensiRow key={l.id} lesson={l} usersById={usersById} />
               ) : (
-                <RefleksiRow key={l.id} lesson={l} usersById={usersById} />
+                <RefleksiRow key={l.id} lesson={l} />
               )
             )}
           </ul>
