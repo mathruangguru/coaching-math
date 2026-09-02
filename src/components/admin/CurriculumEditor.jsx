@@ -36,6 +36,8 @@ const typeTint = {
   meet: "bg-sky-50 text-sky-600",
   recording: "bg-teal-50 text-teal-600",
   form: "bg-violet-50 text-violet-600",
+  presensi: "bg-emerald-50 text-emerald-600",
+  refleksi: "bg-rose-50 text-rose-600",
 };
 
 const cell =
@@ -264,6 +266,7 @@ export default function CurriculumEditor({ courseId }) {
         url: lesson.url ?? null,
         question_set_id: lesson.question_set_id ?? null,
         form_id: lesson.form_id ?? null,
+        prompt: lesson.prompt ?? null,
         publish_status: lesson.publish_status ?? "none",
       }),
     );
@@ -638,6 +641,35 @@ export default function CurriculumEditor({ courseId }) {
                             ))}
                           </select>
                         </div>
+                      )}
+
+                      {lesson.type === "refleksi" && (
+                        <div className="mt-1.5 flex items-center gap-1.5 pl-9">
+                          <Pencil
+                            size={12}
+                            className="shrink-0 text-zinc-400"
+                          />
+                          <input
+                            value={lesson.prompt ?? ""}
+                            onChange={(e) =>
+                              patchLessonLocal(editing.id, lesson.id, {
+                                prompt: e.target.value,
+                              })
+                            }
+                            onBlur={() => saveLesson(lesson)}
+                            onKeyDown={(e) =>
+                              e.key === "Enter" && e.currentTarget.blur()
+                            }
+                            placeholder="Pertanyaan refleksi…"
+                            className={`${cell} flex-1 text-xs`}
+                          />
+                        </div>
+                      )}
+
+                      {lesson.type === "presensi" && (
+                        <p className="mt-1.5 pl-9 text-[11px] text-zinc-400">
+                          Murid klik “Hadir” buat presensi. Rekapnya di bawah.
+                        </p>
                       )}
                     </div>
                   );

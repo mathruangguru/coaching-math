@@ -10,6 +10,8 @@ const typeTint = {
   meet: "bg-sky-50 text-sky-600",
   recording: "bg-teal-50 text-teal-600",
   form: "bg-violet-50 text-violet-600",
+  presensi: "bg-emerald-50 text-emerald-600",
+  refleksi: "bg-rose-50 text-rose-600",
 };
 
 function CardInner({ item, clickable }) {
@@ -91,6 +93,8 @@ export default function CourseSection({ section, courseId }) {
               !inAppForm;
             const recording = item.type === "recording" && item.url;
             const quiz = item.type === "soal" && item.question_set_id;
+            const session =
+              item.type === "presensi" || item.type === "refleksi";
 
             if (external) {
               return (
@@ -105,12 +109,14 @@ export default function CourseSection({ section, courseId }) {
                 </a>
               );
             }
-            if (recording || quiz || inAppForm) {
+            if (recording || quiz || inAppForm || session) {
               const to = recording
                 ? `/course/${courseId}/recording/${item.id}`
                 : inAppForm
                   ? `/course/${courseId}/form/${item.id}`
-                  : `/course/${courseId}/soal/${item.id}`;
+                  : session
+                    ? `/course/${courseId}/${item.type}/${item.id}`
+                    : `/course/${courseId}/soal/${item.id}`;
               return (
                 <Link key={item.id} to={to} className={cardCls + clickableCls}>
                   <CardInner item={item} clickable="internal" />
