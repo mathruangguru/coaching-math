@@ -1,9 +1,19 @@
-import { useEffect, useRef, useState } from "react";
-import { ChevronDown, UserCheck, NotebookPen } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  ChevronDown,
+  UserCheck,
+  NotebookPen,
+  Plus,
+  Trash2,
+} from "lucide-react";
 import { getCourse } from "../../lib/courses";
 import { getUsers } from "../../lib/users";
 import {
-  getLessonAttendance,
+  getRounds,
+  getRoundAttendance,
+  createRound,
+  setRoundOpen,
+  deleteRound,
   getLessonReflections,
 } from "../../lib/sessions";
 import Skeleton from "../ui/Skeleton";
@@ -24,57 +34,251 @@ const fmt = (iso) => {
   }
 };
 
-function SessionRow({ lesson, usersById }) {
+const QUICK = ["Awal", "Tengah", "Akhir"];
+
+function PresensiRow({ lesson, usersById }) {
   const [open, setOpen] = useState(false);
-  const [rows, setRows] = useState(null); // null (belum) | []
+  const [rounds, setRounds] = useState(null); // null | [{ ...round, people: [] }]
+  const [failed, setFailed] = useState(false);
+  const [label, setLabel] = useState("");
+  const [busy, setBusy] = useState(false);
+  const loadedRef = useRef(false);
+
+  const load = useCallback(() => {
+    getRounds(lesson.id)
+      .then(async (rs) => {
+        const people = await Promise.all(
+          rs.map((r) => getRoundAttendance(r.id).catch(() => []))
+        );
+        setRounds(rs.map((r, i) => ({ ...r, people: people[i] })));
+        setFailed(false);
+      })
+      .catch((err) => {
+        console.error("[admin] gagal memuat ronde:", err);
+        loadedRef.current = false;
+        setFailed(true);
+      });
+  }, [lesson.id]);
+
+  useEffect(() => {
+    if (!open || loadedRef.current) return;
+    loadedRef.current = true;
+    load();
+  }, [open, load]);
+
+  const total = rounds?.reduce((n, r) => n + r.people.length, 0) ?? 0;
+
+  const toggle = async (r) => {
+    setRounds((p) =>
+      p.map((x) => (x.id === r.id ? { ...x, is_open: !x.is_open } : x))
+    );
+    try {
+      await setRoundOpen(r.id, !r.is_open);
+    } catch (err) {
+      window.alert(`Gagal: ${err?.message ?? err}`);
+      load();
+    }
+  };
+
+  const add = async (lbl) => {
+    const name = (lbl ?? label).trim();
+    if (!name || busy) return;
+    setBusy(true);
+    try {
+      const row = await createRound(lesson.id, name);
+      setRounds((p) => [...(p ?? []), { ...row, people: [] }]);
+      setLabel("");
+    } catch (err) {
+      window.alert(`Gagal: ${err?.message ?? err}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = async (r) => {
+    if (!window.confirm(`Hapus ronde "${r.label}"?`)) return;
+    try {
+      await deleteRound(r.id);
+      setRounds((p) => p.filter((x) => x.id !== r.id));
+    } catch (err) {
+      window.alert(`Gagal: ${err?.message ?? err}`);
+    }
+  };
+
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-zinc-50"
+      >
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-emerald-50 text-emerald-600">
+          <UserCheck size={15} />
+        </span>
+        <span className="min-w-0 flex-1 truncate text-sm font-medium text-zinc-800">
+          {lesson.title}
+          <span className="ml-1.5 text-xs font-normal text-zinc-400">
+            Presensi
+          </span>
+        </span>
+        {rounds && (
+          <span className="shrink-0 rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold text-zinc-500">
+            {rounds.length} ronde · {total} hadir
+          </span>
+        )}
+        <ChevronDown
+          size={15}
+          className={`shrink-0 text-zinc-400 transition-transform ${
+            open ? "" : "-rotate-90"
+          }`}
+        />
+      </button>
+
+      {open && (
+        <div className="border-t border-zinc-100 bg-zinc-50/50 px-4 py-3">
+          {!rounds && !failed && <Skeleton className="h-10 w-full rounded" />}
+          {failed && <p className="text-xs text-rose-500">Gagal memuat.</p>}
+
+          {rounds && (
+            <div className="flex flex-col gap-3">
+              {rounds.length === 0 && (
+                <p className="text-xs text-zinc-400">Belum ada ronde.</p>
+              )}
+
+              {rounds.map((r) => (
+                <div
+                  key={r.id}
+                  className="rounded-lg border border-zinc-200 bg-white p-3"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="flex-1 text-sm font-semibold text-zinc-800">
+                      {r.label}
+                    </span>
+                    <span className="text-xs text-zinc-400">
+                      {r.people.length} hadir
+                    </span>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={r.is_open}
+                      onClick={() => toggle(r)}
+                      className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
+                        r.is_open ? "bg-emerald-500" : "bg-zinc-300"
+                      }`}
+                      title={r.is_open ? "Tutup presensi" : "Buka presensi"}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                          r.is_open ? "translate-x-4" : "translate-x-0.5"
+                        }`}
+                      />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => remove(r)}
+                      aria-label="Hapus ronde"
+                      className="grid h-6 w-6 shrink-0 place-items-center rounded text-zinc-300 transition-colors hover:bg-rose-50 hover:text-rose-500"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                  {r.people.length > 0 && (
+                    <ul className="mt-2 flex flex-col gap-0.5 border-t border-zinc-100 pt-2">
+                      {r.people.map((p) => {
+                        const u = usersById.get(p.user_id);
+                        return (
+                          <li
+                            key={p.user_id}
+                            className="flex items-baseline justify-between gap-3 text-xs"
+                          >
+                            <span className="text-zinc-700">
+                              {u ? fullName(u) : p.user_id}
+                            </span>
+                            <span className="shrink-0 text-zinc-400">
+                              {fmt(p.checked_in_at)}
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
+              ))}
+
+              <div className="flex flex-wrap items-center gap-1.5">
+                {QUICK.map((q) => (
+                  <button
+                    key={q}
+                    type="button"
+                    onClick={() => add(q)}
+                    disabled={busy}
+                    className="rounded-md border border-zinc-200 bg-white px-2 py-1 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-50 disabled:opacity-50"
+                  >
+                    + {q}
+                  </button>
+                ))}
+                <input
+                  value={label}
+                  onChange={(e) => setLabel(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && add()}
+                  placeholder="nama ronde…"
+                  className="min-w-0 flex-1 rounded-md border border-zinc-300 px-2 py-1 text-xs text-zinc-800 outline-none focus:border-brand-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => add()}
+                  disabled={busy || !label.trim()}
+                  className="inline-flex items-center gap-1 rounded-md bg-brand-500 px-2 py-1 text-xs font-semibold text-white transition-colors hover:bg-brand-600 disabled:opacity-50"
+                >
+                  <Plus size={12} /> Ronde
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </li>
+  );
+}
+
+function RefleksiRow({ lesson, usersById }) {
+  const [open, setOpen] = useState(false);
+  const [rows, setRows] = useState(null);
   const [failed, setFailed] = useState(false);
   const loadedRef = useRef(false);
 
   useEffect(() => {
     if (!open || loadedRef.current) return;
     loadedRef.current = true;
-    const load =
-      lesson.type === "presensi"
-        ? getLessonAttendance(lesson.id)
-        : getLessonReflections(lesson.id);
-    load
+    getLessonReflections(lesson.id)
       .then((d) => {
         setRows(d);
         setFailed(false);
       })
       .catch((err) => {
-        console.error("[admin] gagal memuat rekap sesi:", err);
-        loadedRef.current = false; // biar bisa dicoba lagi
+        console.error("[admin] gagal memuat refleksi:", err);
+        loadedRef.current = false;
         setFailed(true);
       });
-  }, [open, lesson.id, lesson.type]);
-
-  const Icon = lesson.type === "presensi" ? UserCheck : NotebookPen;
-  const status = failed ? "error" : rows === null ? "loading" : "ready";
+  }, [open, lesson.id]);
 
   return (
-    <li className="overflow-hidden">
+    <li>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-zinc-50"
       >
-        <span
-          className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${
-            lesson.type === "presensi"
-              ? "bg-emerald-50 text-emerald-600"
-              : "bg-rose-50 text-rose-600"
-          }`}
-        >
-          <Icon size={15} />
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-rose-50 text-rose-600">
+          <NotebookPen size={15} />
         </span>
         <span className="min-w-0 flex-1 truncate text-sm font-medium text-zinc-800">
           {lesson.title}
           <span className="ml-1.5 text-xs font-normal text-zinc-400">
-            {lesson.type === "presensi" ? "Presensi" : "Refleksi"}
+            Refleksi
           </span>
         </span>
-        {status === "ready" && (
+        {rows && (
           <span className="shrink-0 rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold text-zinc-500">
             {rows.length}
           </span>
@@ -89,14 +293,12 @@ function SessionRow({ lesson, usersById }) {
 
       {open && (
         <div className="border-t border-zinc-100 bg-zinc-50/50 px-4 py-3">
-          {status === "loading" && <Skeleton className="h-10 w-full rounded" />}
-          {status === "error" && (
-            <p className="text-xs text-rose-500">Gagal memuat.</p>
-          )}
-          {status === "ready" && rows.length === 0 && (
+          {!rows && !failed && <Skeleton className="h-10 w-full rounded" />}
+          {failed && <p className="text-xs text-rose-500">Gagal memuat.</p>}
+          {rows && rows.length === 0 && (
             <p className="text-xs text-zinc-400">Belum ada.</p>
           )}
-          {status === "ready" && rows.length > 0 && (
+          {rows && rows.length > 0 && (
             <ul className="flex flex-col gap-2">
               {rows.map((r) => {
                 const u = usersById.get(r.user_id);
@@ -107,14 +309,12 @@ function SessionRow({ lesson, usersById }) {
                         {u ? fullName(u) : r.user_id}
                       </span>
                       <span className="shrink-0 text-xs text-zinc-400">
-                        {fmt(r.checked_in_at ?? r.updated_at)}
+                        {fmt(r.updated_at)}
                       </span>
                     </div>
-                    {lesson.type === "refleksi" && (
-                      <p className="mt-0.5 whitespace-pre-wrap text-xs text-zinc-600">
-                        {r.body}
-                      </p>
-                    )}
+                    <p className="mt-0.5 whitespace-pre-wrap text-xs text-zinc-600">
+                      {r.body}
+                    </p>
                   </li>
                 );
               })}
@@ -137,7 +337,7 @@ export default function CourseSessionRecap({ courseId }) {
       .then(([course, users]) => {
         if (!alive) return;
         const items = (course?.sections ?? [])
-          .flatMap((s) => s.items.map((it) => ({ ...it, section: s.title })))
+          .flatMap((s) => s.items)
           .filter((it) => it.type === "presensi" || it.type === "refleksi");
         setLessons(items);
         setUsersById(new Map(users.map((u) => [u.id, u])));
@@ -178,9 +378,13 @@ export default function CourseSessionRecap({ courseId }) {
         )}
         {status === "ready" && lessons.length > 0 && (
           <ul className="divide-y divide-zinc-100">
-            {lessons.map((l) => (
-              <SessionRow key={l.id} lesson={l} usersById={usersById} />
-            ))}
+            {lessons.map((l) =>
+              l.type === "presensi" ? (
+                <PresensiRow key={l.id} lesson={l} usersById={usersById} />
+              ) : (
+                <RefleksiRow key={l.id} lesson={l} usersById={usersById} />
+              )
+            )}
           </ul>
         )}
       </div>
