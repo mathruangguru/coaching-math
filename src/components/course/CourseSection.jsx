@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { ChevronDown, ExternalLink, ArrowUpRight, Check } from "lucide-react";
 import LessonIcon from "../ui/LessonIcon";
-import { lessonTypeLabels } from "../../lib/lessonTypes";
 
 const typeTint = {
   materi: "bg-zinc-100 text-zinc-500",
@@ -15,6 +14,14 @@ const typeTint = {
 };
 
 function CardInner({ item, clickable, done }) {
+  const soon =
+    (item.type === "soal" && !item.question_set_id) ||
+    (item.type === "form" && !item.form_id && !item.url) ||
+    (item.type === "refleksi" && !item.form_id);
+  const meta = [item.duration || null, soon ? "segera" : null]
+    .filter(Boolean)
+    .join(" · ");
+
   return (
     <>
       <span
@@ -29,17 +36,8 @@ function CardInner({ item, clickable, done }) {
         <p className="text-sm font-semibold leading-snug text-zinc-900 group-hover:text-brand-700">
           {item.title}
         </p>
-        <span className="mt-1 flex items-center gap-1 text-xs text-zinc-400">
-          <span>
-            {lessonTypeLabels[item.type]}
-            {item.duration ? ` · ${item.duration}` : ""}
-            {item.type === "soal" && !item.question_set_id && " · segera"}
-            {item.type === "form" &&
-              !item.form_id &&
-              !item.url &&
-              " · segera"}
-            {item.type === "refleksi" && !item.form_id && " · segera"}
-          </span>
+        <span className="mt-1 flex items-center gap-1.5 text-xs text-zinc-400">
+          {meta && <span>{meta}</span>}
           {done && (
             <span className="inline-flex items-center gap-0.5 rounded bg-teal-50 px-1.5 py-0.5 text-[10px] font-semibold text-teal-600">
               <Check size={10} strokeWidth={3} /> Sudah diisi
