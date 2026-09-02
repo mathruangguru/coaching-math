@@ -1,10 +1,16 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
+import remarkBreaks from "remark-breaks";
 import rehypeKatex from "rehype-katex";
 
+const remarkPlugins = [remarkGfm, remarkBreaks, remarkMath];
+const rehypePlugins = [rehypeKatex];
+
 // Styling elemen hasil render (nggak pakai plugin @tailwindcss/typography).
-const components = {
+// Warna teks body diwarisin dari `className` wrapper — biar 1 komponen bisa
+// dipakai di materi (zinc-700) maupun soal (zinc-900).
+const base = {
   h1: (p) => (
     <h1
       className="mb-3 mt-6 text-2xl font-bold tracking-tight text-zinc-900 first:mt-0"
@@ -23,12 +29,18 @@ const components = {
       {...p}
     />
   ),
-  p: (p) => <p className="my-3 leading-relaxed text-zinc-700" {...p} />,
+  p: (p) => <p className="my-3 leading-relaxed first:mt-0 last:mb-0" {...p} />,
   ul: (p) => (
-    <ul className="my-3 list-disc space-y-1 pl-6 text-zinc-700" {...p} />
+    <ul
+      className="my-3 list-disc space-y-1 pl-6 first:mt-0 last:mb-0"
+      {...p}
+    />
   ),
   ol: (p) => (
-    <ol className="my-3 list-decimal space-y-1 pl-6 text-zinc-700" {...p} />
+    <ol
+      className="my-3 list-decimal space-y-1 pl-6 first:mt-0 last:mb-0"
+      {...p}
+    />
   ),
   li: (p) => <li className="leading-relaxed" {...p} />,
   a: ({ href, ...p }) => (
@@ -42,13 +54,13 @@ const components = {
   ),
   blockquote: (p) => (
     <blockquote
-      className="my-4 border-l-2 border-zinc-300 pl-4 italic text-zinc-500"
+      className="my-4 border-l-2 border-zinc-300 pl-4 italic text-zinc-500 first:mt-0 last:mb-0"
       {...p}
     />
   ),
   pre: (p) => (
     <pre
-      className="my-4 overflow-x-auto rounded-lg bg-zinc-900 p-4 font-mono text-xs leading-relaxed text-zinc-100"
+      className="my-4 overflow-x-auto rounded-lg bg-zinc-900 p-4 font-mono text-xs leading-relaxed text-zinc-100 first:mt-0 last:mb-0"
       {...p}
     />
   ),
@@ -69,8 +81,8 @@ const components = {
     );
   },
   table: (p) => (
-    <div className="my-4 overflow-x-auto">
-      <table className="w-full border-collapse text-sm" {...p} />
+    <div className="my-3 overflow-x-auto first:mt-0 last:mb-0">
+      <table className="border-collapse text-[0.95em]" {...p} />
     </div>
   ),
   th: (p) => (
@@ -96,17 +108,25 @@ const components = {
   strong: (p) => <strong className="font-semibold text-zinc-900" {...p} />,
 };
 
-/** Render string Markdown (GFM + math $…$). HTML mentah diabaikan (aman). */
-export default function Markdown({ children }) {
+// Versi inline: paragraf jadi <span> biar nyatu di baris (mis. label opsi soal).
+const inlineComponents = { ...base, p: (p) => <span {...p} /> };
+
+/**
+ * Render string Markdown (GFM + tabel + math $…$). HTML mentah diabaikan (aman).
+ * `inline` = buat teks pendek yang nyatu di satu baris. `className` mengatur
+ * warna/ukuran teks body.
+ */
+export default function Markdown({ children, inline = false, className = "" }) {
+  const Wrapper = inline ? "span" : "div";
   return (
-    <div className="text-sm">
+    <Wrapper className={className}>
       <ReactMarkdown
-        remarkPlugins={[remarkGfm, remarkMath]}
-        rehypePlugins={[rehypeKatex]}
-        components={components}
+        remarkPlugins={remarkPlugins}
+        rehypePlugins={rehypePlugins}
+        components={inline ? inlineComponents : base}
       >
         {children || ""}
       </ReactMarkdown>
-    </div>
+    </Wrapper>
   );
 }

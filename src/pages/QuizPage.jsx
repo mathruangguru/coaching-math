@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, ChevronLeft, ChevronRight, Clock } from "lucide-react";
 import { getCourse } from "../lib/courses";
@@ -12,6 +12,8 @@ import {
 } from "../lib/quiz";
 import Skeleton from "../components/ui/Skeleton";
 import MathText from "../components/ui/MathText";
+
+const Markdown = lazy(() => import("../components/ui/Markdown"));
 
 const GROUP = 10;
 
@@ -451,53 +453,57 @@ export default function QuizPage() {
               </button>
             )}
           </div>
-          <p className="mt-1.5 text-sm font-medium text-zinc-900">
-            <MathText>{q.prompt}</MathText>
-          </p>
-          {q.type === "multi" && (
-            <p className="mt-1 text-xs font-medium text-brand-600">
-              Bisa pilih lebih dari satu.
-            </p>
-          )}
-          <div className="mt-3 flex flex-col gap-2">
-            {q.options.map((opt, oi) => {
-              const multi = q.type === "multi";
-              const chosen = answers[q.id];
-              const picked = multi
-                ? Array.isArray(chosen) && chosen.includes(oi)
-                : chosen === oi;
-              return (
-                <label
-                  key={oi}
-                  className={`flex cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2 text-sm transition-colors ${
-                    picked
-                      ? "border-brand-500 bg-brand-50 text-brand-800"
-                      : "border-zinc-200 text-zinc-700 hover:bg-zinc-50"
-                  }`}
-                >
-                  <input
-                    type={multi ? "checkbox" : "radio"}
-                    name={q.id}
-                    checked={picked}
-                    onChange={() => pick(q, oi)}
-                    className="sr-only"
-                  />
-                  <span
-                    className={`grid h-6 w-6 shrink-0 place-items-center border text-xs font-bold ${
-                      multi ? "rounded-md" : "rounded-full"
-                    } ${
+          <Suspense
+            fallback={<Skeleton className="mt-3 h-40 w-full rounded" />}
+          >
+            <div className="mt-1.5 text-sm font-medium text-zinc-900">
+              <Markdown>{q.prompt}</Markdown>
+            </div>
+            {q.type === "multi" && (
+              <p className="mt-1 text-xs font-medium text-brand-600">
+                Bisa pilih lebih dari satu.
+              </p>
+            )}
+            <div className="mt-3 flex flex-col gap-2">
+              {q.options.map((opt, oi) => {
+                const multi = q.type === "multi";
+                const chosen = answers[q.id];
+                const picked = multi
+                  ? Array.isArray(chosen) && chosen.includes(oi)
+                  : chosen === oi;
+                return (
+                  <label
+                    key={oi}
+                    className={`flex cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2 text-sm transition-colors ${
                       picked
-                        ? "border-brand-500 bg-brand-500 text-white"
-                        : "border-zinc-300 text-zinc-500"
+                        ? "border-brand-500 bg-brand-50 text-brand-800"
+                        : "border-zinc-200 text-zinc-700 hover:bg-zinc-50"
                     }`}
                   >
-                    {String.fromCharCode(65 + oi)}
-                  </span>
-                  <MathText>{opt}</MathText>
-                </label>
-              );
-            })}
-          </div>
+                    <input
+                      type={multi ? "checkbox" : "radio"}
+                      name={q.id}
+                      checked={picked}
+                      onChange={() => pick(q, oi)}
+                      className="sr-only"
+                    />
+                    <span
+                      className={`grid h-6 w-6 shrink-0 place-items-center border text-xs font-bold ${
+                        multi ? "rounded-md" : "rounded-full"
+                      } ${
+                        picked
+                          ? "border-brand-500 bg-brand-500 text-white"
+                          : "border-zinc-300 text-zinc-500"
+                      }`}
+                    >
+                      {String.fromCharCode(65 + oi)}
+                    </span>
+                    <Markdown inline>{opt}</Markdown>
+                  </label>
+                );
+              })}
+            </div>
+          </Suspense>
         </div>
 
         {/* Navigasi */}

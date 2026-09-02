@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -22,7 +22,8 @@ import {
   bulkCreateQuestions,
 } from "../../lib/quiz";
 import Skeleton from "../../components/ui/Skeleton";
-import MathText from "../../components/ui/MathText";
+
+const Markdown = lazy(() => import("../../components/ui/Markdown"));
 
 const input =
   "w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none transition-colors focus:border-brand-500";
@@ -292,10 +293,10 @@ export default function SetSoalFormPage() {
         </label>
       </div>
 
-      {/* Master-detail */}
+      {/* Master-detail — tiap kolom scroll sendiri di layar lebar */}
       <div className="grid gap-5 lg:grid-cols-[minmax(0,240px)_minmax(0,1fr)] lg:items-start">
         {/* List */}
-        <div className="flex flex-col gap-1.5">
+        <div className="flex flex-col gap-1.5 lg:sticky lg:top-4 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:overscroll-contain lg:pr-1">
           {set.questions.map((q, qi) => {
             const active = q.id === selectedId;
             return (
@@ -369,7 +370,7 @@ export default function SetSoalFormPage() {
         </div>
 
         {/* Preview */}
-        <div className="rounded-2xl border border-zinc-200/80 bg-white p-5">
+        <div className="rounded-2xl border border-zinc-200/80 bg-white p-5 lg:sticky lg:top-4 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:overscroll-contain">
           {!selected ? (
             <p className="py-8 text-center text-sm text-zinc-400">
               Pilih soal di kiri.
@@ -392,37 +393,41 @@ export default function SetSoalFormPage() {
                 </button>
               </div>
 
-              <MathText className="text-sm text-zinc-900">
-                {selected.prompt || "(soal masih kosong)"}
-              </MathText>
+              <Suspense
+                fallback={<Skeleton className="h-24 w-full rounded" />}
+              >
+                <Markdown className="text-sm text-zinc-900">
+                  {selected.prompt || "(soal masih kosong)"}
+                </Markdown>
 
-              <ul className="flex flex-col gap-1.5">
-                {selected.options.map((opt, oi) => {
-                  const key = (selected.answers ?? [selected.answer]).includes(
-                    oi
-                  );
-                  return (
-                    <li
-                      key={oi}
-                      className={`flex items-start gap-2 rounded-lg border px-3 py-2 text-sm ${
-                        key ? "border-teal-300 bg-teal-50" : "border-zinc-200"
-                      }`}
-                    >
-                      <span className="mt-0.5 shrink-0 font-semibold text-zinc-400">
-                        {String.fromCharCode(65 + oi)}.
-                      </span>
-                      <MathText className="text-zinc-700">
-                        {opt || "(kosong)"}
-                      </MathText>
-                      {key && (
-                        <span className="ml-auto shrink-0 text-[11px] font-semibold text-teal-700">
-                          kunci
+                <ul className="flex flex-col gap-1.5">
+                  {selected.options.map((opt, oi) => {
+                    const key = (
+                      selected.answers ?? [selected.answer]
+                    ).includes(oi);
+                    return (
+                      <li
+                        key={oi}
+                        className={`flex items-start gap-2 rounded-lg border px-3 py-2 text-sm ${
+                          key ? "border-teal-300 bg-teal-50" : "border-zinc-200"
+                        }`}
+                      >
+                        <span className="mt-0.5 shrink-0 font-semibold text-zinc-400">
+                          {String.fromCharCode(65 + oi)}.
                         </span>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
+                        <Markdown inline className="text-zinc-700">
+                          {opt || "(kosong)"}
+                        </Markdown>
+                        {key && (
+                          <span className="ml-auto shrink-0 text-[11px] font-semibold text-teal-700">
+                            kunci
+                          </span>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </Suspense>
             </div>
           )}
         </div>
@@ -566,28 +571,32 @@ export default function SetSoalFormPage() {
               <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
                 Pratinjau
               </p>
-              <MathText className="mt-1.5 block text-sm text-zinc-900">
-                {editing.prompt || "(soal masih kosong)"}
-              </MathText>
-              <ul className="mt-2 flex flex-col gap-1 text-sm text-zinc-600">
-                {editing.options.map((opt, oi) => (
-                  <li key={oi} className="flex gap-2">
-                    <span
-                      className={`font-semibold ${
-                        eKeys.includes(oi) ? "text-teal-600" : "text-zinc-400"
-                      }`}
-                    >
-                      {String.fromCharCode(65 + oi)}.
-                    </span>
-                    <MathText>{opt || "(kosong)"}</MathText>
-                    {eKeys.includes(oi) && (
-                      <span className="ml-auto text-[11px] font-semibold text-teal-700">
-                        kunci
+              <Suspense
+                fallback={<Skeleton className="mt-1.5 h-20 w-full rounded" />}
+              >
+                <Markdown className="mt-1.5 block text-sm text-zinc-900">
+                  {editing.prompt || "(soal masih kosong)"}
+                </Markdown>
+                <ul className="mt-2 flex flex-col gap-1 text-sm text-zinc-600">
+                  {editing.options.map((opt, oi) => (
+                    <li key={oi} className="flex gap-2">
+                      <span
+                        className={`font-semibold ${
+                          eKeys.includes(oi) ? "text-teal-600" : "text-zinc-400"
+                        }`}
+                      >
+                        {String.fromCharCode(65 + oi)}.
                       </span>
-                    )}
-                  </li>
-                ))}
-              </ul>
+                      <Markdown inline>{opt || "(kosong)"}</Markdown>
+                      {eKeys.includes(oi) && (
+                        <span className="ml-auto text-[11px] font-semibold text-teal-700">
+                          kunci
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </Suspense>
             </div>
           </div>
         </Modal>
