@@ -165,9 +165,11 @@ export async function submitFormResponse(formId, lessonId, answers) {
 }
 
 /**
- * Waktu (ISO) respons terakhir user ini di sebuah form, atau null.
- * Kalau `lessonId` dikasih, cuma ngitung respons di lesson itu — satu form
- * yang dipakai di beberapa lesson jadi punya cooldown sendiri-sendiri.
+ * Waktu (ISO) respons user ini buat sebuah form, atau null kalau belum ngisi.
+ * Kalau `lessonId` dikasih, di-scope ke lesson itu — satu form yang dipakai
+ * di beberapa lesson dihitung sendiri-sendiri (isi di lesson X, lesson Y
+ * masih kosong). Non-null = udah pernah ngisi (sekali doang, nggak ada
+ * cooldown).
  */
 export async function getMyLastFormResponseAt(formId, lessonId) {
   ensure();
@@ -187,6 +189,25 @@ export async function getMyLastFormResponseAt(formId, lessonId) {
     .maybeSingle();
   if (error) throw error;
   return data?.created_at ?? null;
+}
+
+/**
+ * Dari daftar lesson id, balikin yang mana aja yang user ini udah pernah
+ * kirim respons form-nya. Buat badge "sudah diisi" di daftar materi.
+ */
+export async function getMyFormResponseLessonIds(lessonIds) {
+  if (!hasSupabase || !lessonIds?.length) return [];
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+  const { data, error } = await supabase
+    .from("coaching_form_responses")
+    .select("lesson_id")
+    .eq("user_id", user.id)
+    .in("lesson_id", lessonIds);
+  if (error) throw error;
+  return [...new Set(data.map((r) => r.lesson_id).filter(Boolean))];
 }
 
 /** Semua respons sebuah form — buat rekap admin (RLS admin read). */

@@ -24,14 +24,6 @@ const todayISO = () => {
   ).padStart(2, "0")}`;
 };
 
-// Jeda minimal antar-pengisian form yang sama di lesson yang sama
-// (selaras dgn RLS di forms.sql).
-const COOLDOWN_MIN = 5;
-const COOLDOWN_MS = COOLDOWN_MIN * 60 * 1000;
-const fmtCountdown = (ms) => {
-  const s = Math.max(0, Math.ceil(ms / 1000));
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-};
 
 function StarRating({ value, onChange }) {
   const [hover, setHover] = useState(0);
@@ -80,8 +72,7 @@ export default function FormPage() {
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
   const [err, setErr] = useState("");
-  const [lastAt, setLastAt] = useState(null); // ms epoch respons terakhir user
-  const [now, setNow] = useState(() => Date.now());
+  const [doneAt, setDoneAt] = useState(null); // ISO respons user buat (form, lesson) ini — null = belum
 
   useEffect(() => {
     let alive = true;
@@ -101,9 +92,9 @@ export default function FormPage() {
         ]);
         if (!alive) return;
         setData({ status: "ready", course, lesson, form });
-        // Reset per-lesson: cooldown / state kiriman nggak kebawa dari lesson
-        // (atau form) lain — satu form bisa dipakai di banyak lesson.
-        setLastAt(lastIso ? Date.parse(lastIso) : null);
+        // Per-lesson: status "udah ngisi" nggak kebawa dari lesson (atau form)
+        // lain — satu form bisa dipakai di banyak lesson.
+        setDoneAt(lastIso ?? null);
         setSent(false);
         setValues({});
       } catch (e) {
@@ -148,13 +139,6 @@ export default function FormPage() {
     };
   }, [formId]);
 
-  // Detak 1 detik buat hitung mundur "bisa isi lagi".
-  useEffect(() => {
-    if (!lastAt) return;
-    const t = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(t);
-  }, [lastAt]);
-
   const backLink = (
     <Link
       to={`/course/${courseId}/materi`}
@@ -188,7 +172,8 @@ export default function FormPage() {
     );
 
   const { course, lesson, form } = data;
-  const cooldownLeft = lastAt ? lastAt + COOLDOWN_MS - now : 0;
+  const submitted = sent || !!doneAt;
+  const noun = lesson.type === "refleksi" ? "refleksi" : "form";
 
   const header = (
     <div>
@@ -213,18 +198,10 @@ export default function FormPage() {
       </div>
     );
 
-  if (form.open === false)
-    return (
-      <div className="mx-auto flex max-w-2xl flex-col gap-5">
-        {backLink}
-        {header}
-        <p className="rounded-2xl border border-dashed border-zinc-300 bg-white px-6 py-10 text-center text-sm text-zinc-400">
-          Form ini sedang ditutup.
-        </p>
-      </div>
-    );
-
-  if (sent)
+  // Udah pernah ngisi (barusan / dari sesi sebelumnya) — cukup sekali per
+  // materi. Ini didahulukan dari cek "ditutup" biar pesannya tetap jelas
+  // walau admin nutup form-nya belakangan.
+  if (submitted)
     return (
       <div className="mx-auto flex max-w-2xl flex-col gap-5">
         {backLink}
@@ -234,41 +211,26 @@ export default function FormPage() {
             <Check size={18} strokeWidth={3} />
           </span>
           <p className="mt-3 text-sm font-semibold text-zinc-900">
-            Respons terkirim. Terima kasih!
+            {sent
+              ? "Respons terkirim. Terima kasih!"
+              : `Kamu sudah mengisi ${noun} ini.`}
           </p>
-          {cooldownLeft > 0 ? (
-            <p className="mt-4 text-xs text-zinc-400">
-              Bisa isi lagi dalam {fmtCountdown(cooldownLeft)}.
-            </p>
-          ) : (
-            <button
-              type="button"
-              onClick={() => {
-                setValues({});
-                setSent(false);
-              }}
-              className="mt-4 rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50"
-            >
-              Isi lagi
-            </button>
-          )}
+          <p className="mt-1.5 text-xs text-zinc-400">
+            Cukup sekali per materi.
+            {doneAt && ` Terkirim ${new Date(doneAt).toLocaleString("id-ID")}.`}
+          </p>
         </div>
       </div>
     );
 
-  if (cooldownLeft > 0)
+  if (form.open === false)
     return (
       <div className="mx-auto flex max-w-2xl flex-col gap-5">
         {backLink}
         {header}
-        <div className="rounded-2xl border border-dashed border-zinc-300 bg-white px-6 py-10 text-center">
-          <p className="text-sm text-zinc-500">
-            Kamu baru saja mengisi form ini.
-          </p>
-          <p className="mt-1 text-xs text-zinc-400">
-            Bisa isi lagi dalam {fmtCountdown(cooldownLeft)}.
-          </p>
-        </div>
+        <p className="rounded-2xl border border-dashed border-zinc-300 bg-white px-6 py-10 text-center text-sm text-zinc-400">
+          Form ini sedang ditutup.
+        </p>
       </div>
     );
 
@@ -313,12 +275,11 @@ export default function FormPage() {
       const payload = {};
       for (const f of form.fields) payload[f.id] = valueFor(f);
       await submitFormResponse(form.id, lessonId, payload);
-      setLastAt(Date.now());
       setSent(true);
     } catch (e2) {
       const msg = e2?.message ?? "";
-      // RLS nolak insert kalau form sudah ditutup ATAU masih dalam masa tunggu.
-      // Sinkronkan ulang biar gate render nampilin pesan yang tepat.
+      // RLS nolak insert kalau form udah ditutup ATAU murid udah pernah ngisi
+      // materi ini. Sinkronkan ulang biar gate render nampilin pesan yang tepat.
       if (/row-level security|violates row-level/i.test(msg)) {
         const [fresh, lastIso] = await Promise.all([
           getForm(form.id).catch(() => null),
@@ -328,14 +289,11 @@ export default function FormPage() {
           setData((d) =>
             d.status === "ready" && d.form ? { ...d, form: fresh } : d
           );
-        // Form ditutup -> gate render "ditutup". Kebuka tapi RLS nolak ->
-        // satu-satunya sebab lain adalah masa tunggu form ini.
-        if (fresh?.open === false) return;
-        if (lastIso) {
-          setLastAt(Date.parse(lastIso)); // gate render nampilin hitung mundur
-        } else {
-          setErr("Kamu baru saja mengisi form ini. Coba lagi beberapa menit lagi.");
-        }
+        // Udah pernah ngisi -> gate "sudah mengisi". Kalau nggak, form ditutup
+        // -> gate "ditutup". Selain itu, error umum.
+        if (lastIso) setDoneAt(lastIso);
+        else if (fresh?.open === false) return;
+        else setErr("Nggak bisa mengirim sekarang. Coba lagi.");
         return;
       }
       setErr(msg || "Gagal mengirim.");
