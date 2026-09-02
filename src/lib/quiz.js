@@ -44,7 +44,7 @@ export async function getQuestionSet(id) {
   const { data, error } = await supabase
     .from("coaching_question_sets")
     .select(
-      `id, title, description, time_limit_min,
+      `id, title, description, time_limit_min, intro,
        questions:coaching_questions ( id, code, type, prompt, options, position )`
     )
     .eq("id", id)
@@ -103,7 +103,10 @@ export async function createQuestionSet({ title, description }) {
   return data;
 }
 
-export async function updateQuestionSet(id, { title, description, timeLimitMin }) {
+export async function updateQuestionSet(
+  id,
+  { title, description, timeLimitMin, intro }
+) {
   ensure();
   const patch = {
     title: title.trim() || "Set soal baru",
@@ -113,6 +116,7 @@ export async function updateQuestionSet(id, { title, description, timeLimitMin }
     const n = Number(timeLimitMin);
     patch.time_limit_min = Number.isFinite(n) && n > 0 ? Math.round(n) : null;
   }
+  if (intro !== undefined) patch.intro = intro?.trim() || null;
   const { error } = await supabase
     .from("coaching_question_sets")
     .update(patch)
@@ -332,6 +336,23 @@ export async function openQuizProgress(setId) {
       { onConflict: "user_id,set_id", ignoreDuplicates: true }
     );
 
+  const { data, error } = await supabase
+    .from("coaching_quiz_progress")
+    .select("started_at, answers")
+    .eq("user_id", user.id)
+    .eq("set_id", setId)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+/** Baca sesi kuis yang lagi jalan (tanpa bikin baris baru). null = belum mulai. */
+export async function getQuizProgress(setId) {
+  if (!hasSupabase) return null;
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
   const { data, error } = await supabase
     .from("coaching_quiz_progress")
     .select("started_at, answers")
