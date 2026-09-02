@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { ChevronDown, ExternalLink, ArrowUpRight, Check } from "lucide-react";
+import { ChevronDown, Check } from "lucide-react";
 import LessonIcon from "../ui/LessonIcon";
-import { lessonTypeLabels } from "../../lib/lessonTypes";
 
 const typeTint = {
   materi: "bg-zinc-100 text-zinc-500",
@@ -14,7 +13,47 @@ const typeTint = {
   refleksi: "bg-rose-50 text-rose-600",
 };
 
-function CardInner({ item, clickable, done }) {
+const pill = "rounded px-1.5 py-0.5 text-[10px] font-semibold";
+const pillTeal = `${pill} bg-teal-50 text-teal-600`;
+const pillAmber = `${pill} bg-amber-50 text-amber-600`;
+const pillRose = `${pill} bg-rose-50 text-rose-600`;
+const pillMuted = `${pill} bg-zinc-100 text-zinc-500`;
+
+// Badge hasil kuis: warna ikut rasio benar (biar skor jelek nggak keliatan
+// "lulus" gara-gara hijau).
+const scorePillCls = (score) => {
+  if (!score || score.total == null || !score.total) return pillTeal;
+  const r = (score.score ?? 0) / score.total;
+  return r >= 0.7 ? pillTeal : r >= 0.4 ? pillAmber : pillRose;
+};
+
+function DoneBadge({ children }) {
+  return (
+    <span className={`inline-flex items-center gap-0.5 ${pillTeal}`}>
+      <Check size={10} strokeWidth={3} />
+      <span>{children}</span>
+    </span>
+  );
+}
+
+function CardInner({ item, done, att, score }) {
+  const soon =
+    (item.type === "soal" && !item.question_set_id) ||
+    (item.type === "form" && !item.form_id && !item.url) ||
+    (item.type === "refleksi" && !item.form_id);
+  const meta = [item.duration || null, soon ? "segera" : null]
+    .filter(Boolean)
+    .join(" · ");
+  const notPublish = item.publish_status && item.publish_status !== "all";
+
+  const isForm =
+    (item.type === "form" || item.type === "refleksi") && !!item.form_id;
+  const isQuiz = item.type === "soal" && !!item.question_set_id;
+  const isPresensi = !!att && att.rounds > 0;
+  const hadirPenuh = isPresensi && att.mine >= att.rounds;
+
+  const hasMetaRow = meta || isForm || isQuiz || isPresensi || notPublish;
+
   return (
     <>
       <span
@@ -29,34 +68,42 @@ function CardInner({ item, clickable, done }) {
         <p className="text-sm font-semibold leading-snug text-zinc-900 group-hover:text-brand-700">
           {item.title}
         </p>
-        <span className="mt-1 flex items-center gap-1 text-xs text-zinc-400">
-          <span>
-            {lessonTypeLabels[item.type]}
-            {item.duration ? ` · ${item.duration}` : ""}
-            {item.type === "soal" && !item.question_set_id && " · segera"}
-            {item.type === "form" &&
-              !item.form_id &&
-              !item.url &&
-              " · segera"}
-            {item.type === "refleksi" && !item.form_id && " · segera"}
+        {hasMetaRow && (
+          <span className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-zinc-400">
+            {meta && <span>{meta}</span>}
+
+            {isForm &&
+              (done ? (
+                <DoneBadge>Sudah diisi</DoneBadge>
+              ) : (
+                <span className={pillMuted}>Belum diisi</span>
+              ))}
+
+            {isQuiz &&
+              (score ? (
+                <span className={scorePillCls(score)}>
+                  {score.total != null
+                    ? `Skor ${score.score ?? 0}/${score.total}`
+                    : "Sudah dikerjakan"}
+                </span>
+              ) : (
+                <span className={pillMuted}>Belum dikerjakan</span>
+              ))}
+
+            {isPresensi &&
+              (hadirPenuh ? (
+                <DoneBadge>
+                  Hadir {att.mine}/{att.rounds}
+                </DoneBadge>
+              ) : (
+                <span className={pillMuted}>
+                  Hadir {att.mine}/{att.rounds}
+                </span>
+              ))}
+
+            {notPublish && <span className={pillMuted}>Not publish</span>}
           </span>
-          {done && (
-            <span className="inline-flex items-center gap-0.5 rounded bg-teal-50 px-1.5 py-0.5 text-[10px] font-semibold text-teal-600">
-              <Check size={10} strokeWidth={3} /> Sudah diisi
-            </span>
-          )}
-          {item.publish_status && item.publish_status !== "all" && (
-            <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-500">
-              Not publish
-            </span>
-          )}
-          {clickable === "external" && (
-            <ExternalLink size={12} className="text-brand-500" />
-          )}
-          {clickable === "internal" && (
-            <ArrowUpRight size={13} className="text-brand-500" />
-          )}
-        </span>
+        )}
       </div>
     </>
   );
@@ -66,7 +113,13 @@ const cardCls =
   "group flex items-start gap-3 rounded-xl border border-zinc-200/80 bg-white p-3.5 transition";
 const clickableCls = " hover:border-zinc-300 hover:shadow-sm";
 
-export default function CourseSection({ section, courseId, doneLessons }) {
+const EMPTY_PROGRESS = { done: new Set(), att: {}, score: {} };
+
+export default function CourseSection({
+  section,
+  courseId,
+  progress = EMPTY_PROGRESS,
+}) {
   const [open, setOpen] = useState(true);
 
   return (
@@ -90,7 +143,7 @@ export default function CourseSection({ section, courseId, doneLessons }) {
       </button>
 
       {open && (
-        <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-2 grid items-start gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {section.items.map((item) => {
             const inAppForm =
               (item.type === "form" || item.type === "refleksi") &&
@@ -102,7 +155,9 @@ export default function CourseSection({ section, courseId, doneLessons }) {
             const recording = item.type === "recording" && item.url;
             const quiz = item.type === "soal" && item.question_set_id;
             const presensi = item.type === "presensi";
-            const done = inAppForm && !!doneLessons?.has(item.id);
+            const done = inAppForm && !!progress.done?.has(item.id);
+            const att = presensi ? progress.att?.[item.id] : null;
+            const score = quiz ? progress.score?.[item.id] : null;
 
             if (external) {
               return (
@@ -113,7 +168,7 @@ export default function CourseSection({ section, courseId, doneLessons }) {
                   rel="noopener noreferrer"
                   className={cardCls + clickableCls}
                 >
-                  <CardInner item={item} clickable="external" />
+                  <CardInner item={item} />
                 </a>
               );
             }
@@ -127,7 +182,7 @@ export default function CourseSection({ section, courseId, doneLessons }) {
                     : `/course/${courseId}/soal/${item.id}`;
               return (
                 <Link key={item.id} to={to} className={cardCls + clickableCls}>
-                  <CardInner item={item} clickable="internal" done={done} />
+                  <CardInner item={item} done={done} att={att} score={score} />
                 </Link>
               );
             }
