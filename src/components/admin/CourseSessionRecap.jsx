@@ -34,7 +34,7 @@ const fmt = (iso) => {
   }
 };
 
-const QUICK = ["Awal", "Tengah", "Akhir"];
+const QUICK = ["Presensi 1", "Presensi 2", "Presensi 3"];
 
 function PresensiRow({ lesson, usersById }) {
   const [open, setOpen] = useState(false);
@@ -54,7 +54,7 @@ function PresensiRow({ lesson, usersById }) {
         setFailed(false);
       })
       .catch((err) => {
-        console.error("[admin] gagal memuat ronde:", err);
+        console.error("[admin] gagal memuat presensi:", err);
         loadedRef.current = false;
         setFailed(true);
       });
@@ -96,7 +96,7 @@ function PresensiRow({ lesson, usersById }) {
   };
 
   const remove = async (r) => {
-    if (!window.confirm(`Hapus ronde "${r.label}"?`)) return;
+    if (!window.confirm(`Hapus presensi "${r.label}"?`)) return;
     try {
       await deleteRound(r.id);
       setRounds((p) => p.filter((x) => x.id !== r.id));
@@ -123,7 +123,7 @@ function PresensiRow({ lesson, usersById }) {
         </span>
         {rounds && (
           <span className="shrink-0 rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold text-zinc-500">
-            {rounds.length} ronde · {total} hadir
+            {rounds.length} presensi · {total} hadir
           </span>
         )}
         <ChevronDown
@@ -142,7 +142,7 @@ function PresensiRow({ lesson, usersById }) {
           {rounds && (
             <div className="flex flex-col gap-3">
               {rounds.length === 0 && (
-                <p className="text-xs text-zinc-400">Belum ada ronde.</p>
+                <p className="text-xs text-zinc-400">Belum ada presensi.</p>
               )}
 
               {rounds.map((r) => (
@@ -176,7 +176,7 @@ function PresensiRow({ lesson, usersById }) {
                     <button
                       type="button"
                       onClick={() => remove(r)}
-                      aria-label="Hapus ronde"
+                      aria-label="Hapus presensi"
                       className="grid h-6 w-6 shrink-0 place-items-center rounded text-zinc-300 transition-colors hover:bg-rose-50 hover:text-rose-500"
                     >
                       <Trash2 size={12} />
@@ -221,7 +221,7 @@ function PresensiRow({ lesson, usersById }) {
                   value={label}
                   onChange={(e) => setLabel(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && add()}
-                  placeholder="nama ronde…"
+                  placeholder="nama presensi…"
                   className="min-w-0 flex-1 rounded-md border border-zinc-300 px-2 py-1 text-xs text-zinc-800 outline-none focus:border-brand-500"
                 />
                 <button
@@ -230,7 +230,7 @@ function PresensiRow({ lesson, usersById }) {
                   disabled={busy || !label.trim()}
                   className="inline-flex items-center gap-1 rounded-md bg-brand-500 px-2 py-1 text-xs font-semibold text-white transition-colors hover:bg-brand-600 disabled:opacity-50"
                 >
-                  <Plus size={12} /> Ronde
+                  <Plus size={12} /> Presensi
                 </button>
               </div>
             </div>
