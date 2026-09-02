@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
 import { getCourse } from "../lib/courses";
@@ -8,13 +8,21 @@ import MathText from "../components/ui/MathText";
 
 const GROUP = 10;
 
+const fmtDur = (sec) => {
+  if (sec == null) return null;
+  const s = Math.max(0, Math.round(sec));
+  const m = Math.floor(s / 60);
+  return m > 0 ? `${m} mnt ${s % 60} dtk` : `${s} dtk`;
+};
+
 export default function QuizPage() {
   const { courseId, lessonId } = useParams();
   const [data, setData] = useState({ status: "loading" });
   const [answers, setAnswers] = useState({}); // { qid: idx }
   const [current, setCurrent] = useState(0);
   const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState(null); // { score, total, results }
+  const [result, setResult] = useState(null); // { score, total, results, duration_sec }
+  const startedAtRef = useRef(null);
 
   useEffect(() => {
     let alive = true;
@@ -37,7 +45,11 @@ export default function QuizPage() {
         );
         if (!alive) return;
         if (attempt) {
-          setResult({ score: attempt.score, total: attempt.total });
+          setResult({
+            score: attempt.score,
+            total: attempt.total,
+            duration_sec: attempt.duration_sec ?? null,
+          });
         }
         setData({ status: "ready", course, lesson, set });
       } catch (err) {
@@ -50,6 +62,24 @@ export default function QuizPage() {
       alive = false;
     };
   }, [courseId, lessonId]);
+
+  // Stopwatch mulai begitu murid masuk mode ngerjakan. Disimpan di
+  // localStorage biar refresh nggak nge-reset.
+  useEffect(() => {
+    if (data.status !== "ready" || !data.set || result) return;
+    if (startedAtRef.current != null) return;
+    const key = `quizStart:${data.set.id}`;
+    let t = Number(localStorage.getItem(key));
+    if (!t || Number.isNaN(t)) {
+      t = Date.now();
+      try {
+        localStorage.setItem(key, String(t));
+      } catch {
+        /* private mode / storage penuh — biarin */
+      }
+    }
+    startedAtRef.current = t;
+  }, [data, result]);
 
   const backLink = (
     <Link
@@ -116,9 +146,18 @@ export default function QuizPage() {
     }
     setBusy(true);
     try {
-      const res = await submitQuiz(lessonId, set.id, answers);
+      const durationMs =
+        startedAtRef.current != null
+          ? Date.now() - startedAtRef.current
+          : null;
+      const res = await submitQuiz(lessonId, set.id, answers, durationMs);
       setResult(res);
       setCurrent(0);
+      try {
+        localStorage.removeItem(`quizStart:${set.id}`);
+      } catch {
+        /* biarin */
+      }
     } catch (err) {
       window.alert(err?.message ?? "Gagal submit.");
     } finally {
@@ -172,6 +211,11 @@ export default function QuizPage() {
             <span className="text-lg text-zinc-400"> / {result.total}</span>
           </p>
           <p className="mt-1 text-sm font-semibold text-zinc-400">({p}%)</p>
+          {result.duration_sec != null && (
+            <p className="mt-2 text-xs text-zinc-400">
+              Waktu pengerjaan: {fmtDur(result.duration_sec)}
+            </p>
+          )}
         </div>
       </div>
     );

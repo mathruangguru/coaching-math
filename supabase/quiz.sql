@@ -67,6 +67,11 @@ create index if not exists coaching_quiz_attempts_user_lesson_idx
 alter table public.coaching_quiz_attempts
   add column if not exists results jsonb not null default '{}'::jsonb;
 
+-- Durasi pengerjaan (detik). Diisi Edge Function quiz-submit dari kiriman
+-- client (di-clamp di server). Nullable — attempt lama nggak punya.
+alter table public.coaching_quiz_attempts
+  add column if not exists duration_sec int;
+
 -- 1 attempt per (user, set). Hapus dulu duplikat lama (simpan yang paling
 -- awal), lalu pasang unique index.
 delete from public.coaching_quiz_attempts a

@@ -35,6 +35,13 @@ function fmtDate(iso) {
   }
 }
 
+function fmtDur(sec) {
+  if (sec == null) return null;
+  const s = Math.max(0, Math.round(sec));
+  const m = Math.floor(s / 60);
+  return m > 0 ? `${m}m ${s % 60}d` : `${s}d`;
+}
+
 function pct(score, total) {
   return total > 0 ? Math.round((score / total) * 100) : 0;
 }
@@ -202,6 +209,9 @@ function ResultTable({
                 )}
                 <td className={`${td} whitespace-nowrap text-xs text-zinc-400`}>
                   {fmtDate(a.created_at)}
+                  {a.duration_sec != null && (
+                    <span className="text-zinc-300"> · {fmtDur(a.duration_sec)}</span>
+                  )}
                 </td>
                 <td className={`${td} whitespace-nowrap`}>
                   <ScorePill score={a.score} total={a.total} />
@@ -246,6 +256,11 @@ function PlainRows({ attempts, usersById, showStudent }) {
             {showStudent && (
               <span className="shrink-0 text-xs text-zinc-400">
                 {fmtDate(a.created_at)}
+              </span>
+            )}
+            {a.duration_sec != null && (
+              <span className="shrink-0 text-xs text-zinc-300">
+                {fmtDur(a.duration_sec)}
               </span>
             )}
             <ScorePill score={a.score} total={a.total} />

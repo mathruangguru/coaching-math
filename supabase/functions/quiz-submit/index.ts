@@ -7,8 +7,8 @@
 // Deploy (--no-verify-jwt wajib, auth dicek di dalam):
 //   supabase functions deploy quiz-submit --no-verify-jwt
 //
-// Body: { lessonId, setId, answers: { [questionId]: chosenIndex } }
-// Return: { score, total, results: { [questionId]: boolean }, alreadyDone? }
+// Body: { lessonId, setId, answers: { [questionId]: chosenIndex }, durationMs? }
+// Return: { score, total, results: { [questionId]: boolean }, duration_sec, alreadyDone? }
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
@@ -48,17 +48,25 @@ Deno.serve(async (req) => {
   } = await caller.auth.getUser();
   if (userErr || !user) return json({ error: "Unauthorized" }, 401);
 
-  const { lessonId, setId, answers } = await req.json().catch(() => ({}));
+  const { lessonId, setId, answers, durationMs } = await req
+    .json()
+    .catch(() => ({}));
   if (!lessonId || !setId || typeof answers !== "object" || answers === null) {
     return json({ error: "lessonId, setId, answers wajib" }, 400);
   }
+
+  // Durasi dikirim client -> clamp di server (0 .. 24 jam). null kalau nggak masuk akal.
+  const durNum = Number(durationMs);
+  const durationSec = Number.isFinite(durNum)
+    ? Math.min(Math.max(0, Math.round(durNum / 1000)), 86400)
+    : null;
 
   const admin = createClient(url, serviceKey);
 
   // Sudah pernah ngerjain set ini? -> balikin hasil lama, jangan insert.
   const { data: prev } = await admin
     .from("coaching_quiz_attempts")
-    .select("answers, results, score, total")
+    .select("answers, results, score, total, duration_sec")
     .eq("user_id", user.id)
     .eq("set_id", setId)
     .maybeSingle();
@@ -67,6 +75,7 @@ Deno.serve(async (req) => {
       score: prev.score,
       total: prev.total,
       results: prev.results ?? {},
+      duration_sec: prev.duration_sec ?? null,
       alreadyDone: true,
     });
   }
@@ -116,13 +125,14 @@ Deno.serve(async (req) => {
     results,
     score,
     total,
+    duration_sec: durationSec,
   });
   if (insErr) {
     // 23505 = unique (user, set) -> race; ambil yang barusan masuk.
     if (insErr.code === "23505") {
       const { data: race } = await admin
         .from("coaching_quiz_attempts")
-        .select("results, score, total")
+        .select("results, score, total, duration_sec")
         .eq("user_id", user.id)
         .eq("set_id", setId)
         .maybeSingle();
@@ -131,6 +141,7 @@ Deno.serve(async (req) => {
           score: race.score,
           total: race.total,
           results: race.results ?? {},
+          duration_sec: race.duration_sec ?? null,
           alreadyDone: true,
         });
       }
@@ -138,5 +149,5 @@ Deno.serve(async (req) => {
     return json({ error: insErr.message }, 400);
   }
 
-  return json({ score, total, results });
+  return json({ score, total, results, duration_sec: durationSec });
 });

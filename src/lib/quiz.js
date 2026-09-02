@@ -311,10 +311,10 @@ export async function reorderQuestions(orderedIds) {
 /**
  * Kirim jawaban -> dinilai di Edge Function -> { score, total, results }.
  */
-export async function submitQuiz(lessonId, setId, answers) {
+export async function submitQuiz(lessonId, setId, answers, durationMs) {
   ensure();
   const { data, error } = await supabase.functions.invoke("quiz-submit", {
-    body: { lessonId, setId, answers },
+    body: { lessonId, setId, answers, durationMs },
   });
   if (error) {
     let detail = "";
@@ -344,7 +344,7 @@ export async function getMyAttempt(setId) {
   if (!user) return null;
   const { data, error } = await supabase
     .from("coaching_quiz_attempts")
-    .select("score, total, answers, results, created_at")
+    .select("score, total, answers, results, duration_sec, created_at")
     .eq("set_id", setId)
     .eq("user_id", user.id)
     .order("created_at", { ascending: false })
@@ -363,7 +363,9 @@ export async function getAllAttempts() {
   ensure();
   const { data, error } = await supabase
     .from("coaching_quiz_attempts")
-    .select("id, user_id, lesson_id, set_id, answers, score, total, created_at")
+    .select(
+      "id, user_id, lesson_id, set_id, answers, score, total, duration_sec, created_at"
+    )
     .order("created_at", { ascending: false });
   if (error) throw error;
   return data;
@@ -393,7 +395,7 @@ export async function getLastAttempt(lessonId) {
   if (!user) return null;
   const { data, error } = await supabase
     .from("coaching_quiz_attempts")
-    .select("score, total, answers, created_at")
+    .select("score, total, answers, duration_sec, created_at")
     .eq("user_id", user.id)
     .eq("lesson_id", lessonId)
     .order("created_at", { ascending: false })
