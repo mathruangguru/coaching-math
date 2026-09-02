@@ -10,6 +10,7 @@ import {
   Link2,
   ListChecks,
   Eye,
+  FileText,
 } from "lucide-react";
 import {
   getCourse,
@@ -26,6 +27,7 @@ import { getQuestionSets } from "../../lib/quiz";
 import { getForms } from "../../lib/forms";
 import { lessonTypeLabels } from "../../lib/lessonTypes";
 import LessonIcon from "../ui/LessonIcon";
+import MateriEditor from "./MateriEditor";
 
 const LESSON_TYPES = Object.keys(lessonTypeLabels);
 const URL_TYPES = ["meet", "recording", "slide", "form"];
@@ -127,6 +129,7 @@ export default function CurriculumEditor({ courseId }) {
   const [editingId, setEditingId] = useState(null);
   const [questionSets, setQuestionSets] = useState([]);
   const [forms, setForms] = useState([]);
+  const [contentLesson, setContentLesson] = useState(null); // lesson materi yg lagi diedit isinya
 
   const closeModal = useCallback(() => setEditingId(null), []);
 
@@ -656,6 +659,19 @@ export default function CurriculumEditor({ courseId }) {
                           Murid klik “Hadir” buat presensi. Rekapnya di bawah.
                         </p>
                       )}
+
+                      {lesson.type === "materi" && (
+                        <div className="mt-1.5 pl-9">
+                          <button
+                            type="button"
+                            onClick={() => setContentLesson(lesson)}
+                            className="inline-flex items-center gap-1.5 rounded-md border border-zinc-200 bg-white px-2 py-1 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-50"
+                          >
+                            <FileText size={12} className="text-zinc-400" />
+                            {lesson.content ? "Edit isi materi" : "Tulis isi materi"}
+                          </button>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -679,6 +695,17 @@ export default function CurriculumEditor({ courseId }) {
             </button>
           </div>
         </Modal>
+      )}
+
+      {contentLesson && (
+        <MateriEditor
+          lesson={contentLesson}
+          onClose={() => setContentLesson(null)}
+          onSaved={(content) =>
+            editing &&
+            patchLessonLocal(editing.id, contentLesson.id, { content })
+          }
+        />
       )}
     </div>
   );

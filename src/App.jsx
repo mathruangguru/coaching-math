@@ -6,6 +6,7 @@ import DashboardPage from "./pages/DashboardPage";
 import CoursePage from "./pages/CoursePage";
 import CourseLobbyPage from "./pages/CourseLobbyPage";
 import CourseMateriPage from "./pages/CourseMateriPage";
+import MateriContentPage from "./pages/MateriContentPage";
 import RecordingPage from "./pages/RecordingPage";
 import SlidePage from "./pages/SlidePage";
 import QuizPage from "./pages/QuizPage";
@@ -45,6 +46,10 @@ export default function App() {
           <Route
             path="course/:courseId/materi"
             element={<CourseMateriPage />}
+          />
+          <Route
+            path="course/:courseId/materi/:lessonId"
+            element={<MateriContentPage />}
           />
           <Route
             path="course/:courseId/recording/:lessonId"
