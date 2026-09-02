@@ -7,6 +7,7 @@ import {
   getMyAttempt,
   submitQuiz,
   openQuizProgress,
+  getQuizProgress,
   saveQuizDraft,
 } from "../lib/quiz";
 import Skeleton from "../components/ui/Skeleton";
@@ -38,6 +39,7 @@ export default function QuizPage() {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState(null); // { score, total, results, duration_sec }
   const [startedAt, setStartedAt] = useState(null); // ms epoch, dari server
+  const [started, setStarted] = useState(false); // udah klik "Mulai" / lanjut sesi
   const [now, setNow] = useState(() => Date.now());
   const autoFiredRef = useRef(false);
 
@@ -68,15 +70,16 @@ export default function QuizPage() {
             duration_sec: attempt.duration_sec ?? null,
           });
         } else if (set) {
-          // Mulai / lanjut sesi di server -> timer & draft jawaban ikut
-          // walau pindah device.
-          const prog = await openQuizProgress(set.id).catch(() => null);
+          // Sesi udah jalan (dari sebelumnya / device lain)? -> lanjut,
+          // lewati lobby. Belum -> tampilkan lobby dulu.
+          const prog = await getQuizProgress(set.id).catch(() => null);
           if (!alive) return;
           if (prog?.started_at) {
             setStartedAt(new Date(prog.started_at).getTime());
-          }
-          if (prog?.answers && typeof prog.answers === "object") {
-            setAnswers(prog.answers);
+            if (prog.answers && typeof prog.answers === "object") {
+              setAnswers(prog.answers);
+            }
+            setStarted(true);
           }
         }
         setData({ status: "ready", course, lesson, set });
@@ -128,16 +131,33 @@ export default function QuizPage() {
       ? data.set.time_limit_min * 60000
       : null;
 
+  const handleStart = async () => {
+    if (busy || data.status !== "ready" || !data.set) return;
+    setBusy(true);
+    try {
+      const prog = await openQuizProgress(data.set.id);
+      if (prog?.started_at) setStartedAt(new Date(prog.started_at).getTime());
+      if (prog?.answers && typeof prog.answers === "object") {
+        setAnswers(prog.answers);
+      }
+      setStarted(true);
+    } catch (err) {
+      window.alert(err?.message ?? "Gagal memulai.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   // Simpan draft jawaban ke server (ter-debounce) -> lanjut di device lain.
   useEffect(() => {
-    if (data.status !== "ready" || !data.set || result) return;
+    if (data.status !== "ready" || !data.set || result || !started) return;
     const t = setTimeout(() => {
       saveQuizDraft(data.set.id, answers).catch((e) =>
         console.warn("[QuizPage] draft gagal disimpan:", e)
       );
     }, 800);
     return () => clearTimeout(t);
-  }, [answers, data, result]);
+  }, [answers, data, result, started]);
 
   // Detak per detik buat tampilan timer.
   useEffect(() => {
@@ -276,6 +296,57 @@ export default function QuizPage() {
               Waktu pengerjaan: {fmtDur(result.duration_sec)}
             </p>
           )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Lobby (instruksi + tombol Mulai) ────────────────────────────
+  if (!started) {
+    const limitMin = set.time_limit_min ?? null;
+    return (
+      <div className="mx-auto flex max-w-2xl flex-col gap-5">
+        {backLink}
+        {header}
+
+        <div className="rounded-2xl border border-zinc-200/80 bg-white p-6">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-medium text-zinc-500">
+            <span>{total} soal</span>
+            {limitMin != null && (
+              <span className="inline-flex items-center gap-1">
+                <Clock size={13} /> {limitMin} menit
+              </span>
+            )}
+            <span>1x kesempatan</span>
+          </div>
+
+          {set.intro && (
+            <div className="mt-4 flex flex-col gap-1.5 border-t border-zinc-100 pt-4 text-sm text-zinc-700">
+              {set.intro.split(/\r?\n/).map((line, i) =>
+                line.trim() ? (
+                  <p key={i}>
+                    <MathText>{line}</MathText>
+                  </p>
+                ) : (
+                  <div key={i} className="h-2" />
+                )
+              )}
+            </div>
+          )}
+
+          <p className="mt-4 text-xs text-amber-600">
+            Begitu klik mulai, {limitMin != null ? "timer langsung jalan dan " : ""}
+            jawaban nggak bisa diulang.
+          </p>
+
+          <button
+            type="button"
+            onClick={handleStart}
+            disabled={busy}
+            className="mt-5 w-full rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-brand-600 disabled:opacity-50"
+          >
+            {busy ? "Memulai…" : "MULAI SEKARANG"}
+          </button>
         </div>
       </div>
     );

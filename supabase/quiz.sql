@@ -14,6 +14,10 @@ create table if not exists public.coaching_question_sets (
 alter table public.coaching_question_sets
   add column if not exists time_limit_min int;
 
+-- Instruksi / rules yang tampil di lobby sebelum murid klik "Mulai".
+alter table public.coaching_question_sets
+  add column if not exists intro text;
+
 create table if not exists public.coaching_questions (
   id       text primary key,
   set_id   text not null references public.coaching_question_sets (id) on delete cascade,

@@ -149,6 +149,7 @@ export default function SetSoalFormPage() {
         title: set.title,
         description: set.description,
         timeLimitMin: set.time_limit_min,
+        intro: set.intro,
       })
     );
 
@@ -273,6 +274,20 @@ export default function SetSoalFormPage() {
             onBlur={saveMeta}
             placeholder="mis. 60"
             className={`mt-1.5 ${input} sm:w-40 normal-case tracking-normal`}
+          />
+        </label>
+        <label className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-zinc-400">
+          Instruksi / rules
+          <span className="ml-2 font-normal normal-case tracking-normal text-zinc-400">
+            tampil di lobby sebelum murid klik Mulai
+          </span>
+          <textarea
+            value={set.intro ?? ""}
+            onChange={(e) => patchSet({ intro: e.target.value })}
+            onBlur={saveMeta}
+            rows={4}
+            placeholder={"mis.\n- Kerjakan sendiri, tanpa kalkulator.\n- Sekali mulai, timer jalan dan nggak bisa diulang."}
+            className={`mt-1.5 ${input} resize-y normal-case tracking-normal`}
           />
         </label>
       </div>
