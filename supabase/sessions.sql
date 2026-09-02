@@ -39,10 +39,9 @@ create policy "coaching_attendance_rounds write admin"
   on public.coaching_attendance_rounds for all
   using (public.is_admin()) with check (public.is_admin());
 
--- Presensi murid, per ronde. (Fitur baru — struktur lama di-drop; belum
--- dipakai produksi.)
-drop table if exists public.coaching_attendance cascade;
-create table public.coaching_attendance (
+-- Presensi murid, per ronde. JANGAN di-drop di sini — file ini di-run ulang
+-- tiap ada perubahan tipe lesson, dan drop bakal ngehapus semua check-in.
+create table if not exists public.coaching_attendance (
   id            uuid primary key default gen_random_uuid(),
   round_id      text not null references public.coaching_attendance_rounds (id) on delete cascade,
   user_id       uuid not null references auth.users (id) on delete cascade,
