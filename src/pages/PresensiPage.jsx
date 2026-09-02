@@ -1,29 +1,25 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, UserCheck, Check } from "lucide-react";
 import { getCourse } from "../lib/courses";
-import { getMyAttendance, checkIn } from "../lib/sessions";
+import { supabase, hasSupabase } from "../lib/supabase";
+import { getRounds, getMyCheckins, checkInRound } from "../lib/sessions";
 import Skeleton from "../components/ui/Skeleton";
-
-const fmtTime = (iso) => {
-  try {
-    return new Date(iso).toLocaleString("id-ID", {
-      day: "numeric",
-      month: "short",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return "";
-  }
-};
 
 export default function PresensiPage() {
   const { courseId, lessonId } = useParams();
   const [data, setData] = useState({ status: "loading" });
-  const [at, setAt] = useState(null); // ISO waktu presensi
+  const [rounds, setRounds] = useState([]);
+  const [mine, setMine] = useState(() => new Set()); // round_id yang udah hadir
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+
+  const refreshRounds = useCallback(async () => {
+    const rs = await getRounds(lessonId).catch(() => []);
+    setRounds(rs);
+    const done = await getMyCheckins(rs.map((r) => r.id)).catch(() => []);
+    setMine(new Set(done));
+  }, [lessonId]);
 
   useEffect(() => {
     let alive = true;
@@ -35,9 +31,8 @@ export default function PresensiPage() {
           .find((i) => i.id === lessonId);
         if (!alive) return;
         if (!lesson) return setData({ status: "not-found" });
-        const mine = await getMyAttendance(lessonId).catch(() => null);
+        await refreshRounds();
         if (!alive) return;
-        setAt(mine);
         setData({ status: "ready", course, lesson });
       } catch (e) {
         console.error("[PresensiPage] gagal memuat:", e);
@@ -47,7 +42,30 @@ export default function PresensiPage() {
     return () => {
       alive = false;
     };
-  }, [courseId, lessonId]);
+  }, [courseId, lessonId, refreshRounds]);
+
+  // Ikutin admin buka/tutup ronde secara live.
+  useEffect(() => {
+    if (!hasSupabase) return;
+    const channel = supabase
+      .channel(`attendance_rounds:${lessonId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "coaching_attendance_rounds",
+          filter: `lesson_id=eq.${lessonId}`,
+        },
+        () => {
+          refreshRounds();
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [lessonId, refreshRounds]);
 
   const backLink = (
     <Link
@@ -79,13 +97,15 @@ export default function PresensiPage() {
     );
 
   const { course, lesson } = data;
+  const openRound = rounds.find((r) => r.is_open);
 
   const doCheckIn = async () => {
+    if (!openRound) return;
     setBusy(true);
     setErr("");
     try {
-      await checkIn(lessonId);
-      setAt(new Date().toISOString());
+      await checkInRound(openRound.id);
+      setMine((s) => new Set(s).add(openRound.id));
     } catch (e) {
       setErr(e?.message ?? "Gagal presensi.");
     } finally {
@@ -104,20 +124,24 @@ export default function PresensiPage() {
       </div>
 
       <div className="rounded-2xl border border-zinc-200/80 bg-white p-8 text-center">
-        {at ? (
+        {!openRound ? (
+          <p className="text-sm text-zinc-500">
+            Belum ada presensi yang dibuka. Tunggu pengajar buka window-nya.
+          </p>
+        ) : mine.has(openRound.id) ? (
           <>
             <span className="mx-auto grid h-11 w-11 place-items-center rounded-full bg-emerald-500 text-white">
               <Check size={20} strokeWidth={3} />
             </span>
             <p className="mt-3 text-sm font-semibold text-zinc-900">
-              Kamu sudah presensi
+              Kamu hadir · {openRound.label}
             </p>
-            <p className="mt-0.5 text-xs text-zinc-400">{fmtTime(at)}</p>
           </>
         ) : (
           <>
             <p className="text-sm text-zinc-500">
-              Klik tombol di bawah buat mencatat kehadiran kamu di pertemuan ini.
+              Presensi <span className="font-semibold">{openRound.label}</span>{" "}
+              lagi dibuka.
             </p>
             <button
               type="button"
@@ -125,12 +149,34 @@ export default function PresensiPage() {
               disabled={busy}
               className="mt-4 inline-flex items-center gap-2 rounded-xl bg-brand-500 px-6 py-2.5 text-sm font-bold text-white transition-colors hover:bg-brand-600 disabled:opacity-50"
             >
-              <UserCheck size={16} /> {busy ? "Mencatat…" : "Saya Hadir"}
+              <UserCheck size={16} /> {busy ? "Mencatat…" : "Hadir"}
             </button>
             {err && <p className="mt-2 text-xs text-rose-600">{err}</p>}
           </>
         )}
       </div>
+
+      {rounds.length > 0 && (
+        <ul className="flex flex-col gap-1.5">
+          {rounds.map((r) => (
+            <li
+              key={r.id}
+              className="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 bg-white px-3.5 py-2 text-sm"
+            >
+              <span className="font-medium text-zinc-700">{r.label}</span>
+              {mine.has(r.id) ? (
+                <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600">
+                  <Check size={13} strokeWidth={3} /> Hadir
+                </span>
+              ) : (
+                <span className="text-xs text-zinc-400">
+                  {r.is_open ? "dibuka" : "belum hadir"}
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

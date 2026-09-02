@@ -11,41 +11,86 @@ async function uid() {
   return user?.id ?? null;
 }
 
-// ── Presensi ────────────────────────────────────────────────────────
+// ── Presensi (per ronde) ────────────────────────────────────────────
 
-/** Waktu (ISO) presensi user ini di lesson, atau null kalau belum. */
-export async function getMyAttendance(lessonId) {
-  if (!hasSupabase) return null;
-  const id = await uid();
-  if (!id) return null;
+/** Semua ronde presensi sebuah lesson (urut dibuat). */
+export async function getRounds(lessonId) {
+  if (!hasSupabase) return [];
   const { data, error } = await supabase
-    .from("coaching_attendance")
-    .select("checked_in_at")
+    .from("coaching_attendance_rounds")
+    .select("id, label, is_open, created_at")
     .eq("lesson_id", lessonId)
-    .eq("user_id", id)
-    .maybeSingle();
+    .order("created_at");
   if (error) throw error;
-  return data?.checked_in_at ?? null;
+  return data;
 }
 
-/** Presensi diri sendiri. Idempoten (23505 = udah presensi -> anggap sukses). */
-export async function checkIn(lessonId) {
+/** round_id[] yang udah di-check-in user ini (dari daftar ronde yang dikasih). */
+export async function getMyCheckins(roundIds) {
+  if (!hasSupabase || !roundIds?.length) return [];
+  const id = await uid();
+  if (!id) return [];
+  const { data, error } = await supabase
+    .from("coaching_attendance")
+    .select("round_id")
+    .eq("user_id", id)
+    .in("round_id", roundIds);
+  if (error) throw error;
+  return data.map((r) => r.round_id);
+}
+
+/** Check-in ke satu ronde. Idempoten (23505 = udah). */
+export async function checkInRound(roundId) {
   ensure();
   const id = await uid();
   if (!id) throw new Error("Belum login.");
   const { error } = await supabase
     .from("coaching_attendance")
-    .insert({ lesson_id: lessonId, user_id: id });
+    .insert({ round_id: roundId, user_id: id });
   if (error && error.code !== "23505") throw error;
 }
 
-/** Semua presensi sebuah lesson — buat rekap admin (RLS admin read). */
-export async function getLessonAttendance(lessonId) {
+// Admin
+export async function createRound(lessonId, label) {
+  ensure();
+  const { data, error } = await supabase
+    .from("coaching_attendance_rounds")
+    .insert({
+      id: crypto.randomUUID(),
+      lesson_id: lessonId,
+      label: label?.trim() || "Presensi",
+    })
+    .select("id, label, is_open, created_at")
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function setRoundOpen(roundId, isOpen) {
+  ensure();
+  const { error } = await supabase
+    .from("coaching_attendance_rounds")
+    .update({ is_open: !!isOpen })
+    .eq("id", roundId);
+  if (error) throw error;
+}
+
+export async function deleteRound(roundId) {
+  ensure();
+  const { error } = await supabase
+    .from("coaching_attendance_rounds")
+    .delete()
+    .eq("id", roundId);
+  if (error) throw error;
+}
+
+/** Siapa aja yang hadir di satu ronde — rekap admin. */
+export async function getRoundAttendance(roundId) {
   ensure();
   const { data, error } = await supabase
     .from("coaching_attendance")
     .select("user_id, checked_in_at")
-    .eq("lesson_id", lessonId)
+    .eq("round_id", roundId)
     .order("checked_in_at");
   if (error) throw error;
   return data;
