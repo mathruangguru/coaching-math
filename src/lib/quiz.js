@@ -309,6 +309,50 @@ export async function reorderQuestions(orderedIds) {
 // ── Murid ngerjakan ─────────────────────────────────────────────────
 
 /**
+ * Mulai / lanjut sesi kuis. Bikin baris progress kalau belum ada
+ * (started_at cuma di-stamp sekali), balikin { started_at, answers }.
+ * Ini yang bikin timer & draft jawaban lanjut walau pindah device.
+ */
+export async function openQuizProgress(setId) {
+  if (!hasSupabase) return null;
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  await supabase
+    .from("coaching_quiz_progress")
+    .upsert(
+      { user_id: user.id, set_id: setId },
+      { onConflict: "user_id,set_id", ignoreDuplicates: true }
+    );
+
+  const { data, error } = await supabase
+    .from("coaching_quiz_progress")
+    .select("started_at, answers")
+    .eq("user_id", user.id)
+    .eq("set_id", setId)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+/** Simpan draft jawaban ke server (dipanggil ter-debounce dari QuizPage). */
+export async function saveQuizDraft(setId, answers) {
+  if (!hasSupabase) return;
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return;
+  const { error } = await supabase
+    .from("coaching_quiz_progress")
+    .update({ answers, updated_at: new Date().toISOString() })
+    .eq("user_id", user.id)
+    .eq("set_id", setId);
+  if (error) throw error;
+}
+
+/**
  * Kirim jawaban -> dinilai di Edge Function -> { score, total, results }.
  */
 export async function submitQuiz(lessonId, setId, answers, durationMs) {

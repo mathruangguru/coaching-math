@@ -67,10 +67,32 @@ create index if not exists coaching_quiz_attempts_user_lesson_idx
 alter table public.coaching_quiz_attempts
   add column if not exists results jsonb not null default '{}'::jsonb;
 
--- Durasi pengerjaan (detik). Diisi Edge Function quiz-submit dari kiriman
--- client (di-clamp di server). Nullable — attempt lama nggak punya.
+-- Durasi pengerjaan (detik). Diisi Edge Function quiz-submit — dihitung
+-- dari coaching_quiz_progress.started_at (server-side). Nullable.
 alter table public.coaching_quiz_attempts
   add column if not exists duration_sec int;
+
+-- Progress kuis yang belum disubmit: waktu mulai + draft jawaban. Biar
+-- timer & jawaban lanjut walau pindah device / refresh. Edge Function
+-- quiz-submit ngehapus barisnya begitu attempt masuk.
+create table if not exists public.coaching_quiz_progress (
+  user_id    uuid not null references auth.users (id) on delete cascade,
+  set_id     text not null references public.coaching_question_sets (id) on delete cascade,
+  started_at timestamptz not null default now(),
+  answers    jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now(),
+  primary key (user_id, set_id)
+);
+
+grant select, insert, update, delete on public.coaching_quiz_progress to authenticated;
+grant all on public.coaching_quiz_progress to service_role;
+
+alter table public.coaching_quiz_progress enable row level security;
+
+drop policy if exists "coaching_quiz_progress own" on public.coaching_quiz_progress;
+create policy "coaching_quiz_progress own"
+  on public.coaching_quiz_progress for all
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 -- 1 attempt per (user, set). Hapus dulu duplikat lama (simpan yang paling
 -- awal), lalu pasang unique index.

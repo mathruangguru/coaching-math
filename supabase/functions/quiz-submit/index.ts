@@ -7,6 +7,9 @@
 // Deploy (--no-verify-jwt wajib, auth dicek di dalam):
 //   supabase functions deploy quiz-submit --no-verify-jwt
 //
+// durationMs di body cuma fallback — durasi utama dihitung server dari
+// coaching_quiz_progress.started_at, lalu baris progress-nya dihapus.
+//
 // Body: { lessonId, setId, answers: { [questionId]: chosenIndex }, durationMs? }
 // Return: { score, total, results: { [questionId]: boolean }, duration_sec, alreadyDone? }
 
@@ -55,15 +58,24 @@ Deno.serve(async (req) => {
     return json({ error: "lessonId, setId, answers wajib" }, 400);
   }
 
-  // Durasi dikirim client. > 3 jam dianggap nggak valid (murid ninggalin
-  // soal lama) -> disimpan null.
-  const durNum = Number(durationMs);
-  const rawSec = Number.isFinite(durNum)
-    ? Math.max(0, Math.round(durNum / 1000))
-    : null;
-  const durationSec = rawSec != null && rawSec <= 3 * 3600 ? rawSec : null;
+  // > 3 jam dianggap nggak valid (murid ninggalin soal lama) -> null.
+  const clampSec = (s: number | null) =>
+    s != null && Number.isFinite(s) && s >= 0 && s <= 3 * 3600
+      ? Math.round(s)
+      : null;
+  // Fallback kalau baris progress nggak ada (sesi lama / progress kehapus).
+  const clientDurSec = clampSec(
+    Number.isFinite(Number(durationMs)) ? Number(durationMs) / 1000 : null
+  );
 
   const admin = createClient(url, serviceKey);
+
+  const clearProgress = () =>
+    admin
+      .from("coaching_quiz_progress")
+      .delete()
+      .eq("user_id", user.id)
+      .eq("set_id", setId);
 
   // Sudah pernah ngerjain set ini? -> balikin hasil lama, jangan insert.
   const { data: prev } = await admin
@@ -73,6 +85,7 @@ Deno.serve(async (req) => {
     .eq("set_id", setId)
     .maybeSingle();
   if (prev) {
+    await clearProgress();
     return json({
       score: prev.score,
       total: prev.total,
@@ -81,6 +94,17 @@ Deno.serve(async (req) => {
       alreadyDone: true,
     });
   }
+
+  // Durasi authoritative: server_now - started_at dari baris progress.
+  const { data: prog } = await admin
+    .from("coaching_quiz_progress")
+    .select("started_at")
+    .eq("user_id", user.id)
+    .eq("set_id", setId)
+    .maybeSingle();
+  const durationSec = prog?.started_at
+    ? clampSec((Date.now() - new Date(prog.started_at).getTime()) / 1000)
+    : clientDurSec;
 
   const { data: questions, error: qErr } = await admin
     .from("coaching_questions")
@@ -139,6 +163,7 @@ Deno.serve(async (req) => {
         .eq("set_id", setId)
         .maybeSingle();
       if (race) {
+        await clearProgress();
         return json({
           score: race.score,
           total: race.total,
@@ -151,5 +176,6 @@ Deno.serve(async (req) => {
     return json({ error: insErr.message }, 400);
   }
 
+  await clearProgress();
   return json({ score, total, results, duration_sec: durationSec });
 });

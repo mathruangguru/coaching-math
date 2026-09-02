@@ -2,7 +2,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
 import { getCourse } from "../lib/courses";
-import { getQuestionSet, getMyAttempt, submitQuiz } from "../lib/quiz";
+import {
+  getQuestionSet,
+  getMyAttempt,
+  submitQuiz,
+  openQuizProgress,
+  saveQuizDraft,
+} from "../lib/quiz";
 import Skeleton from "../components/ui/Skeleton";
 import MathText from "../components/ui/MathText";
 
@@ -17,28 +23,6 @@ const fmtDur = (sec) => {
   const s = Math.max(0, Math.round(sec));
   const m = Math.floor(s / 60);
   return m > 0 ? `${m} mnt ${s % 60} dtk` : `${s} dtk`;
-};
-
-const lsGet = (k) => {
-  try {
-    return localStorage.getItem(k);
-  } catch {
-    return null;
-  }
-};
-const lsSet = (k, v) => {
-  try {
-    localStorage.setItem(k, v);
-  } catch {
-    /* private mode / penuh — biarin */
-  }
-};
-const lsDel = (k) => {
-  try {
-    localStorage.removeItem(k);
-  } catch {
-    /* biarin */
-  }
 };
 
 export default function QuizPage() {
@@ -78,12 +62,15 @@ export default function QuizPage() {
             duration_sec: attempt.duration_sec ?? null,
           });
         } else if (set) {
-          // Balikin jawaban yang belum sempat dikirim (refresh / balik lagi).
-          try {
-            const saved = JSON.parse(lsGet(`quizAns:${set.id}`) || "null");
-            if (saved && typeof saved === "object") setAnswers(saved);
-          } catch {
-            /* biarin */
+          // Mulai / lanjut sesi di server -> timer & draft jawaban ikut
+          // walau pindah device.
+          const prog = await openQuizProgress(set.id).catch(() => null);
+          if (!alive) return;
+          if (prog?.started_at) {
+            startedAtRef.current = new Date(prog.started_at).getTime();
+          }
+          if (prog?.answers && typeof prog.answers === "object") {
+            setAnswers(prog.answers);
           }
         }
         setData({ status: "ready", course, lesson, set });
@@ -124,8 +111,6 @@ export default function QuizPage() {
         const res = await submitQuiz(lessonId, data.set.id, answers, durationMs);
         setResult(res);
         setCurrent(0);
-        lsDel(`quizStart:${data.set.id}`);
-        lsDel(`quizAns:${data.set.id}`);
       } catch (err) {
         if (!silent) window.alert(err?.message ?? "Gagal submit.");
       } finally {
@@ -135,24 +120,15 @@ export default function QuizPage() {
     [busy, result, data, answers, lessonId]
   );
 
-  // Stopwatch mulai begitu murid masuk mode ngerjakan. Disimpan di
-  // localStorage biar refresh nggak nge-reset.
+  // Simpan draft jawaban ke server (ter-debounce) -> lanjut di device lain.
   useEffect(() => {
     if (data.status !== "ready" || !data.set || result) return;
-    if (startedAtRef.current != null) return;
-    const key = `quizStart:${data.set.id}`;
-    let t = Number(lsGet(key));
-    if (!t || Number.isNaN(t)) {
-      t = Date.now();
-      lsSet(key, String(t));
-    }
-    startedAtRef.current = t;
-  }, [data, result]);
-
-  // Simpan jawaban sementara -> refresh / balik lagi nggak ilang.
-  useEffect(() => {
-    if (data.status !== "ready" || !data.set || result) return;
-    lsSet(`quizAns:${data.set.id}`, JSON.stringify(answers));
+    const t = setTimeout(() => {
+      saveQuizDraft(data.set.id, answers).catch((e) =>
+        console.warn("[QuizPage] draft gagal disimpan:", e)
+      );
+    }, 800);
+    return () => clearTimeout(t);
   }, [answers, data, result]);
 
   // Auto-submit kalau udah lewat 3 jam sejak buka soal.
