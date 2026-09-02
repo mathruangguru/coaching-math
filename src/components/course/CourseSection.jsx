@@ -156,6 +156,7 @@ export default function CourseSection({
               !inAppForm;
             const recording = item.type === "recording" && item.url;
             const slide = item.type === "slide" && item.url;
+            const article = item.type === "materi" && item.content;
             const quiz = item.type === "soal" && item.question_set_id;
             const presensi = item.type === "presensi";
             const done = inAppForm && !!progress.done?.has(item.id);
@@ -175,16 +176,25 @@ export default function CourseSection({
                 </a>
               );
             }
-            if (recording || slide || quiz || inAppForm || presensi) {
+            if (
+              recording ||
+              slide ||
+              article ||
+              quiz ||
+              inAppForm ||
+              presensi
+            ) {
               const to = recording
                 ? `/course/${courseId}/recording/${item.id}`
                 : slide
                   ? `/course/${courseId}/slide/${item.id}`
-                  : presensi
-                    ? `/course/${courseId}/presensi/${item.id}`
-                    : inAppForm
-                      ? `/course/${courseId}/${item.type}/${item.id}`
-                      : `/course/${courseId}/soal/${item.id}`;
+                  : article
+                    ? `/course/${courseId}/materi/${item.id}`
+                    : presensi
+                      ? `/course/${courseId}/presensi/${item.id}`
+                      : inAppForm
+                        ? `/course/${courseId}/${item.type}/${item.id}`
+                        : `/course/${courseId}/soal/${item.id}`;
               return (
                 <Link key={item.id} to={to} className={cardCls + clickableCls}>
                   <CardInner item={item} done={done} att={att} score={score} />
