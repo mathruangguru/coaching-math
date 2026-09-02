@@ -102,6 +102,12 @@ create policy "coaching_quiz_progress own"
   on public.coaching_quiz_progress for all
   using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
+-- Admin lihat siapa aja yang lagi ngerjain (di /admin/quiz-results).
+drop policy if exists "coaching_quiz_progress admin read" on public.coaching_quiz_progress;
+create policy "coaching_quiz_progress admin read"
+  on public.coaching_quiz_progress for select
+  using (public.is_admin());
+
 -- 1 attempt per (user, set). Hapus dulu duplikat lama (simpan yang paling
 -- awal), lalu pasang unique index.
 delete from public.coaching_quiz_attempts a
