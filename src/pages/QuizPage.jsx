@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
 import { getCourse } from "../lib/courses";
@@ -8,11 +8,37 @@ import MathText from "../components/ui/MathText";
 
 const GROUP = 10;
 
+// Lewat 3 jam sejak buka soal -> jawaban auto-dikirim, durasi dianggap
+// nggak valid (di-null-in server-side juga).
+const HARD_LIMIT_MS = 3 * 60 * 60 * 1000;
+
 const fmtDur = (sec) => {
   if (sec == null) return null;
   const s = Math.max(0, Math.round(sec));
   const m = Math.floor(s / 60);
   return m > 0 ? `${m} mnt ${s % 60} dtk` : `${s} dtk`;
+};
+
+const lsGet = (k) => {
+  try {
+    return localStorage.getItem(k);
+  } catch {
+    return null;
+  }
+};
+const lsSet = (k, v) => {
+  try {
+    localStorage.setItem(k, v);
+  } catch {
+    /* private mode / penuh — biarin */
+  }
+};
+const lsDel = (k) => {
+  try {
+    localStorage.removeItem(k);
+  } catch {
+    /* biarin */
+  }
 };
 
 export default function QuizPage() {
@@ -23,6 +49,7 @@ export default function QuizPage() {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState(null); // { score, total, results, duration_sec }
   const startedAtRef = useRef(null);
+  const autoFiredRef = useRef(false);
 
   useEffect(() => {
     let alive = true;
@@ -50,6 +77,14 @@ export default function QuizPage() {
             total: attempt.total,
             duration_sec: attempt.duration_sec ?? null,
           });
+        } else if (set) {
+          // Balikin jawaban yang belum sempat dikirim (refresh / balik lagi).
+          try {
+            const saved = JSON.parse(lsGet(`quizAns:${set.id}`) || "null");
+            if (saved && typeof saved === "object") setAnswers(saved);
+          } catch {
+            /* biarin */
+          }
         }
         setData({ status: "ready", course, lesson, set });
       } catch (err) {
@@ -63,23 +98,86 @@ export default function QuizPage() {
     };
   }, [courseId, lessonId]);
 
+  const submit = useCallback(
+    async ({ silent = false } = {}) => {
+      if (busy || result || data.status !== "ready" || !data.set) return;
+      const qs = data.set.questions ?? [];
+      if (!silent) {
+        const blanks = qs.filter((qq) => {
+          const v = answers[qq.id];
+          return Array.isArray(v) ? v.length === 0 : v == null;
+        }).length;
+        if (
+          blanks > 0 &&
+          !window.confirm(
+            `Masih ada ${blanks} soal belum dijawab. Kirim sekarang?`
+          )
+        )
+          return;
+      }
+      setBusy(true);
+      try {
+        const durationMs =
+          startedAtRef.current != null
+            ? Date.now() - startedAtRef.current
+            : null;
+        const res = await submitQuiz(lessonId, data.set.id, answers, durationMs);
+        setResult(res);
+        setCurrent(0);
+        lsDel(`quizStart:${data.set.id}`);
+        lsDel(`quizAns:${data.set.id}`);
+      } catch (err) {
+        if (!silent) window.alert(err?.message ?? "Gagal submit.");
+      } finally {
+        setBusy(false);
+      }
+    },
+    [busy, result, data, answers, lessonId]
+  );
+
   // Stopwatch mulai begitu murid masuk mode ngerjakan. Disimpan di
   // localStorage biar refresh nggak nge-reset.
   useEffect(() => {
     if (data.status !== "ready" || !data.set || result) return;
     if (startedAtRef.current != null) return;
     const key = `quizStart:${data.set.id}`;
-    let t = Number(localStorage.getItem(key));
+    let t = Number(lsGet(key));
     if (!t || Number.isNaN(t)) {
       t = Date.now();
-      try {
-        localStorage.setItem(key, String(t));
-      } catch {
-        /* private mode / storage penuh — biarin */
-      }
+      lsSet(key, String(t));
     }
     startedAtRef.current = t;
   }, [data, result]);
+
+  // Simpan jawaban sementara -> refresh / balik lagi nggak ilang.
+  useEffect(() => {
+    if (data.status !== "ready" || !data.set || result) return;
+    lsSet(`quizAns:${data.set.id}`, JSON.stringify(answers));
+  }, [answers, data, result]);
+
+  // Auto-submit kalau udah lewat 3 jam sejak buka soal.
+  useEffect(() => {
+    if (
+      data.status !== "ready" ||
+      !data.set ||
+      result ||
+      startedAtRef.current == null
+    )
+      return;
+    const fire = () => {
+      if (autoFiredRef.current) return;
+      autoFiredRef.current = true;
+      window.alert("Waktu 3 jam terlewati — jawaban kamu otomatis dikirim.");
+      submit({ silent: true });
+    };
+    const left = startedAtRef.current + HARD_LIMIT_MS - Date.now();
+    if (left <= 0) {
+      fire();
+      return;
+    }
+    const t = setTimeout(fire, left);
+    return () => clearTimeout(t);
+  }, [data, result, submit]);
 
   const backLink = (
     <Link
@@ -133,37 +231,6 @@ export default function QuizPage() {
         : [...cur, oi].sort((m, n) => m - n);
       return { ...a, [qq.id]: next };
     });
-
-  const submit = async () => {
-    const blanks = questions.filter((qq) => !isAnswered(qq)).length;
-    if (
-      blanks > 0 &&
-      !window.confirm(
-        `Masih ada ${blanks} soal belum dijawab. Kirim sekarang?`
-      )
-    ) {
-      return;
-    }
-    setBusy(true);
-    try {
-      const durationMs =
-        startedAtRef.current != null
-          ? Date.now() - startedAtRef.current
-          : null;
-      const res = await submitQuiz(lessonId, set.id, answers, durationMs);
-      setResult(res);
-      setCurrent(0);
-      try {
-        localStorage.removeItem(`quizStart:${set.id}`);
-      } catch {
-        /* biarin */
-      }
-    } catch (err) {
-      window.alert(err?.message ?? "Gagal submit.");
-    } finally {
-      setBusy(false);
-    }
-  };
 
   const answeredCount = questions.filter(isAnswered).length;
 
@@ -376,7 +443,7 @@ export default function QuizPage() {
 
           <button
             type="button"
-            onClick={submit}
+            onClick={() => submit()}
             disabled={busy}
             className="rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-600 disabled:opacity-50"
           >

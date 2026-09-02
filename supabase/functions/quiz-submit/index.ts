@@ -55,11 +55,13 @@ Deno.serve(async (req) => {
     return json({ error: "lessonId, setId, answers wajib" }, 400);
   }
 
-  // Durasi dikirim client -> clamp di server (0 .. 24 jam). null kalau nggak masuk akal.
+  // Durasi dikirim client. > 3 jam dianggap nggak valid (murid ninggalin
+  // soal lama) -> disimpan null.
   const durNum = Number(durationMs);
-  const durationSec = Number.isFinite(durNum)
-    ? Math.min(Math.max(0, Math.round(durNum / 1000)), 86400)
+  const rawSec = Number.isFinite(durNum)
+    ? Math.max(0, Math.round(durNum / 1000))
     : null;
+  const durationSec = rawSec != null && rawSec <= 3 * 3600 ? rawSec : null;
 
   const admin = createClient(url, serviceKey);
 
