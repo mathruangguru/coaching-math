@@ -10,6 +10,10 @@ create table if not exists public.coaching_question_sets (
   created_at  timestamptz not null default now()
 );
 
+-- Batas waktu pengerjaan (menit). null = tanpa batas. Ditambahkan belakangan.
+alter table public.coaching_question_sets
+  add column if not exists time_limit_min int;
+
 create table if not exists public.coaching_questions (
   id       text primary key,
   set_id   text not null references public.coaching_question_sets (id) on delete cascade,
