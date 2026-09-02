@@ -13,6 +13,7 @@ import SubjectIcon from "../../components/ui/SubjectIcon";
 import Skeleton from "../../components/ui/Skeleton";
 import CurriculumEditor from "../../components/admin/CurriculumEditor";
 import EnrolledStudents from "../../components/admin/EnrolledStudents";
+import CourseSessionRecap from "../../components/admin/CourseSessionRecap";
 
 const ICONS = Object.keys(subjectIcons);
 
@@ -324,6 +325,10 @@ export default function CourseFormPage() {
 
       {isEdit && status === "ready" && (
         <EnrolledStudents courseId={courseId} />
+      )}
+
+      {isEdit && status === "ready" && (
+        <CourseSessionRecap courseId={courseId} />
       )}
     </div>
   );

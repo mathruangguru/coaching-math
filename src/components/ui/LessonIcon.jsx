@@ -5,6 +5,8 @@ import {
   Video,
   Play,
   ClipboardList,
+  UserCheck,
+  NotebookPen,
   Circle,
 } from "lucide-react";
 
@@ -14,6 +16,8 @@ const icons = {
   meet: Video,
   recording: Play,
   form: ClipboardList,
+  presensi: UserCheck,
+  refleksi: NotebookPen,
 };
 
 // Merender ikon sesuai tipe item materi.

@@ -6,6 +6,8 @@ export const lessonTypeLabels = {
   meet: "Link Meet",
   recording: "Recording",
   form: "Form",
+  presensi: "Presensi",
+  refleksi: "Refleksi",
 };
 
 // Status publikasi per materi (kolom coaching_lessons.publish_status).

@@ -33,7 +33,7 @@ export async function getCourse(id) {
       `id, title, description, icon,
        sections:coaching_course_sections (
          id, title, position,
-         items:coaching_lessons ( id, type, title, duration, url, question_set_id, form_id, publish_status, position )
+         items:coaching_lessons ( id, type, title, duration, url, question_set_id, form_id, prompt, publish_status, position )
        )`
     )
     .eq("id", id)
@@ -187,7 +187,17 @@ export async function reorderSections(orderedIds) {
 
 export async function createLesson(
   sectionId,
-  { type, title, duration, url, questionSetId, formId, publishStatus, position }
+  {
+    type,
+    title,
+    duration,
+    url,
+    questionSetId,
+    formId,
+    prompt,
+    publishStatus,
+    position,
+  }
 ) {
   ensureSupabase();
   const { data, error } = await supabase
@@ -201,12 +211,13 @@ export async function createLesson(
       url: url || null,
       question_set_id: questionSetId || null,
       form_id: formId || null,
+      prompt: prompt?.trim() || null,
       // Materi baru mulai sebagai draft — admin publish kalau sudah siap.
       publish_status: publishStatus || "none",
       position,
     })
     .select(
-      "id, type, title, duration, url, question_set_id, form_id, publish_status"
+      "id, type, title, duration, url, question_set_id, form_id, prompt, publish_status"
     )
     .single();
   if (error) throw error;
@@ -220,6 +231,7 @@ export async function updateLesson(id, patch) {
   if ("url" in clean) clean.url = clean.url?.trim() || null;
   if ("question_set_id" in clean) clean.question_set_id = clean.question_set_id || null;
   if ("form_id" in clean) clean.form_id = clean.form_id || null;
+  if ("prompt" in clean) clean.prompt = clean.prompt?.trim() || null;
   const { error } = await supabase
     .from("coaching_lessons")
     .update(clean)

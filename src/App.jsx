@@ -9,6 +9,8 @@ import CourseMateriPage from "./pages/CourseMateriPage";
 import RecordingPage from "./pages/RecordingPage";
 import QuizPage from "./pages/QuizPage";
 import FormPage from "./pages/FormPage";
+import PresensiPage from "./pages/PresensiPage";
+import RefleksiPage from "./pages/RefleksiPage";
 import ProfilePage from "./pages/ProfilePage";
 import RequireAdmin from "./components/admin/RequireAdmin";
 import AdminLayout from "./components/admin/AdminLayout";
@@ -55,6 +57,14 @@ export default function App() {
           <Route
             path="course/:courseId/form/:lessonId"
             element={<FormPage />}
+          />
+          <Route
+            path="course/:courseId/presensi/:lessonId"
+            element={<PresensiPage />}
+          />
+          <Route
+            path="course/:courseId/refleksi/:lessonId"
+            element={<RefleksiPage />}
           />
           <Route path="profile" element={<ProfilePage />} />
         </Route>
