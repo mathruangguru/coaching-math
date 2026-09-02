@@ -137,82 +137,32 @@ function Cell({ chosen, keyArr }) {
   );
 }
 
-function DraftCell({ chosen }) {
-  if (toAnswerArray(chosen).length === 0) {
-    return (
-      <td className={`${td} bg-zinc-50 text-center text-xs text-zinc-300`}>–</td>
-    );
-  }
-  return (
-    <td className={`${td} text-center text-xs font-semibold text-zinc-600`}>
-      {letters(chosen)}
-    </td>
-  );
-}
-
-/** Matrix jawaban sementara murid yang lagi ngerjain (belum dinilai). */
-function DraftTable({ questions, rows, usersById }) {
-  if (rows.length === 0) return null;
-  return (
-    <div className="no-scrollbar overflow-x-auto">
-      <table className="min-w-full border-collapse">
-        <thead>
-          <tr className="bg-amber-50/70 text-left">
-            <th className={th}>Murid</th>
-            <th className={th}>Mulai</th>
-            <th className={th}>Dijawab</th>
-            {questions.map((_, i) => (
-              <th key={i} className={`${th} text-center`}>
-                {i + 1}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((p) => {
-            const u = usersById?.get(p.user_id);
-            return (
-              <tr key={p.user_id}>
-                <td className={`${td} whitespace-nowrap text-sm text-zinc-700`}>
-                  {u ? fullName(u) : p.user_id}
-                </td>
-                <td className={`${td} whitespace-nowrap text-xs text-zinc-400`}>
-                  {fmtAgo(p.started_at)}
-                </td>
-                <td className={`${td} whitespace-nowrap text-xs text-zinc-500`}>
-                  {answeredOf(p.answers)}/{questions.length}
-                </td>
-                {questions.map((q, i) => (
-                  <DraftCell key={i} chosen={p.answers?.[q.id]} />
-                ))}
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-/** Matrix: kolom = nomor soal, baris = attempt, isi = huruf jawaban. */
+/**
+ * Matrix: kolom = nomor soal, baris = attempt / sesi ongoing.
+ * `ongoing` = [{ user_id, started_at, answers }] — ikut dihitung di
+ * "% benar" dan diwarnai bener/salah, dipisah baris "Sedang mengerjakan".
+ */
 function ResultTable({
   questions,
   attempts,
+  ongoing = [],
   showStudent,
   usersById,
   onReset,
   resetBusyId,
 }) {
+  const graded = [...attempts, ...ongoing];
   const stats = questions.map((q) => {
-    const correct = attempts.filter((a) =>
+    const correct = graded.filter((a) =>
       sameAnswerSet(a.answers?.[q.id], keyOf(q))
     ).length;
-    return attempts.length
-      ? Math.round((correct / attempts.length) * 100)
-      : 0;
+    return graded.length ? Math.round((correct / graded.length) * 100) : 0;
   });
 
-  if (attempts.length === 0) {
+  const colCount =
+    (showStudent ? 1 : 0) + 3 + questions.length + (onReset ? 1 : 0);
+
+  if (graded.length === 0) {
     return (
       <p className="px-4 py-6 text-center text-xs text-zinc-400">
         Belum ada attempt.
@@ -308,6 +258,46 @@ function ResultTable({
                     </button>
                   </td>
                 )}
+              </tr>
+            );
+          })}
+
+          {ongoing.length > 0 && (
+            <tr>
+              <td
+                colSpan={colCount}
+                className="border border-zinc-100 bg-amber-50/70 px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-amber-700"
+              >
+                Sedang mengerjakan · {ongoing.length}
+              </td>
+            </tr>
+          )}
+          {ongoing.map((p) => {
+            const u = usersById?.get(p.user_id);
+            return (
+              <tr key={`prog:${p.user_id}`} className="bg-amber-50/20">
+                {showStudent && (
+                  <td
+                    className={`${td} whitespace-nowrap text-sm text-zinc-700`}
+                  >
+                    {u ? fullName(u) : p.user_id}
+                  </td>
+                )}
+                <td className={`${td} whitespace-nowrap text-xs text-amber-600`}>
+                  mulai {fmtAgo(p.started_at)}
+                </td>
+                <td className={`${td} whitespace-nowrap text-xs text-zinc-300`}>
+                  —
+                </td>
+                <td
+                  className={`${td} whitespace-nowrap text-xs font-medium text-zinc-500`}
+                >
+                  {answeredOf(p.answers)}/{questions.length}
+                </td>
+                {questions.map((q, i) => (
+                  <Cell key={i} chosen={p.answers?.[q.id]} keyArr={keyOf(q)} />
+                ))}
+                {onReset && <td className={td} />}
               </tr>
             );
           })}
@@ -433,6 +423,37 @@ export default function AdminQuizResultsPage() {
     };
   }, []);
 
+  // Auto-refresh data yang berubah cepat (attempt baru + sesi ongoing).
+  // Cuma 2 query ringan, tiap 15 dtk, pas tab aktif — sisanya nggak dimuat ulang.
+  useEffect(() => {
+    if (data.status !== "ready") return;
+    let alive = true;
+    const tick = async () => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      try {
+        const [attempts, progressRaw] = await Promise.all([
+          getAllAttempts(),
+          getAllQuizProgress().catch(() => []),
+        ]);
+        if (!alive) return;
+        const done = new Set(attempts.map((a) => `${a.user_id}|${a.set_id}`));
+        const progress = progressRaw
+          .filter((p) => !done.has(`${p.user_id}|${p.set_id}`))
+          .sort((a, b) => new Date(a.started_at) - new Date(b.started_at));
+        setData((d) =>
+          d.status === "ready" ? { ...d, attempts, progress } : d
+        );
+      } catch {
+        /* diem — coba lagi tick berikutnya */
+      }
+    };
+    const id = setInterval(tick, 15000);
+    return () => {
+      alive = false;
+      clearInterval(id);
+    };
+  }, [data.status]);
+
   const model = useMemo(() => {
     if (data.status !== "ready") return null;
     const usersById = new Map(data.users.map((u) => [u.id, u]));
@@ -501,7 +522,8 @@ export default function AdminQuizResultsPage() {
           Hasil Soal
         </h1>
         <p className="mt-1 text-xs text-zinc-400">
-          Rekap latihan soal. Klik kartu buat lihat jawaban per nomor.
+          Rekap latihan soal. Klik kartu buat lihat jawaban per nomor. Data
+          diperbarui otomatis tiap 15 detik.
         </p>
       </div>
 
@@ -517,43 +539,6 @@ export default function AdminQuizResultsPage() {
         <p className="rounded-xl border border-dashed border-rose-300 bg-white px-6 py-8 text-center text-sm text-rose-500">
           Gagal memuat hasil soal.
         </p>
-      )}
-
-      {data.status === "ready" && data.progress.length > 0 && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-4">
-          <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-amber-700">
-            Sedang mengerjakan · {data.progress.length}
-          </p>
-          <ul className="mt-2 flex flex-col gap-1">
-            {data.progress.map((p) => {
-              const u = model.usersById.get(p.user_id);
-              return (
-                <li key={`${p.user_id}|${p.set_id}`}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setView("set");
-                      setSelUser(null);
-                      setSelSet(p.set_id);
-                    }}
-                    className="flex w-full flex-wrap items-baseline gap-x-2 gap-y-0.5 rounded-md px-1.5 py-1 text-left text-sm transition-colors hover:bg-amber-100/60"
-                  >
-                    <span className="font-medium text-zinc-800">
-                      {u ? fullName(u) : p.user_id}
-                    </span>
-                    <span className="text-zinc-600">
-                      {model.titleOf(p.set_id)}
-                    </span>
-                    <span className="text-xs text-zinc-400">
-                      mulai {fmtAgo(p.started_at)} · {answeredOf(p.answers)}{" "}
-                      dijawab
-                    </span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
       )}
 
       {data.status === "ready" && (
@@ -595,30 +580,67 @@ export default function AdminQuizResultsPage() {
             </div>
           )}
 
-          {data.attempts.length === 0 && (
+          {data.attempts.length === 0 && data.progress.length === 0 && (
             <p className="rounded-xl border border-dashed border-zinc-300 bg-white px-6 py-10 text-center text-sm text-zinc-400">
               Belum ada murid yang mengerjakan latihan soal.
             </p>
           )}
 
           {/* ── Per set: kartu ── */}
-          {view === "set" && !selSet && data.attempts.length > 0 && (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {[...model.setStats.entries()]
-                .filter(([, s]) => s.title.toLowerCase().includes(needle))
-                .sort((a, b) => a[1].title.localeCompare(b[1].title))
-                .map(([sid, s]) => (
-                  <RecapCard
-                    key={sid}
-                    title={s.title}
-                    subtitle={`${s.students} murid · ${s.attempts} attempt`}
-                    big={s.avgPct}
-                    cta="Analisis Set Soal"
-                    onClick={() => setSelSet(sid)}
-                  />
-                ))}
-            </div>
-          )}
+          {view === "set" &&
+            !selSet &&
+            (data.attempts.length > 0 || data.progress.length > 0) &&
+            (() => {
+              const ongoingBySet = new Map();
+              for (const p of data.progress) {
+                ongoingBySet.set(
+                  p.set_id,
+                  (ongoingBySet.get(p.set_id) ?? 0) + 1
+                );
+              }
+              const cards = [
+                ...[...model.setStats.entries()].map(([sid, s]) => ({
+                  sid,
+                  title: s.title,
+                  students: s.students,
+                  attempts: s.attempts,
+                  avgPct: s.avgPct,
+                  ongoing: ongoingBySet.get(sid) ?? 0,
+                })),
+                ...[...ongoingBySet.keys()]
+                  .filter((sid) => !model.setStats.has(sid))
+                  .map((sid) => ({
+                    sid,
+                    title: model.titleOf(sid),
+                    students: 0,
+                    attempts: 0,
+                    avgPct: 0,
+                    ongoing: ongoingBySet.get(sid),
+                  })),
+              ];
+              return (
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {cards
+                    .filter((c) => c.title.toLowerCase().includes(needle))
+                    .sort((a, b) => a.title.localeCompare(b.title))
+                    .map((c) => (
+                      <RecapCard
+                        key={c.sid}
+                        title={c.title}
+                        subtitle={
+                          (c.attempts > 0
+                            ? `${c.students} murid · ${c.attempts} attempt`
+                            : "belum ada yang submit") +
+                          (c.ongoing ? ` · ${c.ongoing} lagi ngerjain` : "")
+                        }
+                        big={c.avgPct}
+                        cta="Analisis Set Soal"
+                        onClick={() => setSelSet(c.sid)}
+                      />
+                    ))}
+                </div>
+              );
+            })()}
 
           {/* ── Per set: detail ── */}
           {view === "set" &&
@@ -627,7 +649,10 @@ export default function AdminQuizResultsPage() {
               const rows = model.bySet.get(selSet) ?? [];
               const detail = data.setDetail.get(selSet);
               const s = model.setStats.get(selSet);
-              const ongoing = data.progress.filter((p) => p.set_id === selSet);
+              const doneUsers = new Set(rows.map((a) => a.user_id));
+              const ongoing = data.progress.filter(
+                (p) => p.set_id === selSet && !doneUsers.has(p.user_id)
+              );
               return (
                 <div className="flex flex-col gap-3">
                   <BackLink onClick={() => setSelSet(null)}>Semua set</BackLink>
@@ -648,6 +673,7 @@ export default function AdminQuizResultsPage() {
                       <ResultTable
                         questions={detail.questions}
                         attempts={rows}
+                        ongoing={ongoing}
                         usersById={model.usersById}
                         showStudent
                         onReset={handleReset}
@@ -661,19 +687,6 @@ export default function AdminQuizResultsPage() {
                       />
                     )}
                   </div>
-
-                  {ongoing.length > 0 && detail?.questions?.length > 0 && (
-                    <div className="overflow-hidden rounded-xl border border-amber-200 bg-white">
-                      <p className="border-b border-zinc-100 bg-amber-50/60 px-4 py-2 text-[11px] font-bold uppercase tracking-[0.08em] text-amber-700">
-                        Sedang mengerjakan · {ongoing.length}
-                      </p>
-                      <DraftTable
-                        questions={detail.questions}
-                        rows={ongoing}
-                        usersById={model.usersById}
-                      />
-                    </div>
-                  )}
                 </div>
               );
             })()}
