@@ -12,6 +12,7 @@ import { subjectIcons } from "../../lib/subjectIcons";
 import SubjectIcon from "../../components/ui/SubjectIcon";
 import Skeleton from "../../components/ui/Skeleton";
 import CurriculumEditor from "../../components/admin/CurriculumEditor";
+import EnrolledStudents from "../../components/admin/EnrolledStudents";
 
 const ICONS = Object.keys(subjectIcons);
 
@@ -320,6 +321,10 @@ export default function CourseFormPage() {
           <CurriculumEditor courseId={courseId} />
         )}
       </div>
+
+      {isEdit && status === "ready" && (
+        <EnrolledStudents courseId={courseId} />
+      )}
     </div>
   );
 }
