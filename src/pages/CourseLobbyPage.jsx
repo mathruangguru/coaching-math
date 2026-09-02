@@ -1,12 +1,29 @@
+import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, BookOpen, ArrowRight } from "lucide-react";
+import { ArrowLeft, BookOpen, ArrowRight, Lock } from "lucide-react";
 import { useCourse } from "../hooks/useCourse";
 import Skeleton from "../components/ui/Skeleton";
 
 export default function CourseLobbyPage() {
   const { courseId } = useParams();
-  const { status, course, visibleSections, canView, enrolling, handleEnroll } =
-    useCourse(courseId);
+  const {
+    status,
+    course,
+    visibleSections,
+    canView,
+    enrolling,
+    enrollLocked,
+    handleEnroll,
+  } = useCourse(courseId);
+  const [passcode, setPasscode] = useState("");
+  const [enrollErr, setEnrollErr] = useState("");
+
+  const submitEnroll = async (e) => {
+    e.preventDefault();
+    setEnrollErr("");
+    const res = await handleEnroll(enrollLocked ? passcode : undefined);
+    if (!res.ok) setEnrollErr(res.error);
+  };
 
   if (status === "loading") {
     return (
@@ -60,22 +77,44 @@ export default function CourseLobbyPage() {
       </div>
 
       {!canView ? (
-        <div className="rounded-2xl border border-zinc-200/80 bg-white px-6 py-10 text-center">
+        <form
+          onSubmit={submitEnroll}
+          className="mx-auto w-full max-w-sm rounded-2xl border border-zinc-200/80 bg-white px-6 py-10 text-center"
+        >
           <p className="text-sm font-semibold text-zinc-900">
             Kamu belum enroll di course ini
           </p>
           <p className="mt-1 text-xs text-zinc-500">
-            Enroll dulu untuk membuka isinya.
+            {enrollLocked
+              ? "Course ini butuh passcode. Minta ke pengajar kamu."
+              : "Enroll dulu untuk membuka isinya."}
           </p>
+
+          {enrollLocked && (
+            <div className="mt-4 flex items-center gap-2 rounded-lg border border-zinc-300 px-3 py-2 focus-within:border-brand-500">
+              <Lock size={14} className="shrink-0 text-zinc-400" />
+              <input
+                value={passcode}
+                onChange={(e) => setPasscode(e.target.value)}
+                placeholder="Passcode"
+                autoComplete="off"
+                className="w-full text-sm text-zinc-900 outline-none placeholder:text-zinc-400"
+              />
+            </div>
+          )}
+
           <button
-            type="button"
-            onClick={handleEnroll}
-            disabled={enrolling}
-            className="mt-4 rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-600 disabled:opacity-50"
+            type="submit"
+            disabled={enrolling || (enrollLocked && !passcode.trim())}
+            className="mt-4 w-full rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-600 disabled:opacity-50"
           >
             {enrolling ? "Mendaftar…" : "Enroll sekarang"}
           </button>
-        </div>
+
+          {enrollErr && (
+            <p className="mt-2 text-xs text-rose-600">{enrollErr}</p>
+          )}
+        </form>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <Link

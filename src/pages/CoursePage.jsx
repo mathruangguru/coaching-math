@@ -2,14 +2,13 @@ import { useEffect, useState } from "react";
 import CourseCard from "../components/course/CourseCard";
 import Skeleton from "../components/ui/Skeleton";
 import { getCourses } from "../lib/courses";
-import { getMyEnrollments, enroll } from "../lib/enroll";
+import { getMyEnrollments } from "../lib/enroll";
 
 export default function CoursePage() {
   const [courses, setCourses] = useState([]);
   const [enrolled, setEnrolled] = useState(new Set());
   const [gated, setGated] = useState(true); // false = mode mock, semua kebuka
   const [status, setStatus] = useState("loading"); // loading | error | ready
-  const [enrollingId, setEnrollingId] = useState(null);
 
   useEffect(() => {
     let alive = true;
@@ -32,18 +31,6 @@ export default function CoursePage() {
       alive = false;
     };
   }, []);
-
-  const handleEnroll = async (courseId) => {
-    setEnrollingId(courseId);
-    try {
-      await enroll(courseId);
-      setEnrolled((s) => new Set(s).add(courseId));
-    } catch (err) {
-      window.alert(`Gagal enroll: ${err?.message ?? err}`);
-    } finally {
-      setEnrollingId(null);
-    }
-  };
 
   return (
     <div className="mx-auto flex max-w-[1180px] flex-col gap-6">
@@ -91,8 +78,6 @@ export default function CoursePage() {
                 key={course.id}
                 course={course}
                 enrolled={!gated || enrolled.has(course.id)}
-                enrolling={enrollingId === course.id}
-                onEnroll={handleEnroll}
               />
             ))}
           </div>

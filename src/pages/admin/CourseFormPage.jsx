@@ -1,7 +1,13 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Check } from "lucide-react";
-import { getCourse, createCourse, updateCourse } from "../../lib/courses";
+import {
+  getCourse,
+  createCourse,
+  updateCourse,
+  getCourseSecret,
+  saveCourseSecret,
+} from "../../lib/courses";
 import { subjectIcons } from "../../lib/subjectIcons";
 import SubjectIcon from "../../components/ui/SubjectIcon";
 import Skeleton from "../../components/ui/Skeleton";
@@ -29,6 +35,7 @@ export default function CourseFormPage() {
     title: "",
     description: "",
     icon: "sigma",
+    passcode: "",
   });
   const [idTouched, setIdTouched] = useState(false);
   const [status, setStatus] = useState(isEdit ? "loading" : "ready");
@@ -40,8 +47,8 @@ export default function CourseFormPage() {
     if (!isEdit) return;
     let alive = true;
 
-    getCourse(courseId)
-      .then((data) => {
+    Promise.all([getCourse(courseId), getCourseSecret(courseId).catch(() => "")])
+      .then(([data, passcode]) => {
         if (!alive) return;
         if (!data) {
           setStatus("not-found");
@@ -52,6 +59,7 @@ export default function CourseFormPage() {
           title: data.title ?? "",
           description: data.description ?? "",
           icon: data.icon ?? "sigma",
+          passcode: passcode ?? "",
         });
         setStatus("ready");
       })
@@ -92,6 +100,7 @@ export default function CourseFormPage() {
     try {
       if (isEdit) {
         await updateCourse(courseId, { title, description, icon: form.icon });
+        await saveCourseSecret(courseId, form.passcode);
         setBusy(false);
         setSaved(true);
         setTimeout(() => setSaved(false), 2500);
@@ -102,6 +111,8 @@ export default function CourseFormPage() {
           description,
           icon: form.icon,
         });
+        if (form.passcode.trim())
+          await saveCourseSecret(effectiveId, form.passcode);
         navigate("/admin", { replace: true });
       }
     } catch (err) {
@@ -243,6 +254,19 @@ export default function CourseFormPage() {
                 rows={3}
                 className={`${inputCls} resize-y`}
                 placeholder="Pathway to Mastery Matematika 2026/2027 Term 1"
+              />
+            </Field>
+
+            <Field
+              label="Passcode enroll"
+              hint="kosongin = siapa aja bisa enroll"
+            >
+              <input
+                value={form.passcode}
+                onChange={(e) => set("passcode", e.target.value)}
+                autoComplete="off"
+                className={`${inputCls} font-mono`}
+                placeholder="mis. MTK-2627"
               />
             </Field>
 

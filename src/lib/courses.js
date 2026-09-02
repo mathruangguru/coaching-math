@@ -100,6 +100,38 @@ export async function deleteCourse(id) {
   if (error) throw error;
 }
 
+// ── Admin: passcode enroll (tabel terpisah, RLS admin-only) ─────────
+
+/** Passcode enroll course sekarang ('' kalau nggak ada). Admin only. */
+export async function getCourseSecret(courseId) {
+  if (!hasSupabase) return "";
+  const { data, error } = await supabase
+    .from("coaching_course_secrets")
+    .select("enroll_passcode")
+    .eq("course_id", courseId)
+    .maybeSingle();
+  if (error) throw error;
+  return data?.enroll_passcode ?? "";
+}
+
+/** Set / hapus passcode enroll. String kosong = hapus (course jadi terbuka). */
+export async function saveCourseSecret(courseId, passcode) {
+  if (!hasSupabase) throw new Error("Supabase belum dikonfigurasi.");
+  const clean = (passcode ?? "").trim();
+  if (!clean) {
+    const { error } = await supabase
+      .from("coaching_course_secrets")
+      .delete()
+      .eq("course_id", courseId);
+    if (error) throw error;
+    return;
+  }
+  const { error } = await supabase
+    .from("coaching_course_secrets")
+    .upsert({ course_id: courseId, enroll_passcode: clean });
+  if (error) throw error;
+}
+
 // ── Admin: kurikulum (section + lesson) ─────────────────────────────
 
 function ensureSupabase() {

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { getCourse } from "../lib/courses";
-import { getMyEnrollments, enroll } from "../lib/enroll";
+import { getMyEnrollments, enroll, isCourseEnrollLocked } from "../lib/enroll";
 import { useAuth } from "../context/auth-context";
 
 /**
@@ -14,12 +14,17 @@ export function useCourse(courseId) {
   const [status, setStatus] = useState("loading");
   const [enrolled, setEnrolled] = useState(true); // sampai kebukti belum
   const [enrolling, setEnrolling] = useState(false);
+  const [enrollLocked, setEnrollLocked] = useState(false);
 
   useEffect(() => {
     let alive = true;
 
-    Promise.all([getCourse(courseId), getMyEnrollments().catch(() => null)])
-      .then(([data, mine]) => {
+    Promise.all([
+      getCourse(courseId),
+      getMyEnrollments().catch(() => null),
+      isCourseEnrollLocked(courseId).catch(() => false),
+    ])
+      .then(([data, mine, locked]) => {
         if (!alive) return;
         if (!data) {
           setStatus("not-found");
@@ -28,6 +33,7 @@ export function useCourse(courseId) {
         setCourse(data);
         setSections(data.sections ?? []);
         setEnrolled(mine === null || mine.includes(courseId));
+        setEnrollLocked(locked);
         setStatus("ready");
       })
       .catch((err) => {
@@ -41,13 +47,15 @@ export function useCourse(courseId) {
     };
   }, [courseId]);
 
-  const handleEnroll = async () => {
+  /** Balikin { ok } atau { ok: false, error }. */
+  const handleEnroll = async (passcode) => {
     setEnrolling(true);
     try {
-      await enroll(courseId);
+      await enroll(courseId, passcode);
       setEnrolled(true);
+      return { ok: true };
     } catch (err) {
-      window.alert(`Gagal enroll: ${err?.message ?? err}`);
+      return { ok: false, error: err?.message ?? "Gagal enroll." };
     } finally {
       setEnrolling(false);
     }
@@ -63,6 +71,7 @@ export function useCourse(courseId) {
     visibleSections,
     canView: enrolled || isAdmin,
     enrolling,
+    enrollLocked,
     handleEnroll,
   };
 }
