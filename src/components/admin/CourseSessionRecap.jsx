@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
 import {
   ChevronDown,
   UserCheck,
   NotebookPen,
   Plus,
   Trash2,
+  Download,
 } from "lucide-react";
 import { getCourse } from "../../lib/courses";
 import { getUsers } from "../../lib/users";
@@ -17,6 +17,12 @@ import {
   setRoundOpen,
   deleteRound,
 } from "../../lib/sessions";
+import {
+  getForm,
+  getFormResponses,
+  deleteFormResponse,
+  responsesToCsv,
+} from "../../lib/forms";
 import Skeleton from "../ui/Skeleton";
 
 const fullName = (u) =>
@@ -263,27 +269,187 @@ function PresensiRow({ lesson, usersById }) {
   );
 }
 
-function RefleksiRow({ lesson }) {
-  return (
-    <li className="flex items-center gap-3 px-4 py-2.5">
-      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-rose-50 text-rose-600">
-        <NotebookPen size={15} />
-      </span>
-      <span className="min-w-0 flex-1 truncate text-sm font-medium text-zinc-800">
-        {lesson.title}
-        <span className="ml-1.5 text-xs font-normal text-zinc-400">
-          Refleksi
+const answerText = (v) =>
+  Array.isArray(v) ? v.join(", ") : v == null || v === "" ? "—" : String(v);
+
+function RefleksiRow({ lesson, usersById }) {
+  const [open, setOpen] = useState(false);
+  const [data, setData] = useState(null); // { form, responses } | null
+  const [failed, setFailed] = useState(false);
+  const loadedRef = useRef(false);
+
+  const load = useCallback(() => {
+    Promise.all([
+      getForm(lesson.form_id),
+      getFormResponses(lesson.form_id, lesson.id),
+    ])
+      .then(([form, responses]) => {
+        setData({ form, responses });
+        setFailed(false);
+      })
+      .catch((err) => {
+        console.error("[admin] gagal memuat respons refleksi:", err);
+        loadedRef.current = false;
+        setFailed(true);
+      });
+  }, [lesson.form_id, lesson.id]);
+
+  useEffect(() => {
+    if (!open || !lesson.form_id || loadedRef.current) return;
+    loadedRef.current = true;
+    load();
+  }, [open, load, lesson.form_id]);
+
+  const removeResp = async (id) => {
+    if (!window.confirm("Hapus respons ini?")) return;
+    try {
+      await deleteFormResponse(id);
+      setData((d) =>
+        d ? { ...d, responses: d.responses.filter((r) => r.id !== id) } : d
+      );
+    } catch (err) {
+      window.alert(`Gagal: ${err?.message ?? err}`);
+    }
+  };
+
+  const downloadCsv = () => {
+    const csv = responsesToCsv(data.form, data.responses, usersById);
+    const url = URL.createObjectURL(
+      new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" })
+    );
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${lesson.title.replace(/[^\w.-]+/g, "_")}-refleksi.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  if (!lesson.form_id)
+    return (
+      <li className="flex items-center gap-3 px-4 py-2.5">
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-rose-50 text-rose-600">
+          <NotebookPen size={15} />
         </span>
-      </span>
-      {lesson.form_id ? (
-        <Link
-          to={`/admin/forms/${lesson.form_id}/responses`}
-          className="shrink-0 text-xs font-semibold text-brand-600 hover:text-brand-700"
-        >
-          Lihat respons →
-        </Link>
-      ) : (
+        <span className="min-w-0 flex-1 truncate text-sm font-medium text-zinc-800">
+          {lesson.title}
+          <span className="ml-1.5 text-xs font-normal text-zinc-400">
+            Refleksi
+          </span>
+        </span>
         <span className="shrink-0 text-xs text-zinc-400">belum ada form</span>
+      </li>
+    );
+
+  const fields = data?.form?.fields ?? [];
+
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-zinc-50"
+      >
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-rose-50 text-rose-600">
+          <NotebookPen size={15} />
+        </span>
+        <span className="min-w-0 flex-1 truncate text-sm font-medium text-zinc-800">
+          {lesson.title}
+          <span className="ml-1.5 text-xs font-normal text-zinc-400">
+            Refleksi
+          </span>
+        </span>
+        {data && (
+          <span className="shrink-0 rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold text-zinc-500">
+            {data.responses.length} respons
+          </span>
+        )}
+        <ChevronDown
+          size={15}
+          className={`shrink-0 text-zinc-400 transition-transform ${
+            open ? "" : "-rotate-90"
+          }`}
+        />
+      </button>
+
+      {open && (
+        <div className="border-t border-zinc-100 bg-zinc-50/50 px-4 py-3">
+          {!data && !failed && <Skeleton className="h-10 w-full rounded" />}
+          {failed && <p className="text-xs text-rose-500">Gagal memuat.</p>}
+
+          {data && data.responses.length === 0 && (
+            <p className="text-xs text-zinc-400">Belum ada yang mengisi.</p>
+          )}
+
+          {data && data.responses.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={downloadCsv}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-zinc-200 bg-white px-2 py-1 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-50"
+                >
+                  <Download size={12} /> CSV
+                </button>
+              </div>
+              <div className="overflow-x-auto rounded-lg border border-zinc-200 bg-white">
+                <table className="min-w-full border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-zinc-50 text-left text-zinc-500">
+                      <th className="whitespace-nowrap border-b border-zinc-100 px-2.5 py-1.5 font-semibold">
+                        Nama
+                      </th>
+                      <th className="whitespace-nowrap border-b border-zinc-100 px-2.5 py-1.5 font-semibold">
+                        Waktu
+                      </th>
+                      {fields.map((f) => (
+                        <th
+                          key={f.id}
+                          className="border-b border-zinc-100 px-2.5 py-1.5 font-semibold"
+                        >
+                          {f.label || "(tanpa label)"}
+                        </th>
+                      ))}
+                      <th className="border-b border-zinc-100" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.responses.map((r) => {
+                      const u = usersById.get(r.user_id);
+                      return (
+                        <tr key={r.id} className="align-top">
+                          <td className="whitespace-nowrap border-b border-zinc-100 px-2.5 py-1.5 text-zinc-700">
+                            {u ? fullName(u) : r.user_id}
+                          </td>
+                          <td className="whitespace-nowrap border-b border-zinc-100 px-2.5 py-1.5 text-zinc-400">
+                            {fmt(r.created_at)}
+                          </td>
+                          {fields.map((f) => (
+                            <td
+                              key={f.id}
+                              className="border-b border-zinc-100 px-2.5 py-1.5 text-zinc-700"
+                            >
+                              {answerText(r.answers?.[f.id])}
+                            </td>
+                          ))}
+                          <td className="border-b border-zinc-100 px-1.5 py-1.5">
+                            <button
+                              type="button"
+                              onClick={() => removeResp(r.id)}
+                              aria-label="Hapus respons"
+                              className="grid h-6 w-6 place-items-center rounded text-zinc-300 transition-colors hover:bg-rose-50 hover:text-rose-500"
+                            >
+                              <Trash2 size={11} />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
       )}
     </li>
   );
@@ -358,7 +524,7 @@ export default function CourseSessionRecap({ courseId, only }) {
               l.type === "presensi" ? (
                 <PresensiRow key={l.id} lesson={l} usersById={usersById} />
               ) : (
-                <RefleksiRow key={l.id} lesson={l} />
+                <RefleksiRow key={l.id} lesson={l} usersById={usersById} />
               )
             )}
           </ul>
