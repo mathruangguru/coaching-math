@@ -393,6 +393,7 @@ export default function AdminUsersPage() {
   const [showCheck, setShowCheck] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [q, setQ] = useState("");
+  const [sort, setSort] = useState("name"); // name | email | created
 
   const fetchUsers = () =>
     getUsers()
@@ -507,16 +508,22 @@ export default function AdminUsersPage() {
   };
 
   const needle = q.trim().toLowerCase();
-  const shown =
-    status === "ready"
-      ? users.filter(
-          (u) =>
-            !needle ||
-            fullName(u).toLowerCase().includes(needle) ||
-            (u.email ?? "").toLowerCase().includes(needle) ||
-            (u.branch?.name ?? "").toLowerCase().includes(needle)
-        )
-      : [];
+  const shown = useMemo(() => {
+    if (status !== "ready") return [];
+    const filtered = users.filter(
+      (u) =>
+        !needle ||
+        fullName(u).toLowerCase().includes(needle) ||
+        (u.email ?? "").toLowerCase().includes(needle) ||
+        (u.branch?.name ?? "").toLowerCase().includes(needle)
+    );
+    if (sort === "created") return filtered; // getUsers() sudah urut created_at
+    const key =
+      sort === "email"
+        ? (u) => (u.email ?? "").toLowerCase()
+        : (u) => (fullName(u) || u.email || "").toLowerCase();
+    return [...filtered].sort((a, b) => key(a).localeCompare(key(b), "id"));
+  }, [users, needle, sort, status]);
 
   return (
     <div className="flex flex-col gap-5">
@@ -683,12 +690,24 @@ export default function AdminUsersPage() {
 
       {status === "ready" && (
         <>
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Cari nama / email / cabang…"
-            className={inputCls}
-          />
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Cari nama / email / cabang…"
+              className={`${inputCls} min-w-0 flex-1`}
+            />
+            <select
+              value={sort}
+              onChange={(e) => setSort(e.target.value)}
+              aria-label="Urutkan"
+              className="shrink-0 rounded-lg border border-zinc-300 px-2.5 py-2 text-sm text-zinc-700 outline-none transition-colors focus:border-brand-500"
+            >
+              <option value="name">Urut: Nama</option>
+              <option value="email">Urut: Email</option>
+              <option value="created">Urut: Terbaru</option>
+            </select>
+          </div>
 
           <ul className="divide-y divide-zinc-100 overflow-hidden rounded-xl border border-zinc-200 bg-white">
             {shown.map((user) => {
