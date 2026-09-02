@@ -164,18 +164,24 @@ export async function submitFormResponse(formId, lessonId, answers) {
   if (error) throw error;
 }
 
-/** Waktu (ISO) respons terakhir user ini di sebuah form, atau null. */
-export async function getMyLastFormResponseAt(formId) {
+/**
+ * Waktu (ISO) respons terakhir user ini di sebuah form, atau null.
+ * Kalau `lessonId` dikasih, cuma ngitung respons di lesson itu — satu form
+ * yang dipakai di beberapa lesson jadi punya cooldown sendiri-sendiri.
+ */
+export async function getMyLastFormResponseAt(formId, lessonId) {
   ensure();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return null;
-  const { data, error } = await supabase
+  let q = supabase
     .from("coaching_form_responses")
     .select("created_at")
     .eq("form_id", formId)
-    .eq("user_id", user.id)
+    .eq("user_id", user.id);
+  if (lessonId) q = q.eq("lesson_id", lessonId);
+  const { data, error } = await q
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
