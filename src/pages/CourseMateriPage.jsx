@@ -6,8 +6,7 @@ import CourseSection from "../components/course/CourseSection";
 
 export default function CourseMateriPage() {
   const { courseId } = useParams();
-  const { status, course, visibleSections, canView, enrolling, handleEnroll } =
-    useCourse(courseId);
+  const { status, course, visibleSections, canView } = useCourse(courseId);
 
   const backToLobby = (
     <Link
@@ -65,16 +64,14 @@ export default function CourseMateriPage() {
             Kamu belum enroll di course ini
           </p>
           <p className="mt-1 text-xs text-zinc-500">
-            Enroll dulu untuk membuka materinya.
+            Enroll dulu di halaman course untuk membuka materinya.
           </p>
-          <button
-            type="button"
-            onClick={handleEnroll}
-            disabled={enrolling}
-            className="mt-4 rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-600 disabled:opacity-50"
+          <Link
+            to={`/course/${courseId}`}
+            className="mt-4 inline-block rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-600"
           >
-            {enrolling ? "Mendaftar…" : "Enroll sekarang"}
-          </button>
+            Ke halaman course
+          </Link>
         </div>
       ) : (
         <div className="flex flex-col gap-3">

@@ -21,36 +21,18 @@ function Inner({ course }) {
   );
 }
 
-export default function CourseCard({ course, enrolled, enrolling, onEnroll }) {
-  if (enrolled) {
-    return (
-      <Link to={`/course/${course.id}`} className={cardCls}>
-        <Inner course={course} />
-        <span className="mt-auto inline-flex w-fit items-center gap-1.5 pt-4 text-xs font-semibold text-brand-600">
-          Buka Course
-          <ArrowRight
-            size={13}
-            strokeWidth={2.5}
-            className="transition-transform group-hover:translate-x-0.5"
-          />
-        </span>
-      </Link>
-    );
-  }
-
+export default function CourseCard({ course, enrolled }) {
   return (
-    <div className={cardCls}>
+    <Link to={`/course/${course.id}`} className={cardCls}>
       <Inner course={course} />
-      <div className="mt-auto pt-4">
-        <button
-          type="button"
-          onClick={() => onEnroll(course.id)}
-          disabled={enrolling}
-          className="w-fit rounded-lg bg-brand-500 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-brand-600 disabled:opacity-50"
-        >
-          {enrolling ? "Mendaftar…" : "Enroll"}
-        </button>
-      </div>
-    </div>
+      <span className="mt-auto inline-flex w-fit items-center gap-1.5 pt-4 text-xs font-semibold text-brand-600">
+        {enrolled ? "Buka Course" : "Enroll"}
+        <ArrowRight
+          size={13}
+          strokeWidth={2.5}
+          className="transition-transform group-hover:translate-x-0.5"
+        />
+      </span>
+    </Link>
   );
 }

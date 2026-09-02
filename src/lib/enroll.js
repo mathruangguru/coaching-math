@@ -36,16 +36,33 @@ export async function getAllEnrollments() {
   return data;
 }
 
-export async function enroll(courseId) {
-  if (!hasSupabase) throw new Error("Supabase belum dikonfigurasi.");
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Belum login.");
+/** true kalau course butuh passcode buat enroll. */
+export async function isCourseEnrollLocked(courseId) {
+  if (!hasSupabase) return false;
+  const { data, error } = await supabase.rpc("course_enroll_locked", {
+    p_course_id: courseId,
+  });
+  if (error) throw error;
+  return !!data;
+}
 
-  const { error } = await supabase
-    .from("coaching_enrollments")
-    .insert({ user_id: user.id, course_id: courseId });
-  // 23505 = sudah enroll -> anggap sukses
-  if (error && error.code !== "23505") throw error;
+const ENROLL_ERRORS = {
+  PASSCODE_SALAH: "Passcode salah.",
+  BELUM_LOGIN: "Kamu belum login.",
+  COURSE_TIDAK_ADA: "Course-nya nggak ditemukan.",
+};
+
+export async function enroll(courseId, passcode) {
+  if (!hasSupabase) throw new Error("Supabase belum dikonfigurasi.");
+
+  const { error } = await supabase.rpc("enroll_course", {
+    p_course_id: courseId,
+    p_passcode: passcode ?? null,
+  });
+  if (!error) return;
+
+  const key = Object.keys(ENROLL_ERRORS).find((k) =>
+    (error.message || "").includes(k)
+  );
+  throw new Error(key ? ENROLL_ERRORS[key] : (error.message ?? "Gagal enroll."));
 }
