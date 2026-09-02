@@ -140,8 +140,8 @@ export default function PresensiPage() {
         ) : (
           <>
             <p className="text-sm text-zinc-500">
-              Presensi <span className="font-semibold">{openRound.label}</span>{" "}
-              lagi dibuka.
+              <span className="font-semibold">{openRound.label}</span> sedang
+              dibuka.
             </p>
             <button
               type="button"
