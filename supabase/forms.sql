@@ -52,6 +52,9 @@ create table if not exists public.coaching_form_responses (
 );
 create index if not exists coaching_form_responses_form_idx
   on public.coaching_form_responses (form_id, created_at desc);
+-- Cooldown & "respons terakhir" di-scope ke (form, lesson, user).
+create index if not exists coaching_form_responses_form_lesson_user_idx
+  on public.coaching_form_responses (form_id, lesson_id, user_id, created_at desc);
 
 -- Lesson tipe 'form' bisa nunjuk ke satu form in-app (selain kolom `url`).
 alter table public.coaching_lessons
@@ -93,8 +96,9 @@ create policy "coaching_form_fields write admin"
 
 -- Respons: murid insert & baca miliknya; admin baca & hapus semua.
 -- Murid cuma boleh submit ke form yang masih `open`, dan minimal 5 menit
--- sejak respons terakhirnya di form yang sama (selaras dgn COOLDOWN_MIN
--- di src/pages/FormPage.jsx).
+-- sejak respons terakhirnya di form yang sama DAN lesson yang sama (selaras
+-- dgn COOLDOWN_MIN di src/pages/FormPage.jsx). Satu form yang dipasang di
+-- beberapa lesson jadi bisa diisi sendiri-sendiri per lesson.
 drop policy if exists "coaching_form_responses insert own" on public.coaching_form_responses;
 create policy "coaching_form_responses insert own"
   on public.coaching_form_responses for insert
@@ -104,12 +108,14 @@ create policy "coaching_form_responses insert own"
       select 1 from public.coaching_forms f
       where f.id = coaching_form_responses.form_id and f.open
     )
-    -- Cooldown per-form: `form_id` di dalam subquery ke-shadow sama alias `r`,
-    -- jadi WAJIB qualified ke tabel target biar nggak jadi `r.form_id = r.form_id`
-    -- (yang bikin cooldown lintas semua form).
+    -- Cooldown per-(form, lesson): kolom tak-berqualifier di dalam subquery
+    -- ke-shadow sama alias `r`, jadi WAJIB qualified ke tabel target biar
+    -- nggak jadi `r.x = r.x` (yang bikin cooldown lintas semua form/lesson).
+    -- `is not distinct from` = NULL lesson_id (form tanpa lesson) ikut ke-cover.
     and not exists (
       select 1 from public.coaching_form_responses r
       where r.form_id = coaching_form_responses.form_id
+        and r.lesson_id is not distinct from coaching_form_responses.lesson_id
         and r.user_id = auth.uid()
         and r.created_at > now() - interval '5 minutes'
     )

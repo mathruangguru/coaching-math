@@ -24,7 +24,8 @@ const todayISO = () => {
   ).padStart(2, "0")}`;
 };
 
-// Jeda minimal antar-pengisian form yang sama (selaras dgn RLS di forms.sql).
+// Jeda minimal antar-pengisian form yang sama di lesson yang sama
+// (selaras dgn RLS di forms.sql).
 const COOLDOWN_MIN = 5;
 const COOLDOWN_MS = COOLDOWN_MIN * 60 * 1000;
 const fmtCountdown = (ms) => {
@@ -96,11 +97,12 @@ export default function FormPage() {
           return setData({ status: "ready", course, lesson, form: null });
         const [form, lastIso] = await Promise.all([
           getForm(lesson.form_id),
-          getMyLastFormResponseAt(lesson.form_id).catch(() => null),
+          getMyLastFormResponseAt(lesson.form_id, lessonId).catch(() => null),
         ]);
         if (!alive) return;
         setData({ status: "ready", course, lesson, form });
-        // Reset per-form: jangan bawa cooldown / state kiriman dari form lain.
+        // Reset per-lesson: cooldown / state kiriman nggak kebawa dari lesson
+        // (atau form) lain — satu form bisa dipakai di banyak lesson.
         setLastAt(lastIso ? Date.parse(lastIso) : null);
         setSent(false);
         setValues({});
@@ -320,7 +322,7 @@ export default function FormPage() {
       if (/row-level security|violates row-level/i.test(msg)) {
         const [fresh, lastIso] = await Promise.all([
           getForm(form.id).catch(() => null),
-          getMyLastFormResponseAt(form.id).catch(() => null),
+          getMyLastFormResponseAt(form.id, lessonId).catch(() => null),
         ]);
         if (fresh)
           setData((d) =>
