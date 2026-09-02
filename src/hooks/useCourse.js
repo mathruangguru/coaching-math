@@ -1,14 +1,12 @@
 import { useEffect, useState } from "react";
 import { getCourse } from "../lib/courses";
 import { getMyEnrollments, enroll, isCourseEnrollLocked } from "../lib/enroll";
-import { useAuth } from "../context/auth-context";
 
 /**
  * Fetch course + status enroll + aksi enroll. Dipakai lobby & halaman materi.
  * status: loading | error | not-found | ready
  */
 export function useCourse(courseId) {
-  const { isAdmin } = useAuth();
   const [course, setCourse] = useState(null);
   const [sections, setSections] = useState([]);
   const [status, setStatus] = useState("loading");
@@ -69,7 +67,8 @@ export function useCourse(courseId) {
     status,
     course,
     visibleSections,
-    canView: enrolled || isAdmin,
+    // Semua orang — termasuk admin — harus enroll dulu buat lihat isi course.
+    canView: enrolled,
     enrolling,
     enrollLocked,
     handleEnroll,
