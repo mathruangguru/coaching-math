@@ -1,5 +1,13 @@
-import { useEffect, useState } from "react";
-import { UserPlus, KeyRound, Trash2, Users, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  UserPlus,
+  KeyRound,
+  Trash2,
+  Users,
+  X,
+  MailCheck,
+  Check,
+} from "lucide-react";
 import {
   getUsers,
   createUser,
@@ -227,6 +235,148 @@ function BulkModal({ isSuperAdmin, onClose, onDone }) {
   );
 }
 
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+
+function CheckEmailModal({ users, onClose }) {
+  const [text, setText] = useState("");
+  const [report, setReport] = useState(null);
+
+  const byEmail = useMemo(() => {
+    const m = new Map();
+    for (const u of users) if (u.email) m.set(u.email.toLowerCase(), u);
+    return m;
+  }, [users]);
+
+  const run = () => {
+    const seen = new Set();
+    const registered = [];
+    const missing = [];
+    const invalid = [];
+    for (const raw of text.split(/[\s,;]+/)) {
+      const e = raw.trim().toLowerCase();
+      if (!e || seen.has(e)) continue;
+      seen.add(e);
+      if (!EMAIL_RE.test(e)) {
+        invalid.push(e);
+        continue;
+      }
+      const u = byEmail.get(e);
+      if (u) registered.push({ email: e, name: fullName(u) || e });
+      else missing.push(e);
+    }
+    setReport({ registered, missing, invalid });
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-zinc-900/40 p-4 sm:p-8"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-xl rounded-2xl border border-zinc-200 bg-white shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between gap-3 border-b border-zinc-100 px-5 py-3.5">
+          <h3 className="text-sm font-bold text-zinc-900">Cek email terdaftar</h3>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Tutup"
+            className="grid h-8 w-8 place-items-center rounded-lg text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="max-h-[70vh] overflow-y-auto p-5">
+          <p className="text-xs text-zinc-500">
+            Tempel email (pisah baris / koma / spasi). Cuma ngecek — nggak ada
+            user yang ditambahin.
+          </p>
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            rows={7}
+            spellCheck={false}
+            placeholder={"budi@sekolah.id\nsiti@sekolah.id\nadi@sekolah.id"}
+            className="mt-2 w-full rounded-lg border border-zinc-300 px-3 py-2 font-mono text-xs text-zinc-900 outline-none focus:border-brand-500"
+          />
+          <button
+            type="button"
+            onClick={run}
+            disabled={!text.trim()}
+            className="mt-3 rounded-lg bg-brand-500 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-brand-600 disabled:opacity-50"
+          >
+            Cek
+          </button>
+
+          {report && (
+            <div className="mt-4 flex flex-col gap-3 text-xs">
+              <p className="font-semibold text-zinc-700">
+                {report.registered.length} terdaftar · {report.missing.length}{" "}
+                belum
+                {report.invalid.length > 0 &&
+                  ` · ${report.invalid.length} nggak valid`}
+              </p>
+
+              {report.missing.length > 0 && (
+                <div>
+                  <p className="font-semibold text-amber-600">
+                    Belum terdaftar ({report.missing.length})
+                  </p>
+                  <textarea
+                    readOnly
+                    value={report.missing.join("\n")}
+                    rows={Math.min(report.missing.length + 1, 8)}
+                    onFocus={(e) => e.target.select()}
+                    className="mt-1 w-full rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-2 font-mono text-xs text-zinc-900"
+                  />
+                </div>
+              )}
+
+              {report.registered.length > 0 && (
+                <div>
+                  <p className="font-semibold text-emerald-600">
+                    Terdaftar ({report.registered.length})
+                  </p>
+                  <ul className="mt-1 flex flex-col gap-1">
+                    {report.registered.map((r) => (
+                      <li
+                        key={r.email}
+                        className="flex items-center gap-2 rounded-md border border-zinc-100 px-2.5 py-1.5"
+                      >
+                        <Check
+                          size={13}
+                          className="shrink-0 text-emerald-500"
+                        />
+                        <span className="min-w-0 truncate text-zinc-700">
+                          {r.email}
+                          <span className="ml-1.5 text-zinc-400">{r.name}</span>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {report.invalid.length > 0 && (
+                <div>
+                  <p className="font-semibold text-rose-600">
+                    Nggak valid ({report.invalid.length})
+                  </p>
+                  <p className="mt-1 break-words font-mono text-rose-500">
+                    {report.invalid.join(", ")}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminUsersPage() {
   const { session, isSuperAdmin } = useAuth();
   const myId = session?.user?.id ?? null;
@@ -240,6 +390,7 @@ export default function AdminUsersPage() {
   const [formOk, setFormOk] = useState("");
   const [rowBusyId, setRowBusyId] = useState(null);
   const [showBulk, setShowBulk] = useState(false);
+  const [showCheck, setShowCheck] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [q, setQ] = useState("");
 
@@ -396,6 +547,14 @@ export default function AdminUsersPage() {
           >
             <Users size={13} /> Tambah banyak
           </button>
+          <button
+            type="button"
+            onClick={() => setShowCheck(true)}
+            disabled={status !== "ready"}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2.5 py-2 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-50 disabled:opacity-50"
+          >
+            <MailCheck size={13} /> Cek email
+          </button>
         </div>
       </div>
 
@@ -405,6 +564,10 @@ export default function AdminUsersPage() {
           onClose={() => setShowBulk(false)}
           onDone={fetchUsers}
         />
+      )}
+
+      {showCheck && (
+        <CheckEmailModal users={users} onClose={() => setShowCheck(false)} />
       )}
 
       {/* Tambah user — collapsible */}
