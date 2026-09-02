@@ -210,14 +210,19 @@ export async function getMyFormResponseLessonIds(lessonIds) {
   return [...new Set(data.map((r) => r.lesson_id).filter(Boolean))];
 }
 
-/** Semua respons sebuah form — buat rekap admin (RLS admin read). */
-export async function getFormResponses(formId) {
+/**
+ * Semua respons sebuah form — buat rekap admin (RLS admin read).
+ * Kalau `lessonId` dikasih, dibatasi ke respons yang masuk lewat lesson itu
+ * (satu form bisa dipasang di beberapa lesson).
+ */
+export async function getFormResponses(formId, lessonId) {
   ensure();
-  const { data, error } = await supabase
+  let q = supabase
     .from("coaching_form_responses")
     .select("id, user_id, answers, created_at")
-    .eq("form_id", formId)
-    .order("created_at", { ascending: false });
+    .eq("form_id", formId);
+  if (lessonId) q = q.eq("lesson_id", lessonId);
+  const { data, error } = await q.order("created_at", { ascending: false });
   if (error) throw error;
   return data;
 }
