@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { ChevronDown, ExternalLink, ArrowUpRight } from "lucide-react";
+import { ChevronDown, ExternalLink, ArrowUpRight, Check } from "lucide-react";
 import LessonIcon from "../ui/LessonIcon";
 import { lessonTypeLabels } from "../../lib/lessonTypes";
 
@@ -14,7 +14,7 @@ const typeTint = {
   refleksi: "bg-rose-50 text-rose-600",
 };
 
-function CardInner({ item, clickable }) {
+function CardInner({ item, clickable, done }) {
   return (
     <>
       <span
@@ -40,6 +40,11 @@ function CardInner({ item, clickable }) {
               " · segera"}
             {item.type === "refleksi" && !item.form_id && " · segera"}
           </span>
+          {done && (
+            <span className="inline-flex items-center gap-0.5 rounded bg-teal-50 px-1.5 py-0.5 text-[10px] font-semibold text-teal-600">
+              <Check size={10} strokeWidth={3} /> Sudah diisi
+            </span>
+          )}
           {item.publish_status && item.publish_status !== "all" && (
             <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-500">
               Not publish
@@ -61,7 +66,7 @@ const cardCls =
   "group flex items-start gap-3 rounded-xl border border-zinc-200/80 bg-white p-3.5 transition";
 const clickableCls = " hover:border-zinc-300 hover:shadow-sm";
 
-export default function CourseSection({ section, courseId }) {
+export default function CourseSection({ section, courseId, doneLessons }) {
   const [open, setOpen] = useState(true);
 
   return (
@@ -97,6 +102,7 @@ export default function CourseSection({ section, courseId }) {
             const recording = item.type === "recording" && item.url;
             const quiz = item.type === "soal" && item.question_set_id;
             const presensi = item.type === "presensi";
+            const done = inAppForm && !!doneLessons?.has(item.id);
 
             if (external) {
               return (
@@ -121,7 +127,7 @@ export default function CourseSection({ section, courseId }) {
                     : `/course/${courseId}/soal/${item.id}`;
               return (
                 <Link key={item.id} to={to} className={cardCls + clickableCls}>
-                  <CardInner item={item} clickable="internal" />
+                  <CardInner item={item} clickable="internal" done={done} />
                 </Link>
               );
             }

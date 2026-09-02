@@ -1,12 +1,33 @@
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { useCourse } from "../hooks/useCourse";
+import { getMyFormResponseLessonIds } from "../lib/forms";
 import Skeleton from "../components/ui/Skeleton";
 import CourseSection from "../components/course/CourseSection";
 
 export default function CourseMateriPage() {
   const { courseId } = useParams();
   const { status, course, visibleSections, canView } = useCourse(courseId);
+  const [doneLessons, setDoneLessons] = useState(() => new Set());
+
+  useEffect(() => {
+    if (status !== "ready" || !course) return;
+    const ids = (course.sections ?? [])
+      .flatMap((s) => s.items ?? [])
+      .filter((it) => (it.type === "form" || it.type === "refleksi") && it.form_id)
+      .map((it) => it.id);
+    if (ids.length === 0) return;
+    let alive = true;
+    getMyFormResponseLessonIds(ids)
+      .then((done) => {
+        if (alive) setDoneLessons(new Set(done));
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [status, course]);
 
   const backToLobby = (
     <Link
@@ -85,6 +106,7 @@ export default function CourseMateriPage() {
                 key={section.id}
                 section={section}
                 courseId={courseId}
+                doneLessons={doneLessons}
               />
             ))
           )}
