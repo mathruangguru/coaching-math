@@ -3,25 +3,43 @@ import { Link, useParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { useCourse } from "../hooks/useCourse";
 import { getMyFormResponseLessonIds } from "../lib/forms";
+import { getMyAttendanceByLesson } from "../lib/sessions";
+import { getMyAttemptsByLesson } from "../lib/quiz";
 import Skeleton from "../components/ui/Skeleton";
 import CourseSection from "../components/course/CourseSection";
 
 export default function CourseMateriPage() {
   const { courseId } = useParams();
   const { status, course, visibleSections, canView } = useCourse(courseId);
-  const [doneLessons, setDoneLessons] = useState(() => new Set());
+  // Keterangan progres per lesson buat kartu daftar materi.
+  const [progress, setProgress] = useState({
+    done: new Set(), // lessonId form/refleksi yang udah diisi
+    att: {}, // lessonId presensi -> { rounds, mine }
+    score: {}, // lessonId soal -> { score, total }
+  });
 
   useEffect(() => {
     if (status !== "ready" || !course) return;
-    const ids = (course.sections ?? [])
-      .flatMap((s) => s.items ?? [])
+    const items = (course.sections ?? []).flatMap((s) => s.items ?? []);
+    const formIds = items
       .filter((it) => (it.type === "form" || it.type === "refleksi") && it.form_id)
       .map((it) => it.id);
-    if (ids.length === 0) return;
+    const presensiIds = items
+      .filter((it) => it.type === "presensi")
+      .map((it) => it.id);
+    const soalIds = items
+      .filter((it) => it.type === "soal" && it.question_set_id)
+      .map((it) => it.id);
+    if (!formIds.length && !presensiIds.length && !soalIds.length) return;
+
     let alive = true;
-    getMyFormResponseLessonIds(ids)
-      .then((done) => {
-        if (alive) setDoneLessons(new Set(done));
+    Promise.all([
+      formIds.length ? getMyFormResponseLessonIds(formIds) : [],
+      presensiIds.length ? getMyAttendanceByLesson(presensiIds) : {},
+      soalIds.length ? getMyAttemptsByLesson(soalIds) : {},
+    ])
+      .then(([done, att, score]) => {
+        if (alive) setProgress({ done: new Set(done), att, score });
       })
       .catch(() => {});
     return () => {
@@ -106,7 +124,7 @@ export default function CourseMateriPage() {
                 key={section.id}
                 section={section}
                 courseId={courseId}
-                doneLessons={doneLessons}
+                progress={progress}
               />
             ))
           )}

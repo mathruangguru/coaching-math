@@ -13,7 +13,11 @@ const typeTint = {
   refleksi: "bg-rose-50 text-rose-600",
 };
 
-function CardInner({ item, done }) {
+const pill = "rounded px-1.5 py-0.5 text-[10px] font-semibold";
+const pillDone = `inline-flex items-center gap-0.5 ${pill} bg-teal-50 text-teal-600`;
+const pillMuted = `${pill} bg-zinc-100 text-zinc-500`;
+
+function CardInner({ item, done, att, score }) {
   const soon =
     (item.type === "soal" && !item.question_set_id) ||
     (item.type === "form" && !item.form_id && !item.url) ||
@@ -22,7 +26,15 @@ function CardInner({ item, done }) {
     .filter(Boolean)
     .join(" · ");
   const notPublish = item.publish_status && item.publish_status !== "all";
-  const hasMetaRow = meta || done || notPublish;
+
+  const showAtt = att && att.rounds > 0;
+  const scoreText = score
+    ? score.total != null
+      ? `Skor ${score.score ?? 0}/${score.total}`
+      : "Sudah dikerjakan"
+    : null;
+
+  const hasMetaRow = meta || done || notPublish || showAtt || scoreText;
 
   return (
     <>
@@ -42,15 +54,24 @@ function CardInner({ item, done }) {
           <span className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-zinc-400">
             {meta && <span>{meta}</span>}
             {done && (
-              <span className="inline-flex items-center gap-0.5 rounded bg-teal-50 px-1.5 py-0.5 text-[10px] font-semibold text-teal-600">
+              <span className={pillDone}>
                 <Check size={10} strokeWidth={3} /> Sudah diisi
               </span>
             )}
-            {notPublish && (
-              <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-500">
-                Not publish
+            {scoreText && (
+              <span className={pillDone}>
+                <Check size={10} strokeWidth={3} /> {scoreText}
               </span>
             )}
+            {showAtt && (
+              <span className={att.mine > 0 ? pillDone : pillMuted}>
+                {att.mine > 0 && <Check size={10} strokeWidth={3} />}
+                <span>
+                  Hadir {att.mine}/{att.rounds}
+                </span>
+              </span>
+            )}
+            {notPublish && <span className={pillMuted}>Not publish</span>}
           </span>
         )}
       </div>
@@ -62,7 +83,13 @@ const cardCls =
   "group flex items-center gap-3 rounded-xl border border-zinc-200/80 bg-white p-3.5 transition";
 const clickableCls = " hover:border-zinc-300 hover:shadow-sm";
 
-export default function CourseSection({ section, courseId, doneLessons }) {
+const EMPTY_PROGRESS = { done: new Set(), att: {}, score: {} };
+
+export default function CourseSection({
+  section,
+  courseId,
+  progress = EMPTY_PROGRESS,
+}) {
   const [open, setOpen] = useState(true);
 
   return (
@@ -98,7 +125,9 @@ export default function CourseSection({ section, courseId, doneLessons }) {
             const recording = item.type === "recording" && item.url;
             const quiz = item.type === "soal" && item.question_set_id;
             const presensi = item.type === "presensi";
-            const done = inAppForm && !!doneLessons?.has(item.id);
+            const done = inAppForm && !!progress.done?.has(item.id);
+            const att = presensi ? progress.att?.[item.id] : null;
+            const score = quiz ? progress.score?.[item.id] : null;
 
             if (external) {
               return (
@@ -123,7 +152,7 @@ export default function CourseSection({ section, courseId, doneLessons }) {
                     : `/course/${courseId}/soal/${item.id}`;
               return (
                 <Link key={item.id} to={to} className={cardCls + clickableCls}>
-                  <CardInner item={item} done={done} />
+                  <CardInner item={item} done={done} att={att} score={score} />
                 </Link>
               );
             }

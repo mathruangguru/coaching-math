@@ -470,6 +470,31 @@ export async function deleteAttempt(id) {
 }
 
 /**
+ * Dari daftar lesson soal, balikin { [lessonId]: { score, total } } — attempt
+ * user ini per lesson (yang terakhir). Buat keterangan skor di daftar materi.
+ */
+export async function getMyAttemptsByLesson(lessonIds) {
+  if (!hasSupabase || !lessonIds?.length) return {};
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return {};
+  const { data, error } = await supabase
+    .from("coaching_quiz_attempts")
+    .select("lesson_id, score, total, created_at")
+    .eq("user_id", user.id)
+    .in("lesson_id", lessonIds)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  const out = {};
+  for (const a of data) {
+    if (a.lesson_id && !(a.lesson_id in out))
+      out[a.lesson_id] = { score: a.score, total: a.total };
+  }
+  return out;
+}
+
+/**
  * Attempt terakhir user di lesson ini (buat nampilin skor sebelumnya).
  */
 export async function getLastAttempt(lessonId) {

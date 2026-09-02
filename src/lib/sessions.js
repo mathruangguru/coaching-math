@@ -39,6 +39,39 @@ export async function getMyCheckins(roundIds) {
   return data.map((r) => r.round_id);
 }
 
+/**
+ * Dari daftar lesson presensi, balikin { [lessonId]: { rounds, mine } } —
+ * jumlah ronde & berapa yang udah di-check-in user ini. Buat keterangan
+ * kehadiran di daftar materi.
+ */
+export async function getMyAttendanceByLesson(lessonIds) {
+  if (!hasSupabase || !lessonIds?.length) return {};
+  const id = await uid();
+  if (!id) return {};
+  const { data: rounds, error } = await supabase
+    .from("coaching_attendance_rounds")
+    .select("id, lesson_id")
+    .in("lesson_id", lessonIds);
+  if (error) throw error;
+  if (!rounds.length) return {};
+
+  const roundToLesson = new Map(rounds.map((r) => [r.id, r.lesson_id]));
+  const out = {};
+  for (const r of rounds) (out[r.lesson_id] ??= { rounds: 0, mine: 0 }).rounds++;
+
+  const { data: mine, error: e2 } = await supabase
+    .from("coaching_attendance")
+    .select("round_id")
+    .eq("user_id", id)
+    .in("round_id", [...roundToLesson.keys()]);
+  if (e2) throw e2;
+  for (const a of mine) {
+    const lid = roundToLesson.get(a.round_id);
+    if (lid) out[lid].mine++;
+  }
+  return out;
+}
+
 /** Check-in ke satu ronde. Idempoten (23505 = udah). */
 export async function checkInRound(roundId) {
   ensure();
