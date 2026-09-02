@@ -14,8 +14,27 @@ const typeTint = {
 };
 
 const pill = "rounded px-1.5 py-0.5 text-[10px] font-semibold";
-const pillDone = `inline-flex items-center gap-0.5 ${pill} bg-teal-50 text-teal-600`;
+const pillTeal = `${pill} bg-teal-50 text-teal-600`;
+const pillAmber = `${pill} bg-amber-50 text-amber-600`;
+const pillRose = `${pill} bg-rose-50 text-rose-600`;
 const pillMuted = `${pill} bg-zinc-100 text-zinc-500`;
+
+// Badge hasil kuis: warna ikut rasio benar (biar skor jelek nggak keliatan
+// "lulus" gara-gara hijau).
+const scorePillCls = (score) => {
+  if (!score || score.total == null || !score.total) return pillTeal;
+  const r = (score.score ?? 0) / score.total;
+  return r >= 0.7 ? pillTeal : r >= 0.4 ? pillAmber : pillRose;
+};
+
+function DoneBadge({ children }) {
+  return (
+    <span className={`inline-flex items-center gap-0.5 ${pillTeal}`}>
+      <Check size={10} strokeWidth={3} />
+      <span>{children}</span>
+    </span>
+  );
+}
 
 function CardInner({ item, done, att, score }) {
   const soon =
@@ -27,14 +46,13 @@ function CardInner({ item, done, att, score }) {
     .join(" · ");
   const notPublish = item.publish_status && item.publish_status !== "all";
 
-  const showAtt = att && att.rounds > 0;
-  const scoreText = score
-    ? score.total != null
-      ? `Skor ${score.score ?? 0}/${score.total}`
-      : "Sudah dikerjakan"
-    : null;
+  const isForm =
+    (item.type === "form" || item.type === "refleksi") && !!item.form_id;
+  const isQuiz = item.type === "soal" && !!item.question_set_id;
+  const isPresensi = !!att && att.rounds > 0;
+  const hadirPenuh = isPresensi && att.mine >= att.rounds;
 
-  const hasMetaRow = meta || done || notPublish || showAtt || scoreText;
+  const hasMetaRow = meta || isForm || isQuiz || isPresensi || notPublish;
 
   return (
     <>
@@ -53,24 +71,36 @@ function CardInner({ item, done, att, score }) {
         {hasMetaRow && (
           <span className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-zinc-400">
             {meta && <span>{meta}</span>}
-            {done && (
-              <span className={pillDone}>
-                <Check size={10} strokeWidth={3} /> Sudah diisi
-              </span>
-            )}
-            {scoreText && (
-              <span className={pillDone}>
-                <Check size={10} strokeWidth={3} /> {scoreText}
-              </span>
-            )}
-            {showAtt && (
-              <span className={att.mine > 0 ? pillDone : pillMuted}>
-                {att.mine > 0 && <Check size={10} strokeWidth={3} />}
-                <span>
+
+            {isForm &&
+              (done ? (
+                <DoneBadge>Sudah diisi</DoneBadge>
+              ) : (
+                <span className={pillMuted}>Belum diisi</span>
+              ))}
+
+            {isQuiz &&
+              (score ? (
+                <span className={scorePillCls(score)}>
+                  {score.total != null
+                    ? `Skor ${score.score ?? 0}/${score.total}`
+                    : "Sudah dikerjakan"}
+                </span>
+              ) : (
+                <span className={pillMuted}>Belum dikerjakan</span>
+              ))}
+
+            {isPresensi &&
+              (hadirPenuh ? (
+                <DoneBadge>
+                  Hadir {att.mine}/{att.rounds}
+                </DoneBadge>
+              ) : (
+                <span className={pillMuted}>
                   Hadir {att.mine}/{att.rounds}
                 </span>
-              </span>
-            )}
+              ))}
+
             {notPublish && <span className={pillMuted}>Not publish</span>}
           </span>
         )}
@@ -80,7 +110,7 @@ function CardInner({ item, done, att, score }) {
 }
 
 const cardCls =
-  "group flex items-center gap-3 rounded-xl border border-zinc-200/80 bg-white p-3.5 transition";
+  "group flex items-start gap-3 rounded-xl border border-zinc-200/80 bg-white p-3.5 transition";
 const clickableCls = " hover:border-zinc-300 hover:shadow-sm";
 
 const EMPTY_PROGRESS = { done: new Set(), att: {}, score: {} };
@@ -113,7 +143,7 @@ export default function CourseSection({
       </button>
 
       {open && (
-        <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-2 grid items-start gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {section.items.map((item) => {
             const inAppForm =
               (item.type === "form" || item.type === "refleksi") &&

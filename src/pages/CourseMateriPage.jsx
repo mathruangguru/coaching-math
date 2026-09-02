@@ -33,15 +33,20 @@ export default function CourseMateriPage() {
     if (!formIds.length && !presensiIds.length && !soalIds.length) return;
 
     let alive = true;
-    Promise.all([
+    // allSettled: satu query gagal nggak boleh nutup badge dari query lain.
+    Promise.allSettled([
       formIds.length ? getMyFormResponseLessonIds(formIds) : [],
       presensiIds.length ? getMyAttendanceByLesson(presensiIds) : {},
       soalIds.length ? getMyAttemptsByLesson(soalIds) : {},
-    ])
-      .then(([done, att, score]) => {
-        if (alive) setProgress({ done: new Set(done), att, score });
-      })
-      .catch(() => {});
+    ]).then(([f, a, s]) => {
+      if (!alive) return;
+      const val = (r, fallback) => (r.status === "fulfilled" ? r.value : fallback);
+      setProgress({
+        done: new Set(val(f, [])),
+        att: val(a, {}),
+        score: val(s, {}),
+      });
+    });
     return () => {
       alive = false;
     };
