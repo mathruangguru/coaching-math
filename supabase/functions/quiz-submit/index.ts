@@ -58,16 +58,6 @@ Deno.serve(async (req) => {
     return json({ error: "lessonId, setId, answers wajib" }, 400);
   }
 
-  // > 3 jam dianggap nggak valid (murid ninggalin soal lama) -> null.
-  const clampSec = (s: number | null) =>
-    s != null && Number.isFinite(s) && s >= 0 && s <= 3 * 3600
-      ? Math.round(s)
-      : null;
-  // Fallback kalau baris progress nggak ada (sesi lama / progress kehapus).
-  const clientDurSec = clampSec(
-    Number.isFinite(Number(durationMs)) ? Number(durationMs) / 1000 : null
-  );
-
   const admin = createClient(url, serviceKey);
 
   const clearProgress = () =>
@@ -95,7 +85,23 @@ Deno.serve(async (req) => {
     });
   }
 
+  // Batas waktu set. Durasi di atas batas (+ grace 60 dtk) -> disimpan null.
+  // Tanpa batas -> sanity cap 24 jam.
+  const { data: setRow } = await admin
+    .from("coaching_question_sets")
+    .select("time_limit_min")
+    .eq("id", setId)
+    .maybeSingle();
+  const capSec = setRow?.time_limit_min
+    ? setRow.time_limit_min * 60 + 60
+    : 24 * 3600;
+  const clampSec = (s: number | null) =>
+    s != null && Number.isFinite(s) && s >= 0 && s <= capSec
+      ? Math.round(s)
+      : null;
+
   // Durasi authoritative: server_now - started_at dari baris progress.
+  // Fallback ke durationMs client kalau baris progress nggak ada.
   const { data: prog } = await admin
     .from("coaching_quiz_progress")
     .select("started_at")
@@ -104,7 +110,9 @@ Deno.serve(async (req) => {
     .maybeSingle();
   const durationSec = prog?.started_at
     ? clampSec((Date.now() - new Date(prog.started_at).getTime()) / 1000)
-    : clientDurSec;
+    : clampSec(
+        Number.isFinite(Number(durationMs)) ? Number(durationMs) / 1000 : null
+      );
 
   const { data: questions, error: qErr } = await admin
     .from("coaching_questions")

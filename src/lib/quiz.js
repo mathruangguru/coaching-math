@@ -16,7 +16,7 @@ export async function getQuestionSets() {
   ensure();
   const { data, error } = await supabase
     .from("coaching_question_sets")
-    .select("id, title, description, created_at")
+    .select("id, title, description, time_limit_min, created_at")
     .order("created_at");
   if (error) throw error;
   return data;
@@ -44,7 +44,7 @@ export async function getQuestionSet(id) {
   const { data, error } = await supabase
     .from("coaching_question_sets")
     .select(
-      `id, title, description,
+      `id, title, description, time_limit_min,
        questions:coaching_questions ( id, code, type, prompt, options, position )`
     )
     .eq("id", id)
@@ -103,14 +103,19 @@ export async function createQuestionSet({ title, description }) {
   return data;
 }
 
-export async function updateQuestionSet(id, { title, description }) {
+export async function updateQuestionSet(id, { title, description, timeLimitMin }) {
   ensure();
+  const patch = {
+    title: title.trim() || "Set soal baru",
+    description: description?.trim() || null,
+  };
+  if (timeLimitMin !== undefined) {
+    const n = Number(timeLimitMin);
+    patch.time_limit_min = Number.isFinite(n) && n > 0 ? Math.round(n) : null;
+  }
   const { error } = await supabase
     .from("coaching_question_sets")
-    .update({
-      title: title.trim() || "Set soal baru",
-      description: description?.trim() || null,
-    })
+    .update(patch)
     .eq("id", id);
   if (error) throw error;
 }

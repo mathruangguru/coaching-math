@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Clock } from "lucide-react";
 import { getCourse } from "../lib/courses";
 import {
   getQuestionSet,
@@ -14,15 +14,20 @@ import MathText from "../components/ui/MathText";
 
 const GROUP = 10;
 
-// Lewat 3 jam sejak buka soal -> jawaban auto-dikirim, durasi dianggap
-// nggak valid (di-null-in server-side juga).
-const HARD_LIMIT_MS = 3 * 60 * 60 * 1000;
-
 const fmtDur = (sec) => {
   if (sec == null) return null;
   const s = Math.max(0, Math.round(sec));
   const m = Math.floor(s / 60);
   return m > 0 ? `${m} mnt ${s % 60} dtk` : `${s} dtk`;
+};
+
+// mm:ss atau h:mm:ss
+const fmtClock = (ms) => {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const p = (x) => String(x).padStart(2, "0");
+  return h > 0 ? `${h}:${p(m)}:${p(s % 60)}` : `${p(m)}:${p(s % 60)}`;
 };
 
 export default function QuizPage() {
@@ -32,7 +37,8 @@ export default function QuizPage() {
   const [current, setCurrent] = useState(0);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState(null); // { score, total, results, duration_sec }
-  const startedAtRef = useRef(null);
+  const [startedAt, setStartedAt] = useState(null); // ms epoch, dari server
+  const [now, setNow] = useState(() => Date.now());
   const autoFiredRef = useRef(false);
 
   useEffect(() => {
@@ -67,7 +73,7 @@ export default function QuizPage() {
           const prog = await openQuizProgress(set.id).catch(() => null);
           if (!alive) return;
           if (prog?.started_at) {
-            startedAtRef.current = new Date(prog.started_at).getTime();
+            setStartedAt(new Date(prog.started_at).getTime());
           }
           if (prog?.answers && typeof prog.answers === "object") {
             setAnswers(prog.answers);
@@ -104,10 +110,7 @@ export default function QuizPage() {
       }
       setBusy(true);
       try {
-        const durationMs =
-          startedAtRef.current != null
-            ? Date.now() - startedAtRef.current
-            : null;
+        const durationMs = startedAt != null ? Date.now() - startedAt : null;
         const res = await submitQuiz(lessonId, data.set.id, answers, durationMs);
         setResult(res);
         setCurrent(0);
@@ -117,8 +120,13 @@ export default function QuizPage() {
         setBusy(false);
       }
     },
-    [busy, result, data, answers, lessonId]
+    [busy, result, data, answers, lessonId, startedAt]
   );
+
+  const limitMs =
+    data.status === "ready" && data.set?.time_limit_min
+      ? data.set.time_limit_min * 60000
+      : null;
 
   // Simpan draft jawaban ke server (ter-debounce) -> lanjut di device lain.
   useEffect(() => {
@@ -131,29 +139,38 @@ export default function QuizPage() {
     return () => clearTimeout(t);
   }, [answers, data, result]);
 
-  // Auto-submit kalau udah lewat 3 jam sejak buka soal.
+  // Detak per detik buat tampilan timer.
+  useEffect(() => {
+    if (data.status !== "ready" || !data.set || result || startedAt == null)
+      return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [data, result, startedAt]);
+
+  // Auto-submit kalau batas waktu set kelewat.
   useEffect(() => {
     if (
       data.status !== "ready" ||
       !data.set ||
       result ||
-      startedAtRef.current == null
+      startedAt == null ||
+      limitMs == null
     )
       return;
     const fire = () => {
       if (autoFiredRef.current) return;
       autoFiredRef.current = true;
-      window.alert("Waktu 3 jam terlewati — jawaban kamu otomatis dikirim.");
+      window.alert("Waktu habis — jawaban kamu otomatis dikirim.");
       submit({ silent: true });
     };
-    const left = startedAtRef.current + HARD_LIMIT_MS - Date.now();
+    const left = startedAt + limitMs - Date.now();
     if (left <= 0) {
       fire();
       return;
     }
     const t = setTimeout(fire, left);
     return () => clearTimeout(t);
-  }, [data, result, submit]);
+  }, [data, result, submit, startedAt, limitMs]);
 
   const backLink = (
     <Link
@@ -270,11 +287,33 @@ export default function QuizPage() {
   const groupEnd = Math.min(groupStart + GROUP, total);
   const isLast = current === total - 1;
 
+  const elapsedMs = startedAt != null ? Math.max(0, now - startedAt) : 0;
+  const remainingMs = limitMs != null ? limitMs - elapsedMs : null;
+  const timerTone =
+    remainingMs == null
+      ? "text-zinc-400"
+      : remainingMs < 60000
+        ? "text-rose-600"
+        : remainingMs < 5 * 60000
+          ? "text-amber-600"
+          : "text-zinc-400";
+
   return (
     <div className="flex min-h-full flex-col">
       <div className="mx-auto my-auto flex w-full max-w-2xl flex-col gap-5 py-2">
         {backLink}
         {header}
+
+        {startedAt != null && (
+          <p
+            className={`flex items-center justify-center gap-1.5 text-xs font-semibold tabular-nums ${timerTone}`}
+          >
+            <Clock size={13} />
+            {remainingMs != null
+              ? `Sisa waktu ${fmtClock(remainingMs)}`
+              : `Waktu ${fmtClock(elapsedMs)}`}
+          </p>
+        )}
 
         {/* Strip nomor soal, per 10 */}
         <div className="flex items-center justify-center gap-1.5">
