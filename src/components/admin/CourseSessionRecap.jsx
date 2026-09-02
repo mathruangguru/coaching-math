@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   ChevronDown,
   UserCheck,
@@ -8,13 +9,13 @@ import {
 } from "lucide-react";
 import { getCourse } from "../../lib/courses";
 import { getUsers } from "../../lib/users";
+import { supabase, hasSupabase } from "../../lib/supabase";
 import {
   getRounds,
   getRoundAttendance,
   createRound,
   setRoundOpen,
   deleteRound,
-  getLessonReflections,
 } from "../../lib/sessions";
 import Skeleton from "../ui/Skeleton";
 
@@ -34,7 +35,7 @@ const fmt = (iso) => {
   }
 };
 
-const QUICK = ["Awal", "Tengah", "Akhir"];
+const QUICK = ["Presensi 1", "Presensi 2", "Presensi 3"];
 
 function PresensiRow({ lesson, usersById }) {
   const [open, setOpen] = useState(false);
@@ -54,7 +55,7 @@ function PresensiRow({ lesson, usersById }) {
         setFailed(false);
       })
       .catch((err) => {
-        console.error("[admin] gagal memuat ronde:", err);
+        console.error("[admin] gagal memuat presensi:", err);
         loadedRef.current = false;
         setFailed(true);
       });
@@ -65,6 +66,27 @@ function PresensiRow({ lesson, usersById }) {
     loadedRef.current = true;
     load();
   }, [open, load]);
+
+  // Realtime: check-in murid masuk -> refresh (debounce biar nggak spam).
+  useEffect(() => {
+    if (!open || !hasSupabase) return;
+    let t;
+    const channel = supabase
+      .channel(`att:${lesson.id}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "coaching_attendance" },
+        () => {
+          clearTimeout(t);
+          t = setTimeout(load, 400);
+        }
+      )
+      .subscribe();
+    return () => {
+      clearTimeout(t);
+      supabase.removeChannel(channel);
+    };
+  }, [open, load, lesson.id]);
 
   const total = rounds?.reduce((n, r) => n + r.people.length, 0) ?? 0;
 
@@ -96,7 +118,7 @@ function PresensiRow({ lesson, usersById }) {
   };
 
   const remove = async (r) => {
-    if (!window.confirm(`Hapus ronde "${r.label}"?`)) return;
+    if (!window.confirm(`Hapus presensi "${r.label}"?`)) return;
     try {
       await deleteRound(r.id);
       setRounds((p) => p.filter((x) => x.id !== r.id));
@@ -123,7 +145,7 @@ function PresensiRow({ lesson, usersById }) {
         </span>
         {rounds && (
           <span className="shrink-0 rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold text-zinc-500">
-            {rounds.length} ronde · {total} hadir
+            {rounds.length} presensi · {total} hadir
           </span>
         )}
         <ChevronDown
@@ -142,7 +164,7 @@ function PresensiRow({ lesson, usersById }) {
           {rounds && (
             <div className="flex flex-col gap-3">
               {rounds.length === 0 && (
-                <p className="text-xs text-zinc-400">Belum ada ronde.</p>
+                <p className="text-xs text-zinc-400">Belum ada presensi.</p>
               )}
 
               {rounds.map((r) => (
@@ -176,7 +198,7 @@ function PresensiRow({ lesson, usersById }) {
                     <button
                       type="button"
                       onClick={() => remove(r)}
-                      aria-label="Hapus ronde"
+                      aria-label="Hapus presensi"
                       className="grid h-6 w-6 shrink-0 place-items-center rounded text-zinc-300 transition-colors hover:bg-rose-50 hover:text-rose-500"
                     >
                       <Trash2 size={12} />
@@ -221,7 +243,7 @@ function PresensiRow({ lesson, usersById }) {
                   value={label}
                   onChange={(e) => setLabel(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && add()}
-                  placeholder="nama ronde…"
+                  placeholder="nama presensi…"
                   className="min-w-0 flex-1 rounded-md border border-zinc-300 px-2 py-1 text-xs text-zinc-800 outline-none focus:border-brand-500"
                 />
                 <button
@@ -230,7 +252,7 @@ function PresensiRow({ lesson, usersById }) {
                   disabled={busy || !label.trim()}
                   className="inline-flex items-center gap-1 rounded-md bg-brand-500 px-2 py-1 text-xs font-semibold text-white transition-colors hover:bg-brand-600 disabled:opacity-50"
                 >
-                  <Plus size={12} /> Ronde
+                  <Plus size={12} /> Presensi
                 </button>
               </div>
             </div>
@@ -241,95 +263,38 @@ function PresensiRow({ lesson, usersById }) {
   );
 }
 
-function RefleksiRow({ lesson, usersById }) {
-  const [open, setOpen] = useState(false);
-  const [rows, setRows] = useState(null);
-  const [failed, setFailed] = useState(false);
-  const loadedRef = useRef(false);
-
-  useEffect(() => {
-    if (!open || loadedRef.current) return;
-    loadedRef.current = true;
-    getLessonReflections(lesson.id)
-      .then((d) => {
-        setRows(d);
-        setFailed(false);
-      })
-      .catch((err) => {
-        console.error("[admin] gagal memuat refleksi:", err);
-        loadedRef.current = false;
-        setFailed(true);
-      });
-  }, [open, lesson.id]);
-
+function RefleksiRow({ lesson }) {
   return (
-    <li>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-zinc-50"
-      >
-        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-rose-50 text-rose-600">
-          <NotebookPen size={15} />
+    <li className="flex items-center gap-3 px-4 py-2.5">
+      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-rose-50 text-rose-600">
+        <NotebookPen size={15} />
+      </span>
+      <span className="min-w-0 flex-1 truncate text-sm font-medium text-zinc-800">
+        {lesson.title}
+        <span className="ml-1.5 text-xs font-normal text-zinc-400">
+          Refleksi
         </span>
-        <span className="min-w-0 flex-1 truncate text-sm font-medium text-zinc-800">
-          {lesson.title}
-          <span className="ml-1.5 text-xs font-normal text-zinc-400">
-            Refleksi
-          </span>
-        </span>
-        {rows && (
-          <span className="shrink-0 rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold text-zinc-500">
-            {rows.length}
-          </span>
-        )}
-        <ChevronDown
-          size={15}
-          className={`shrink-0 text-zinc-400 transition-transform ${
-            open ? "" : "-rotate-90"
-          }`}
-        />
-      </button>
-
-      {open && (
-        <div className="border-t border-zinc-100 bg-zinc-50/50 px-4 py-3">
-          {!rows && !failed && <Skeleton className="h-10 w-full rounded" />}
-          {failed && <p className="text-xs text-rose-500">Gagal memuat.</p>}
-          {rows && rows.length === 0 && (
-            <p className="text-xs text-zinc-400">Belum ada.</p>
-          )}
-          {rows && rows.length > 0 && (
-            <ul className="flex flex-col gap-2">
-              {rows.map((r) => {
-                const u = usersById.get(r.user_id);
-                return (
-                  <li key={r.user_id} className="text-sm">
-                    <div className="flex items-baseline justify-between gap-3">
-                      <span className="font-medium text-zinc-800">
-                        {u ? fullName(u) : r.user_id}
-                      </span>
-                      <span className="shrink-0 text-xs text-zinc-400">
-                        {fmt(r.updated_at)}
-                      </span>
-                    </div>
-                    <p className="mt-0.5 whitespace-pre-wrap text-xs text-zinc-600">
-                      {r.body}
-                    </p>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </div>
+      </span>
+      {lesson.form_id ? (
+        <Link
+          to={`/admin/forms/${lesson.form_id}/responses`}
+          className="shrink-0 text-xs font-semibold text-brand-600 hover:text-brand-700"
+        >
+          Lihat respons →
+        </Link>
+      ) : (
+        <span className="shrink-0 text-xs text-zinc-400">belum ada form</span>
       )}
     </li>
   );
 }
 
-export default function CourseSessionRecap({ courseId }) {
+export default function CourseSessionRecap({ courseId, only }) {
   const [status, setStatus] = useState("loading");
   const [lessons, setLessons] = useState([]);
   const [usersById, setUsersById] = useState(new Map());
+
+  const kinds = only ? [only] : ["presensi", "refleksi"];
 
   useEffect(() => {
     let alive = true;
@@ -338,7 +303,11 @@ export default function CourseSessionRecap({ courseId }) {
         if (!alive) return;
         const items = (course?.sections ?? [])
           .flatMap((s) => s.items)
-          .filter((it) => it.type === "presensi" || it.type === "refleksi");
+          .filter((it) =>
+            only
+              ? it.type === only
+              : it.type === "presensi" || it.type === "refleksi"
+          );
         setLessons(items);
         setUsersById(new Map(users.map((u) => [u.id, u])));
         setStatus("ready");
@@ -350,13 +319,20 @@ export default function CourseSessionRecap({ courseId }) {
     return () => {
       alive = false;
     };
-  }, [courseId]);
+  }, [courseId, only]);
+
+  const heading =
+    only === "presensi"
+      ? "Presensi"
+      : only === "refleksi"
+        ? "Refleksi"
+        : "Presensi & Refleksi";
 
   return (
     <div className="overflow-hidden rounded-2xl border border-zinc-200/80 bg-white">
       <div className="border-b border-zinc-100 px-5 py-3">
         <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
-          Presensi &amp; Refleksi
+          {heading}
         </span>
       </div>
       <div className="p-2">
@@ -372,8 +348,8 @@ export default function CourseSessionRecap({ courseId }) {
         )}
         {status === "ready" && lessons.length === 0 && (
           <p className="p-3 text-sm text-zinc-400">
-            Belum ada item Presensi / Refleksi di course ini. Tambahin lewat
-            editor kurikulum di atas.
+            Belum ada item {kinds.map((k) => (k === "presensi" ? "Presensi" : "Refleksi")).join(" / ")}{" "}
+            di course ini. Tambahin lewat editor kurikulum.
           </p>
         )}
         {status === "ready" && lessons.length > 0 && (
@@ -382,7 +358,7 @@ export default function CourseSessionRecap({ courseId }) {
               l.type === "presensi" ? (
                 <PresensiRow key={l.id} lesson={l} usersById={usersById} />
               ) : (
-                <RefleksiRow key={l.id} lesson={l} usersById={usersById} />
+                <RefleksiRow key={l.id} lesson={l} />
               )
             )}
           </ul>

@@ -126,7 +126,7 @@ export default function PresensiPage() {
       <div className="rounded-2xl border border-zinc-200/80 bg-white p-8 text-center">
         {!openRound ? (
           <p className="text-sm text-zinc-500">
-            Belum ada presensi yang dibuka. Tunggu pengajar buka window-nya.
+            Belum ada presensi yang dibuka.
           </p>
         ) : mine.has(openRound.id) ? (
           <>
@@ -140,8 +140,8 @@ export default function PresensiPage() {
         ) : (
           <>
             <p className="text-sm text-zinc-500">
-              Presensi <span className="font-semibold">{openRound.label}</span>{" "}
-              lagi dibuka.
+              <span className="font-semibold">{openRound.label}</span> sedang
+              dibuka.
             </p>
             <button
               type="button"

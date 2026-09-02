@@ -96,46 +96,7 @@ export async function getRoundAttendance(roundId) {
   return data;
 }
 
-// ── Refleksi ────────────────────────────────────────────────────────
-
-export async function getMyReflection(lessonId) {
-  if (!hasSupabase) return null;
-  const id = await uid();
-  if (!id) return null;
-  const { data, error } = await supabase
-    .from("coaching_reflections")
-    .select("body, updated_at")
-    .eq("lesson_id", lessonId)
-    .eq("user_id", id)
-    .maybeSingle();
-  if (error) throw error;
-  return data;
-}
-
-export async function saveReflection(lessonId, body) {
-  ensure();
-  const id = await uid();
-  if (!id) throw new Error("Belum login.");
-  const { error } = await supabase.from("coaching_reflections").upsert(
-    {
-      lesson_id: lessonId,
-      user_id: id,
-      body: (body ?? "").trim(),
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "lesson_id,user_id" }
-  );
-  if (error) throw error;
-}
-
-/** Semua refleksi sebuah lesson — rekap admin (RLS admin read). */
-export async function getLessonReflections(lessonId) {
-  ensure();
-  const { data, error } = await supabase
-    .from("coaching_reflections")
-    .select("user_id, body, updated_at")
-    .eq("lesson_id", lessonId)
-    .order("updated_at", { ascending: false });
-  if (error) throw error;
-  return data;
-}
+// Refleksi = lesson tipe 'refleksi' yang nunjuk ke sebuah Form in-app
+// (coaching_lessons.form_id). Ngerjain & rekap-nya lewat sistem Form
+// (lib/forms.js, FormPage, /admin/forms/:id/responses) — nggak ada
+// tabel/endpoint khusus di sini.
