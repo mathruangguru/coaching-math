@@ -1,12 +1,29 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
 import { getCourse } from "../lib/courses";
-import { getQuestionSet, getMyAttempt, submitQuiz } from "../lib/quiz";
+import {
+  getQuestionSet,
+  getMyAttempt,
+  submitQuiz,
+  openQuizProgress,
+  saveQuizDraft,
+} from "../lib/quiz";
 import Skeleton from "../components/ui/Skeleton";
 import MathText from "../components/ui/MathText";
 
 const GROUP = 10;
+
+// Lewat 3 jam sejak buka soal -> jawaban auto-dikirim, durasi dianggap
+// nggak valid (di-null-in server-side juga).
+const HARD_LIMIT_MS = 3 * 60 * 60 * 1000;
+
+const fmtDur = (sec) => {
+  if (sec == null) return null;
+  const s = Math.max(0, Math.round(sec));
+  const m = Math.floor(s / 60);
+  return m > 0 ? `${m} mnt ${s % 60} dtk` : `${s} dtk`;
+};
 
 export default function QuizPage() {
   const { courseId, lessonId } = useParams();
@@ -14,7 +31,9 @@ export default function QuizPage() {
   const [answers, setAnswers] = useState({}); // { qid: idx }
   const [current, setCurrent] = useState(0);
   const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState(null); // { score, total, results }
+  const [result, setResult] = useState(null); // { score, total, results, duration_sec }
+  const startedAtRef = useRef(null);
+  const autoFiredRef = useRef(false);
 
   useEffect(() => {
     let alive = true;
@@ -37,7 +56,22 @@ export default function QuizPage() {
         );
         if (!alive) return;
         if (attempt) {
-          setResult({ score: attempt.score, total: attempt.total });
+          setResult({
+            score: attempt.score,
+            total: attempt.total,
+            duration_sec: attempt.duration_sec ?? null,
+          });
+        } else if (set) {
+          // Mulai / lanjut sesi di server -> timer & draft jawaban ikut
+          // walau pindah device.
+          const prog = await openQuizProgress(set.id).catch(() => null);
+          if (!alive) return;
+          if (prog?.started_at) {
+            startedAtRef.current = new Date(prog.started_at).getTime();
+          }
+          if (prog?.answers && typeof prog.answers === "object") {
+            setAnswers(prog.answers);
+          }
         }
         setData({ status: "ready", course, lesson, set });
       } catch (err) {
@@ -50,6 +84,76 @@ export default function QuizPage() {
       alive = false;
     };
   }, [courseId, lessonId]);
+
+  const submit = useCallback(
+    async ({ silent = false } = {}) => {
+      if (busy || result || data.status !== "ready" || !data.set) return;
+      const qs = data.set.questions ?? [];
+      if (!silent) {
+        const blanks = qs.filter((qq) => {
+          const v = answers[qq.id];
+          return Array.isArray(v) ? v.length === 0 : v == null;
+        }).length;
+        if (
+          blanks > 0 &&
+          !window.confirm(
+            `Masih ada ${blanks} soal belum dijawab. Kirim sekarang?`
+          )
+        )
+          return;
+      }
+      setBusy(true);
+      try {
+        const durationMs =
+          startedAtRef.current != null
+            ? Date.now() - startedAtRef.current
+            : null;
+        const res = await submitQuiz(lessonId, data.set.id, answers, durationMs);
+        setResult(res);
+        setCurrent(0);
+      } catch (err) {
+        if (!silent) window.alert(err?.message ?? "Gagal submit.");
+      } finally {
+        setBusy(false);
+      }
+    },
+    [busy, result, data, answers, lessonId]
+  );
+
+  // Simpan draft jawaban ke server (ter-debounce) -> lanjut di device lain.
+  useEffect(() => {
+    if (data.status !== "ready" || !data.set || result) return;
+    const t = setTimeout(() => {
+      saveQuizDraft(data.set.id, answers).catch((e) =>
+        console.warn("[QuizPage] draft gagal disimpan:", e)
+      );
+    }, 800);
+    return () => clearTimeout(t);
+  }, [answers, data, result]);
+
+  // Auto-submit kalau udah lewat 3 jam sejak buka soal.
+  useEffect(() => {
+    if (
+      data.status !== "ready" ||
+      !data.set ||
+      result ||
+      startedAtRef.current == null
+    )
+      return;
+    const fire = () => {
+      if (autoFiredRef.current) return;
+      autoFiredRef.current = true;
+      window.alert("Waktu 3 jam terlewati — jawaban kamu otomatis dikirim.");
+      submit({ silent: true });
+    };
+    const left = startedAtRef.current + HARD_LIMIT_MS - Date.now();
+    if (left <= 0) {
+      fire();
+      return;
+    }
+    const t = setTimeout(fire, left);
+    return () => clearTimeout(t);
+  }, [data, result, submit]);
 
   const backLink = (
     <Link
@@ -104,28 +208,6 @@ export default function QuizPage() {
       return { ...a, [qq.id]: next };
     });
 
-  const submit = async () => {
-    const blanks = questions.filter((qq) => !isAnswered(qq)).length;
-    if (
-      blanks > 0 &&
-      !window.confirm(
-        `Masih ada ${blanks} soal belum dijawab. Kirim sekarang?`
-      )
-    ) {
-      return;
-    }
-    setBusy(true);
-    try {
-      const res = await submitQuiz(lessonId, set.id, answers);
-      setResult(res);
-      setCurrent(0);
-    } catch (err) {
-      window.alert(err?.message ?? "Gagal submit.");
-    } finally {
-      setBusy(false);
-    }
-  };
-
   const answeredCount = questions.filter(isAnswered).length;
 
   const header = (
@@ -172,6 +254,11 @@ export default function QuizPage() {
             <span className="text-lg text-zinc-400"> / {result.total}</span>
           </p>
           <p className="mt-1 text-sm font-semibold text-zinc-400">({p}%)</p>
+          {result.duration_sec != null && (
+            <p className="mt-2 text-xs text-zinc-400">
+              Waktu pengerjaan: {fmtDur(result.duration_sec)}
+            </p>
+          )}
         </div>
       </div>
     );
@@ -332,7 +419,7 @@ export default function QuizPage() {
 
           <button
             type="button"
-            onClick={submit}
+            onClick={() => submit()}
             disabled={busy}
             className="rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-600 disabled:opacity-50"
           >

@@ -7,8 +7,11 @@
 // Deploy (--no-verify-jwt wajib, auth dicek di dalam):
 //   supabase functions deploy quiz-submit --no-verify-jwt
 //
-// Body: { lessonId, setId, answers: { [questionId]: chosenIndex } }
-// Return: { score, total, results: { [questionId]: boolean }, alreadyDone? }
+// durationMs di body cuma fallback — durasi utama dihitung server dari
+// coaching_quiz_progress.started_at, lalu baris progress-nya dihapus.
+//
+// Body: { lessonId, setId, answers: { [questionId]: chosenIndex }, durationMs? }
+// Return: { score, total, results: { [questionId]: boolean }, duration_sec, alreadyDone? }
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
@@ -48,28 +51,60 @@ Deno.serve(async (req) => {
   } = await caller.auth.getUser();
   if (userErr || !user) return json({ error: "Unauthorized" }, 401);
 
-  const { lessonId, setId, answers } = await req.json().catch(() => ({}));
+  const { lessonId, setId, answers, durationMs } = await req
+    .json()
+    .catch(() => ({}));
   if (!lessonId || !setId || typeof answers !== "object" || answers === null) {
     return json({ error: "lessonId, setId, answers wajib" }, 400);
   }
 
+  // > 3 jam dianggap nggak valid (murid ninggalin soal lama) -> null.
+  const clampSec = (s: number | null) =>
+    s != null && Number.isFinite(s) && s >= 0 && s <= 3 * 3600
+      ? Math.round(s)
+      : null;
+  // Fallback kalau baris progress nggak ada (sesi lama / progress kehapus).
+  const clientDurSec = clampSec(
+    Number.isFinite(Number(durationMs)) ? Number(durationMs) / 1000 : null
+  );
+
   const admin = createClient(url, serviceKey);
+
+  const clearProgress = () =>
+    admin
+      .from("coaching_quiz_progress")
+      .delete()
+      .eq("user_id", user.id)
+      .eq("set_id", setId);
 
   // Sudah pernah ngerjain set ini? -> balikin hasil lama, jangan insert.
   const { data: prev } = await admin
     .from("coaching_quiz_attempts")
-    .select("answers, results, score, total")
+    .select("answers, results, score, total, duration_sec")
     .eq("user_id", user.id)
     .eq("set_id", setId)
     .maybeSingle();
   if (prev) {
+    await clearProgress();
     return json({
       score: prev.score,
       total: prev.total,
       results: prev.results ?? {},
+      duration_sec: prev.duration_sec ?? null,
       alreadyDone: true,
     });
   }
+
+  // Durasi authoritative: server_now - started_at dari baris progress.
+  const { data: prog } = await admin
+    .from("coaching_quiz_progress")
+    .select("started_at")
+    .eq("user_id", user.id)
+    .eq("set_id", setId)
+    .maybeSingle();
+  const durationSec = prog?.started_at
+    ? clampSec((Date.now() - new Date(prog.started_at).getTime()) / 1000)
+    : clientDurSec;
 
   const { data: questions, error: qErr } = await admin
     .from("coaching_questions")
@@ -116,21 +151,24 @@ Deno.serve(async (req) => {
     results,
     score,
     total,
+    duration_sec: durationSec,
   });
   if (insErr) {
     // 23505 = unique (user, set) -> race; ambil yang barusan masuk.
     if (insErr.code === "23505") {
       const { data: race } = await admin
         .from("coaching_quiz_attempts")
-        .select("results, score, total")
+        .select("results, score, total, duration_sec")
         .eq("user_id", user.id)
         .eq("set_id", setId)
         .maybeSingle();
       if (race) {
+        await clearProgress();
         return json({
           score: race.score,
           total: race.total,
           results: race.results ?? {},
+          duration_sec: race.duration_sec ?? null,
           alreadyDone: true,
         });
       }
@@ -138,5 +176,6 @@ Deno.serve(async (req) => {
     return json({ error: insErr.message }, 400);
   }
 
-  return json({ score, total, results });
+  await clearProgress();
+  return json({ score, total, results, duration_sec: durationSec });
 });
