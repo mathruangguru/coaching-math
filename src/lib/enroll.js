@@ -36,6 +36,32 @@ export async function getAllEnrollments() {
   return data;
 }
 
+/**
+ * Enrollment satu course — buat panel "murid enrolled" di edit course.
+ * Bentuk: { user_id, created_at }[]. Dijaga RLS admin/own.
+ */
+export async function getCourseEnrollments(courseId) {
+  if (!hasSupabase) return [];
+  const { data, error } = await supabase
+    .from("coaching_enrollments")
+    .select("user_id, created_at")
+    .eq("course_id", courseId)
+    .order("created_at");
+  if (error) throw error;
+  return data;
+}
+
+/** Admin: keluarkan seorang murid dari course. */
+export async function kickEnrollment(courseId, userId) {
+  if (!hasSupabase) throw new Error("Supabase belum dikonfigurasi.");
+  const { error } = await supabase
+    .from("coaching_enrollments")
+    .delete()
+    .eq("course_id", courseId)
+    .eq("user_id", userId);
+  if (error) throw error;
+}
+
 /** true kalau course butuh passcode buat enroll. */
 export async function isCourseEnrollLocked(courseId) {
   if (!hasSupabase) return false;
