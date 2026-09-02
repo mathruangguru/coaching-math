@@ -24,6 +24,24 @@ const todayISO = () => {
   ).padStart(2, "0")}`;
 };
 
+// "2 September 2026 pukul 22:00:13"
+const fmtSent = (iso) => {
+  const d = new Date(iso);
+  const tgl = d.toLocaleDateString("id-ID", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+  const jam = d
+    .toLocaleTimeString("id-ID", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hourCycle: "h23",
+    })
+    .replace(/\./g, ":");
+  return `${tgl} pukul ${jam}`;
+};
 
 function StarRating({ value, onChange }) {
   const [hover, setHover] = useState(0);
@@ -215,10 +233,11 @@ export default function FormPage() {
               ? "Respons terkirim. Terima kasih!"
               : `Kamu sudah mengisi ${noun} ini.`}
           </p>
-          <p className="mt-1.5 text-xs text-zinc-400">
-            Cukup sekali per materi.
-            {doneAt && ` Terkirim ${new Date(doneAt).toLocaleString("id-ID")}.`}
-          </p>
+          {doneAt && (
+            <p className="mt-1.5 text-xs text-zinc-400">
+              Terkirim pada {fmtSent(doneAt)}.
+            </p>
+          )}
         </div>
       </div>
     );
@@ -275,6 +294,7 @@ export default function FormPage() {
       const payload = {};
       for (const f of form.fields) payload[f.id] = valueFor(f);
       await submitFormResponse(form.id, lessonId, payload);
+      setDoneAt(new Date().toISOString());
       setSent(true);
     } catch (e2) {
       const msg = e2?.message ?? "";
