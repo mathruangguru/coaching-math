@@ -17,6 +17,14 @@ import CourseSessionRecap from "../../components/admin/CourseSessionRecap";
 
 const ICONS = Object.keys(subjectIcons);
 
+const TABS = [
+  ["detail", "Detail"],
+  ["kurikulum", "Kurikulum"],
+  ["murid", "Murid"],
+  ["presensi", "Presensi"],
+  ["refleksi", "Refleksi"],
+];
+
 const inputCls =
   "w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none transition-colors focus:border-brand-500 disabled:bg-zinc-100 disabled:text-zinc-400";
 
@@ -44,6 +52,23 @@ export default function CourseFormPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
+  const [tab, setTab] = useState(() => {
+    try {
+      return localStorage.getItem("courseEditTab") || "detail";
+    } catch {
+      return "detail";
+    }
+  });
+  const [seen, setSeen] = useState(() => new Set([tab]));
+  const switchTab = (t) => {
+    setTab(t);
+    setSeen((s) => new Set(s).add(t));
+    try {
+      localStorage.setItem("courseEditTab", t);
+    } catch {
+      /* biarin */
+    }
+  };
 
   useEffect(() => {
     if (!isEdit) return;
@@ -160,57 +185,55 @@ export default function CourseFormPage() {
           <ArrowLeft size={13} /> Semua course
         </Link>
 
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex min-w-0 items-center gap-3.5">
-            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-sky-50 text-sky-600">
-              <SubjectIcon name={form.icon} size={24} />
-            </span>
-            <div className="min-w-0">
-              <h1 className="truncate text-xl font-bold tracking-tight text-zinc-900">
-                {heading}
-              </h1>
-              <p className="mt-0.5 truncate font-mono text-xs text-zinc-400">
-                {subLabel}
-              </p>
-            </div>
+        <div className="flex min-w-0 items-center gap-3.5">
+          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-sky-50 text-sky-600">
+            <SubjectIcon name={form.icon} size={24} />
+          </span>
+          <div className="min-w-0">
+            <h1 className="truncate text-xl font-bold tracking-tight text-zinc-900">
+              {heading}
+            </h1>
+            <p className="mt-0.5 truncate font-mono text-xs text-zinc-400">
+              {subLabel}
+            </p>
           </div>
+        </div>
 
-          {isEdit && (
-            <div className="flex items-center gap-3">
-              <span
-                className={`inline-flex items-center gap-1 text-xs font-medium text-emerald-600 transition-opacity duration-300 ${
-                  saved ? "opacity-100" : "opacity-0"
+        {isEdit && status === "ready" && (
+          <div className="-mb-2 flex gap-1 overflow-x-auto border-b border-zinc-200">
+            {TABS.map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => switchTab(key)}
+                className={`shrink-0 border-b-2 px-3.5 py-2 text-sm font-semibold transition-colors ${
+                  tab === key
+                    ? "border-brand-500 text-brand-700"
+                    : "border-transparent text-zinc-500 hover:text-zinc-800"
                 }`}
               >
-                <Check size={13} strokeWidth={3} /> tersimpan
-              </span>
-              <button
-                type="submit"
-                form="course-meta"
-                disabled={busy}
-                className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-brand-500/25 transition-colors hover:bg-brand-600 disabled:opacity-50"
-              >
-                {busy ? "Menyimpan…" : "Simpan detail"}
+                {label}
               </button>
-            </div>
-          )}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Body */}
+      {/* Detail (form) — selalu ke-mount karena pegang state; disembunyiin
+          kalau tab lain lagi aktif. */}
       <div
         className={
-          isEdit
-            ? "grid gap-6 lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)] lg:items-start"
-            : "max-w-xl"
+          !isEdit
+            ? "max-w-xl"
+            : tab === "detail"
+              ? "max-w-2xl"
+              : "hidden"
         }
       >
         <form
           id="course-meta"
           onSubmit={handleSubmit}
-          className={`overflow-hidden rounded-2xl border border-zinc-200/80 bg-white ${
-            isEdit ? "lg:sticky lg:top-0" : ""
-          }`}
+          className="overflow-hidden rounded-2xl border border-zinc-200/80 bg-white"
         >
           <div className="border-b border-zinc-100 px-5 py-3">
             <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
@@ -298,37 +321,58 @@ export default function CourseFormPage() {
 
             {error && <p className="text-xs text-rose-600">{error}</p>}
 
-            {!isEdit && (
-              <div className="flex items-center gap-3 pt-1">
-                <button
-                  type="submit"
-                  disabled={busy}
-                  className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-600 disabled:opacity-50"
+            <div className="flex items-center gap-3 pt-1">
+              <button
+                type="submit"
+                disabled={busy}
+                className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-600 disabled:opacity-50"
+              >
+                {busy
+                  ? "Menyimpan…"
+                  : isEdit
+                    ? "Simpan detail"
+                    : "Buat course"}
+              </button>
+              {isEdit ? (
+                <span
+                  className={`inline-flex items-center gap-1 text-xs font-medium text-emerald-600 transition-opacity duration-300 ${
+                    saved ? "opacity-100" : "opacity-0"
+                  }`}
                 >
-                  {busy ? "Menyimpan…" : "Buat course"}
-                </button>
+                  <Check size={13} strokeWidth={3} /> tersimpan
+                </span>
+              ) : (
                 <Link
                   to="/admin"
                   className="rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50"
                 >
                   Batal
                 </Link>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </form>
-
-        {isEdit && status === "ready" && (
-          <CurriculumEditor courseId={courseId} />
-        )}
       </div>
 
-      {isEdit && status === "ready" && (
-        <EnrolledStudents courseId={courseId} />
+      {isEdit && status === "ready" && seen.has("kurikulum") && (
+        <div className={tab === "kurikulum" ? "" : "hidden"}>
+          <CurriculumEditor courseId={courseId} />
+        </div>
       )}
-
-      {isEdit && status === "ready" && (
-        <CourseSessionRecap courseId={courseId} />
+      {isEdit && status === "ready" && seen.has("murid") && (
+        <div className={tab === "murid" ? "" : "hidden"}>
+          <EnrolledStudents courseId={courseId} />
+        </div>
+      )}
+      {isEdit && status === "ready" && seen.has("presensi") && (
+        <div className={tab === "presensi" ? "" : "hidden"}>
+          <CourseSessionRecap courseId={courseId} only="presensi" />
+        </div>
+      )}
+      {isEdit && status === "ready" && seen.has("refleksi") && (
+        <div className={tab === "refleksi" ? "" : "hidden"}>
+          <CourseSessionRecap courseId={courseId} only="refleksi" />
+        </div>
       )}
     </div>
   );

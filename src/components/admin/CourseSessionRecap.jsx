@@ -378,10 +378,12 @@ function RefleksiRow({ lesson, usersById }) {
   );
 }
 
-export default function CourseSessionRecap({ courseId }) {
+export default function CourseSessionRecap({ courseId, only }) {
   const [status, setStatus] = useState("loading");
   const [lessons, setLessons] = useState([]);
   const [usersById, setUsersById] = useState(new Map());
+
+  const kinds = only ? [only] : ["presensi", "refleksi"];
 
   useEffect(() => {
     let alive = true;
@@ -390,7 +392,11 @@ export default function CourseSessionRecap({ courseId }) {
         if (!alive) return;
         const items = (course?.sections ?? [])
           .flatMap((s) => s.items)
-          .filter((it) => it.type === "presensi" || it.type === "refleksi");
+          .filter((it) =>
+            only
+              ? it.type === only
+              : it.type === "presensi" || it.type === "refleksi"
+          );
         setLessons(items);
         setUsersById(new Map(users.map((u) => [u.id, u])));
         setStatus("ready");
@@ -402,13 +408,20 @@ export default function CourseSessionRecap({ courseId }) {
     return () => {
       alive = false;
     };
-  }, [courseId]);
+  }, [courseId, only]);
+
+  const heading =
+    only === "presensi"
+      ? "Presensi"
+      : only === "refleksi"
+        ? "Refleksi"
+        : "Presensi & Refleksi";
 
   return (
     <div className="overflow-hidden rounded-2xl border border-zinc-200/80 bg-white">
       <div className="border-b border-zinc-100 px-5 py-3">
         <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
-          Presensi &amp; Refleksi
+          {heading}
         </span>
       </div>
       <div className="p-2">
@@ -424,8 +437,8 @@ export default function CourseSessionRecap({ courseId }) {
         )}
         {status === "ready" && lessons.length === 0 && (
           <p className="p-3 text-sm text-zinc-400">
-            Belum ada item Presensi / Refleksi di course ini. Tambahin lewat
-            editor kurikulum di atas.
+            Belum ada item {kinds.map((k) => (k === "presensi" ? "Presensi" : "Refleksi")).join(" / ")}{" "}
+            di course ini. Tambahin lewat editor kurikulum.
           </p>
         )}
         {status === "ready" && lessons.length > 0 && (
