@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { getCourse } from "../../lib/courses";
 import { getUsers } from "../../lib/users";
+import { supabase, hasSupabase } from "../../lib/supabase";
 import {
   getRounds,
   getRoundAttendance,
@@ -65,6 +66,27 @@ function PresensiRow({ lesson, usersById }) {
     loadedRef.current = true;
     load();
   }, [open, load]);
+
+  // Realtime: check-in murid masuk -> refresh (debounce biar nggak spam).
+  useEffect(() => {
+    if (!open || !hasSupabase) return;
+    let t;
+    const channel = supabase
+      .channel(`att:${lesson.id}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "coaching_attendance" },
+        () => {
+          clearTimeout(t);
+          t = setTimeout(load, 400);
+        }
+      )
+      .subscribe();
+    return () => {
+      clearTimeout(t);
+      supabase.removeChannel(channel);
+    };
+  }, [open, load, lesson.id]);
 
   const total = rounds?.reduce((n, r) => n + r.people.length, 0) ?? 0;
 
@@ -247,9 +269,7 @@ function RefleksiRow({ lesson, usersById }) {
   const [failed, setFailed] = useState(false);
   const loadedRef = useRef(false);
 
-  useEffect(() => {
-    if (!open || loadedRef.current) return;
-    loadedRef.current = true;
+  const load = useCallback(() => {
     getLessonReflections(lesson.id)
       .then((d) => {
         setRows(d);
@@ -260,7 +280,39 @@ function RefleksiRow({ lesson, usersById }) {
         loadedRef.current = false;
         setFailed(true);
       });
-  }, [open, lesson.id]);
+  }, [lesson.id]);
+
+  useEffect(() => {
+    if (!open || loadedRef.current) return;
+    loadedRef.current = true;
+    load();
+  }, [open, load]);
+
+  // Realtime: murid submit / edit refleksi -> refresh.
+  useEffect(() => {
+    if (!open || !hasSupabase) return;
+    let t;
+    const channel = supabase
+      .channel(`refl:${lesson.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "coaching_reflections",
+          filter: `lesson_id=eq.${lesson.id}`,
+        },
+        () => {
+          clearTimeout(t);
+          t = setTimeout(load, 400);
+        }
+      )
+      .subscribe();
+    return () => {
+      clearTimeout(t);
+      supabase.removeChannel(channel);
+    };
+  }, [open, load, lesson.id]);
 
   return (
     <li>

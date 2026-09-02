@@ -72,12 +72,16 @@ create policy "coaching_attendance insert own"
     )
   );
 
--- Realtime: halaman presensi murid ngikutin buka/tutup ronde.
+-- Realtime: murid ngikutin buka/tutup ronde; admin ngikutin check-in masuk.
 do $$
 begin
   alter publication supabase_realtime add table public.coaching_attendance_rounds;
-exception
-  when duplicate_object then null;
+exception when duplicate_object then null;
+end $$;
+do $$
+begin
+  alter publication supabase_realtime add table public.coaching_attendance;
+exception when duplicate_object then null;
 end $$;
 
 -- ── Refleksi ──────────────────────────────────────────────────────
@@ -106,3 +110,10 @@ drop policy if exists "coaching_reflections admin read" on public.coaching_refle
 create policy "coaching_reflections admin read"
   on public.coaching_reflections for select
   using (public.is_admin());
+
+-- Realtime: rekap refleksi admin update pas murid submit.
+do $$
+begin
+  alter publication supabase_realtime add table public.coaching_reflections;
+exception when duplicate_object then null;
+end $$;
