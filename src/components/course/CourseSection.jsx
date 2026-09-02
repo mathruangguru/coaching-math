@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { ChevronDown, ExternalLink, ArrowUpRight, Check } from "lucide-react";
+import { ChevronDown, Check } from "lucide-react";
 import LessonIcon from "../ui/LessonIcon";
 
 const typeTint = {
@@ -13,7 +13,7 @@ const typeTint = {
   refleksi: "bg-rose-50 text-rose-600",
 };
 
-function CardInner({ item, clickable, done }) {
+function CardInner({ item, done }) {
   const soon =
     (item.type === "soal" && !item.question_set_id) ||
     (item.type === "form" && !item.form_id && !item.url) ||
@@ -21,6 +21,8 @@ function CardInner({ item, clickable, done }) {
   const meta = [item.duration || null, soon ? "segera" : null]
     .filter(Boolean)
     .join(" · ");
+  const notPublish = item.publish_status && item.publish_status !== "all";
+  const hasMetaRow = meta || done || notPublish;
 
   return (
     <>
@@ -36,32 +38,28 @@ function CardInner({ item, clickable, done }) {
         <p className="text-sm font-semibold leading-snug text-zinc-900 group-hover:text-brand-700">
           {item.title}
         </p>
-        <span className="mt-1 flex items-center gap-1.5 text-xs text-zinc-400">
-          {meta && <span>{meta}</span>}
-          {done && (
-            <span className="inline-flex items-center gap-0.5 rounded bg-teal-50 px-1.5 py-0.5 text-[10px] font-semibold text-teal-600">
-              <Check size={10} strokeWidth={3} /> Sudah diisi
-            </span>
-          )}
-          {item.publish_status && item.publish_status !== "all" && (
-            <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-500">
-              Not publish
-            </span>
-          )}
-          {clickable === "external" && (
-            <ExternalLink size={12} className="text-brand-500" />
-          )}
-          {clickable === "internal" && (
-            <ArrowUpRight size={13} className="text-brand-500" />
-          )}
-        </span>
+        {hasMetaRow && (
+          <span className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-zinc-400">
+            {meta && <span>{meta}</span>}
+            {done && (
+              <span className="inline-flex items-center gap-0.5 rounded bg-teal-50 px-1.5 py-0.5 text-[10px] font-semibold text-teal-600">
+                <Check size={10} strokeWidth={3} /> Sudah diisi
+              </span>
+            )}
+            {notPublish && (
+              <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-500">
+                Not publish
+              </span>
+            )}
+          </span>
+        )}
       </div>
     </>
   );
 }
 
 const cardCls =
-  "group flex items-start gap-3 rounded-xl border border-zinc-200/80 bg-white p-3.5 transition";
+  "group flex items-center gap-3 rounded-xl border border-zinc-200/80 bg-white p-3.5 transition";
 const clickableCls = " hover:border-zinc-300 hover:shadow-sm";
 
 export default function CourseSection({ section, courseId, doneLessons }) {
@@ -111,7 +109,7 @@ export default function CourseSection({ section, courseId, doneLessons }) {
                   rel="noopener noreferrer"
                   className={cardCls + clickableCls}
                 >
-                  <CardInner item={item} clickable="external" />
+                  <CardInner item={item} />
                 </a>
               );
             }
@@ -125,7 +123,7 @@ export default function CourseSection({ section, courseId, doneLessons }) {
                     : `/course/${courseId}/soal/${item.id}`;
               return (
                 <Link key={item.id} to={to} className={cardCls + clickableCls}>
-                  <CardInner item={item} clickable="internal" done={done} />
+                  <CardInner item={item} done={done} />
                 </Link>
               );
             }
