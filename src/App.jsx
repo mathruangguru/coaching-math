@@ -7,6 +7,7 @@ import CoursePage from "./pages/CoursePage";
 import CourseLobbyPage from "./pages/CourseLobbyPage";
 import CourseMateriPage from "./pages/CourseMateriPage";
 import RecordingPage from "./pages/RecordingPage";
+import SlidePage from "./pages/SlidePage";
 import QuizPage from "./pages/QuizPage";
 import FormPage from "./pages/FormPage";
 import PresensiPage from "./pages/PresensiPage";
@@ -48,6 +49,10 @@ export default function App() {
           <Route
             path="course/:courseId/recording/:lessonId"
             element={<RecordingPage />}
+          />
+          <Route
+            path="course/:courseId/slide/:lessonId"
+            element={<SlidePage />}
           />
           <Route
             path="course/:courseId/soal/:lessonId"

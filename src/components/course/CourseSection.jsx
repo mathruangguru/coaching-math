@@ -8,6 +8,7 @@ const typeTint = {
   soal: "bg-amber-50 text-amber-600",
   meet: "bg-sky-50 text-sky-600",
   recording: "bg-teal-50 text-teal-600",
+  slide: "bg-orange-50 text-orange-600",
   form: "bg-violet-50 text-violet-600",
   presensi: "bg-emerald-50 text-emerald-600",
   refleksi: "bg-rose-50 text-rose-600",
@@ -40,7 +41,8 @@ function CardInner({ item, done, att, score }) {
   const soon =
     (item.type === "soal" && !item.question_set_id) ||
     (item.type === "form" && !item.form_id && !item.url) ||
-    (item.type === "refleksi" && !item.form_id);
+    (item.type === "refleksi" && !item.form_id) ||
+    (item.type === "slide" && !item.url);
   const meta = [item.duration || null, soon ? "segera" : null]
     .filter(Boolean)
     .join(" · ");
@@ -153,6 +155,7 @@ export default function CourseSection({
               item.url &&
               !inAppForm;
             const recording = item.type === "recording" && item.url;
+            const slide = item.type === "slide" && item.url;
             const quiz = item.type === "soal" && item.question_set_id;
             const presensi = item.type === "presensi";
             const done = inAppForm && !!progress.done?.has(item.id);
@@ -172,14 +175,16 @@ export default function CourseSection({
                 </a>
               );
             }
-            if (recording || quiz || inAppForm || presensi) {
+            if (recording || slide || quiz || inAppForm || presensi) {
               const to = recording
                 ? `/course/${courseId}/recording/${item.id}`
-                : presensi
-                  ? `/course/${courseId}/presensi/${item.id}`
-                  : inAppForm
-                    ? `/course/${courseId}/${item.type}/${item.id}`
-                    : `/course/${courseId}/soal/${item.id}`;
+                : slide
+                  ? `/course/${courseId}/slide/${item.id}`
+                  : presensi
+                    ? `/course/${courseId}/presensi/${item.id}`
+                    : inAppForm
+                      ? `/course/${courseId}/${item.type}/${item.id}`
+                      : `/course/${courseId}/soal/${item.id}`;
               return (
                 <Link key={item.id} to={to} className={cardCls + clickableCls}>
                   <CardInner item={item} done={done} att={att} score={score} />

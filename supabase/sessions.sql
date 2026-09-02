@@ -2,10 +2,12 @@
 -- Jalankan di SQL Editor Supabase SETELAH schema.sql + admin.sql. Aman diulang.
 
 -- ── Tipe lesson baru ──────────────────────────────────────────────
+-- 'slide' = preview Google Slides (link disimpan di kolom `url`, sama
+-- kayak recording/meet).
 alter table public.coaching_lessons drop constraint if exists coaching_lessons_type_check;
 alter table public.coaching_lessons
   add constraint coaching_lessons_type_check
-    check (type in ('materi', 'soal', 'meet', 'recording', 'form',
+    check (type in ('materi', 'soal', 'meet', 'recording', 'slide', 'form',
                     'presensi', 'refleksi'));
 
 -- Pertanyaan refleksi (dipakai lesson tipe 'refleksi').
