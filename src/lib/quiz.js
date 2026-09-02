@@ -363,6 +363,21 @@ export async function getQuizProgress(setId) {
   return data;
 }
 
+/**
+ * Semua sesi kuis yang lagi jalan (belum disubmit) — buat panel
+ * "sedang mengerjakan" di /admin/quiz-results. RLS admin read.
+ * Bentuk: { user_id, set_id, started_at, updated_at, answers }[]
+ */
+export async function getAllQuizProgress() {
+  ensure();
+  const { data, error } = await supabase
+    .from("coaching_quiz_progress")
+    .select("user_id, set_id, started_at, updated_at, answers")
+    .order("started_at", { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
 /** Simpan draft jawaban ke server (dipanggil ter-debounce dari QuizPage). */
 export async function saveQuizDraft(setId, answers) {
   if (!hasSupabase) return;

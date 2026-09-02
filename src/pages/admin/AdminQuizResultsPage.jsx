@@ -5,6 +5,7 @@ import {
   getQuestionSets,
   getQuestionSetAdmin,
   getAllAttempts,
+  getAllQuizProgress,
   deleteAttempt,
   toAnswerArray,
   sameAnswerSet,
@@ -41,6 +42,20 @@ function fmtDur(sec) {
   const m = Math.floor(s / 60);
   return m > 0 ? `${m}m ${s % 60}d` : `${s}d`;
 }
+
+function fmtAgo(iso) {
+  const m = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+  if (m < 1) return "baru aja";
+  if (m < 60) return `${m} mnt lalu`;
+  const h = Math.round(m / 60);
+  if (h < 24) return `${h} jam lalu`;
+  return `${Math.round(h / 24)} hari lalu`;
+}
+
+const answeredOf = (ans) =>
+  Object.values(ans ?? {}).filter((v) =>
+    Array.isArray(v) ? v.length > 0 : v != null && v !== ""
+  ).length;
 
 function pct(score, total) {
   return total > 0 ? Math.round((score / total) * 100) : 0;
@@ -323,10 +338,11 @@ export default function AdminQuizResultsPage() {
     let alive = true;
     (async () => {
       try {
-        const [sets, users, attempts] = await Promise.all([
+        const [sets, users, attempts, progressRaw] = await Promise.all([
           getQuestionSets(),
           getUsers(),
           getAllAttempts(),
+          getAllQuizProgress().catch(() => []),
         ]);
         const setIds = [
           ...new Set(attempts.map((a) => a.set_id).filter(Boolean)),
@@ -337,7 +353,14 @@ export default function AdminQuizResultsPage() {
         if (!alive) return;
         const setDetail = new Map();
         setIds.forEach((id, i) => setDetail.set(id, details[i]));
-        setData({ status: "ready", sets, users, attempts, setDetail });
+        // Buang yang sebenernya udah submit (baris progress nyasar).
+        const done = new Set(
+          attempts.map((a) => `${a.user_id}|${a.set_id}`)
+        );
+        const progress = progressRaw
+          .filter((p) => !done.has(`${p.user_id}|${p.set_id}`))
+          .sort((a, b) => new Date(a.started_at) - new Date(b.started_at));
+        setData({ status: "ready", sets, users, attempts, setDetail, progress });
       } catch (err) {
         console.error("[admin] gagal memuat hasil soal:", err);
         if (alive) setData({ status: "error" });
@@ -432,6 +455,33 @@ export default function AdminQuizResultsPage() {
         <p className="rounded-xl border border-dashed border-rose-300 bg-white px-6 py-8 text-center text-sm text-rose-500">
           Gagal memuat hasil soal.
         </p>
+      )}
+
+      {data.status === "ready" && data.progress.length > 0 && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-4">
+          <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-amber-700">
+            Sedang mengerjakan · {data.progress.length}
+          </p>
+          <ul className="mt-2 flex flex-col gap-1.5">
+            {data.progress.map((p) => {
+              const u = model.usersById.get(p.user_id);
+              return (
+                <li
+                  key={`${p.user_id}|${p.set_id}`}
+                  className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-sm"
+                >
+                  <span className="font-medium text-zinc-800">
+                    {u ? fullName(u) : p.user_id}
+                  </span>
+                  <span className="text-zinc-600">{model.titleOf(p.set_id)}</span>
+                  <span className="text-xs text-zinc-400">
+                    mulai {fmtAgo(p.started_at)} · {answeredOf(p.answers)} dijawab
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       )}
 
       {data.status === "ready" && (
