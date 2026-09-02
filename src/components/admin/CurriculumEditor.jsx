@@ -28,13 +28,14 @@ import { lessonTypeLabels } from "../../lib/lessonTypes";
 import LessonIcon from "../ui/LessonIcon";
 
 const LESSON_TYPES = Object.keys(lessonTypeLabels);
-const URL_TYPES = ["meet", "recording", "form"];
+const URL_TYPES = ["meet", "recording", "slide", "form"];
 
 const typeTint = {
   materi: "bg-zinc-100 text-zinc-500",
   soal: "bg-amber-50 text-amber-600",
   meet: "bg-sky-50 text-sky-600",
   recording: "bg-teal-50 text-teal-600",
+  slide: "bg-orange-50 text-orange-600",
   form: "bg-violet-50 text-violet-600",
   presensi: "bg-emerald-50 text-emerald-600",
   refleksi: "bg-rose-50 text-rose-600",
@@ -582,7 +583,9 @@ export default function CurriculumEditor({ courseId }) {
                                 ? "https://meet.google.com/…"
                                 : lesson.type === "form"
                                   ? "https://forms.gle/…"
-                                  : "Link video (Drive / YouTube / …)"
+                                  : lesson.type === "slide"
+                                    ? "https://docs.google.com/presentation/d/…"
+                                    : "Link video (Drive / YouTube / …)"
                             }
                             className={`${cell} flex-1 text-xs`}
                           />
