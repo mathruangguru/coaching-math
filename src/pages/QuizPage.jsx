@@ -334,11 +334,6 @@ export default function QuizPage() {
             </div>
           )}
 
-          <p className="mt-4 text-xs text-amber-600">
-            Begitu klik mulai, {limitMin != null ? "timer langsung jalan dan " : ""}
-            jawaban nggak bisa diulang.
-          </p>
-
           <button
             type="button"
             onClick={handleStart}
