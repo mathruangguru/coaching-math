@@ -274,8 +274,9 @@ export default function QuizPage() {
 
   // ── Hasil ─────────────────────────────────────────────────────────
   if (result) {
+    // Sampai 2 desimal, tapi buang nol di belakang (50 bukan 50.00; 3.33; 66.67).
     const p = result.total
-      ? Math.round((result.score / result.total) * 100)
+      ? +((result.score / result.total) * 100).toFixed(2)
       : 0;
     return (
       <div className="mx-auto flex max-w-2xl flex-col gap-5">
