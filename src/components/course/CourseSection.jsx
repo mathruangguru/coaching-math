@@ -9,6 +9,7 @@ const typeTint = {
   meet: "bg-sky-50 text-sky-600",
   recording: "bg-teal-50 text-teal-600",
   slide: "bg-orange-50 text-orange-600",
+  pdf: "bg-red-50 text-red-600",
   form: "bg-violet-50 text-violet-600",
   presensi: "bg-emerald-50 text-emerald-600",
   refleksi: "bg-rose-50 text-rose-600",
@@ -53,7 +54,8 @@ function CardInner({ item, done, att, score, quizStarted }) {
     (item.type === "soal" && !item.question_set_id) ||
     (item.type === "form" && !item.form_id && !item.url) ||
     (item.type === "refleksi" && !item.form_id) ||
-    (item.type === "slide" && !item.url);
+    (item.type === "slide" && !item.url) ||
+    (item.type === "pdf" && !item.url);
   const meta = [item.duration || null, soon ? "segera" : null]
     .filter(Boolean)
     .join(" · ");
@@ -170,6 +172,7 @@ export default function CourseSection({
               !inAppForm;
             const recording = item.type === "recording" && item.url;
             const slide = item.type === "slide" && item.url;
+            const pdf = item.type === "pdf" && item.url;
             const article = item.type === "materi" && item.content;
             const quiz = item.type === "soal" && item.question_set_id;
             const presensi = item.type === "presensi";
@@ -197,6 +200,7 @@ export default function CourseSection({
             if (
               recording ||
               slide ||
+              pdf ||
               article ||
               quiz ||
               inAppForm ||
@@ -206,13 +210,15 @@ export default function CourseSection({
                 ? `/course/${courseId}/recording/${item.id}`
                 : slide
                   ? `/course/${courseId}/slide/${item.id}`
-                  : article
-                    ? `/course/${courseId}/materi/${item.id}`
-                    : presensi
-                      ? `/course/${courseId}/presensi/${item.id}`
-                      : inAppForm
-                        ? `/course/${courseId}/${item.type}/${item.id}`
-                        : `/course/${courseId}/soal/${item.id}`;
+                  : pdf
+                    ? `/course/${courseId}/pdf/${item.id}`
+                    : article
+                      ? `/course/${courseId}/materi/${item.id}`
+                      : presensi
+                        ? `/course/${courseId}/presensi/${item.id}`
+                        : inAppForm
+                          ? `/course/${courseId}/${item.type}/${item.id}`
+                          : `/course/${courseId}/soal/${item.id}`;
               return (
                 <Link key={item.id} to={to} className={cardCls + clickableCls}>
                   <CardInner
