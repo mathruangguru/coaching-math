@@ -392,6 +392,11 @@ export default function QuizPage() {
                             {String.fromCharCode(65 + oi)}
                           </span>
                           <Markdown inline>{opt}</Markdown>
+                          {picked(oi) && (
+                            <span className="ml-auto shrink-0 rounded bg-brand-500 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                              Jawaban kamu
+                            </span>
+                          )}
                         </div>
                       ))}
                     </div>
