@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, lazy, useEffect, useMemo, useState } from "react";
 import { Search, ArrowLeft, ArrowRight, RotateCcw } from "lucide-react";
 import { getUsers } from "../../lib/users";
 import {
@@ -11,6 +11,8 @@ import {
   sameAnswerSet,
 } from "../../lib/quiz";
 import Skeleton from "../../components/ui/Skeleton";
+
+const Markdown = lazy(() => import("../../components/ui/Markdown"));
 
 const keyOf = (q) => q.answers ?? [q.answer ?? 0];
 const letters = (v) =>
@@ -119,16 +121,11 @@ const th =
   "border border-zinc-100 px-2.5 py-1.5 text-xs font-semibold text-zinc-500";
 const td = "border border-zinc-100 px-2.5 py-1.5";
 
-function Cell({ chosen, keyArr, n, active, onEnter, onLeave }) {
-  const hover = {
-    title: `Soal ${n}`,
-    onMouseEnter: onEnter,
-    onMouseLeave: onLeave,
-  };
+function Cell({ chosen, keyArr, active, onEnter }) {
   if (toAnswerArray(chosen).length === 0) {
     return (
       <td
-        {...hover}
+        onMouseEnter={onEnter}
         className={`${td} text-center text-xs text-zinc-300 ${
           active ? "bg-brand-50" : "bg-zinc-50"
         }`}
@@ -140,7 +137,7 @@ function Cell({ chosen, keyArr, n, active, onEnter, onLeave }) {
   const ok = sameAnswerSet(chosen, keyArr);
   return (
     <td
-      {...hover}
+      onMouseEnter={onEnter}
       className={`${td} text-center text-xs font-bold ${
         ok ? "bg-teal-50 text-teal-700" : "bg-rose-50 text-rose-700"
       } ${active ? "ring-1 ring-inset ring-brand-300" : ""}`}
@@ -164,11 +161,24 @@ function ResultTable({
   onReset,
   resetBusyId,
 }) {
-  const [hoverCol, setHoverCol] = useState(null);
-  const colProps = (i) => ({
-    onMouseEnter: () => setHoverCol(i),
-    onMouseLeave: () => setHoverCol((c) => (c === i ? null : c)),
-  });
+  // { col, pos, maxH } — kolom yang lagi di-hover + posisi popup teks soal.
+  const [hover, setHover] = useState(null);
+  const enterCol = (i) => (e) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    const vw = window.innerWidth || 1024;
+    const vh = window.innerHeight || 768;
+    const W = Math.min(360, Math.max(240, vw - 16));
+    const H = 320;
+    const left = Math.max(
+      8,
+      Math.min(r.left + r.width / 2 - W / 2, vw - W - 8)
+    );
+    const flip = r.bottom + 8 + H > vh;
+    const top = flip ? Math.max(8, r.top - 8 - H) : r.bottom + 8;
+    const maxH = Math.max(120, Math.min(H, vh - top - 8));
+    setHover({ col: i, pos: { left, top, width: W }, maxH });
+  };
+  const colProps = (i) => ({ onMouseEnter: enterCol(i) });
 
   const graded = [...attempts, ...ongoing];
   const stats = questions.map((q) => {
@@ -190,7 +200,10 @@ function ResultTable({
   }
 
   return (
-    <div className="no-scrollbar overflow-x-auto">
+    <div
+      className="no-scrollbar overflow-x-auto"
+      onMouseLeave={() => setHover(null)}
+    >
       <table className="min-w-full border-collapse">
         <thead>
           <tr className="bg-zinc-50 text-left">
@@ -202,9 +215,8 @@ function ResultTable({
               <th
                 key={i}
                 {...colProps(i)}
-                title={`Soal ${i + 1}`}
-                className={`${th} text-center transition-colors ${
-                  hoverCol === i ? "bg-brand-500 text-white" : ""
+                className={`${th} cursor-help text-center transition-colors ${
+                  hover?.col === i ? "bg-brand-500 text-white" : ""
                 }`}
               >
                 {i + 1}
@@ -216,6 +228,7 @@ function ResultTable({
             <th
               className={`${th} font-bold text-zinc-600`}
               colSpan={showStudent ? 4 : 3}
+              onMouseEnter={() => setHover(null)}
             >
               Kunci
             </th>
@@ -223,9 +236,10 @@ function ResultTable({
               <td
                 key={i}
                 {...colProps(i)}
-                title={`Soal ${i + 1}`}
-                className={`${td} text-center text-xs font-bold transition-colors ${
-                  hoverCol === i ? "bg-brand-100 text-brand-700" : "text-zinc-600"
+                className={`${td} cursor-help text-center text-xs font-bold transition-colors ${
+                  hover?.col === i
+                    ? "bg-brand-100 text-brand-700"
+                    : "text-zinc-600"
                 }`}
               >
                 {letters(keyOf(q))}
@@ -234,16 +248,19 @@ function ResultTable({
             {onReset && <td className={td} />}
           </tr>
           <tr className="bg-white text-left">
-            <th className={`${th} font-semibold`} colSpan={showStudent ? 4 : 3}>
+            <th
+              className={`${th} font-semibold`}
+              colSpan={showStudent ? 4 : 3}
+              onMouseEnter={() => setHover(null)}
+            >
               % benar
             </th>
             {stats.map((s, i) => (
               <td
                 key={i}
                 {...colProps(i)}
-                title={`Soal ${i + 1}`}
-                className={`${td} text-center text-[11px] font-bold transition-colors ${toneFor(s)} ${
-                  hoverCol === i ? "bg-brand-50" : ""
+                className={`${td} cursor-help text-center text-[11px] font-bold transition-colors ${toneFor(s)} ${
+                  hover?.col === i ? "bg-brand-50" : ""
                 }`}
               >
                 {s}%
@@ -280,12 +297,10 @@ function ResultTable({
                 {questions.map((q, i) => (
                   <Cell
                     key={i}
-                    n={i + 1}
                     chosen={a.answers?.[q.id]}
                     keyArr={keyOf(q)}
-                    active={hoverCol === i}
-                    onEnter={() => setHoverCol(i)}
-                    onLeave={() => setHoverCol((c) => (c === i ? null : c))}
+                    active={hover?.col === i}
+                    onEnter={enterCol(i)}
                   />
                 ))}
                 {onReset && (
@@ -339,12 +354,10 @@ function ResultTable({
                 {questions.map((q, i) => (
                   <Cell
                     key={i}
-                    n={i + 1}
                     chosen={p.answers?.[q.id]}
                     keyArr={keyOf(q)}
-                    active={hoverCol === i}
-                    onEnter={() => setHoverCol(i)}
-                    onLeave={() => setHoverCol((c) => (c === i ? null : c))}
+                    active={hover?.col === i}
+                    onEnter={enterCol(i)}
                   />
                 ))}
                 {onReset && <td className={td} />}
@@ -353,6 +366,33 @@ function ResultTable({
           })}
         </tbody>
       </table>
+
+      {hover && questions[hover.col] && (
+        <div
+          className="pointer-events-none fixed z-50 rounded-lg border border-zinc-200 bg-white p-3 shadow-xl"
+          style={hover.pos}
+        >
+          <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-zinc-400">
+            Soal {hover.col + 1}
+          </p>
+          <div
+            className="overflow-auto text-xs leading-relaxed text-zinc-700 [&_.katex-display]:my-1.5 [&_.katex-display]:text-left"
+            style={{ maxHeight: hover.maxH }}
+          >
+            {questions[hover.col].prompt ? (
+              <Suspense
+                fallback={<span className="text-zinc-300">memuat…</span>}
+              >
+                <Markdown className="text-zinc-700">
+                  {questions[hover.col].prompt}
+                </Markdown>
+              </Suspense>
+            ) : (
+              <span className="text-zinc-300">(soal tanpa teks)</span>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
