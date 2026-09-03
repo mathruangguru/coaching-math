@@ -43,6 +43,81 @@ const fmt = (iso) => {
 
 const QUICK = ["Presensi 1", "Presensi 2", "Presensi 3"];
 
+// Inisial dari nama: huruf pertama kata pertama + kata terakhir.
+const initialsOf = (name) => {
+  const parts = (name || "").trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+};
+
+const AV_TINTS = [
+  "bg-emerald-100 text-emerald-700",
+  "bg-sky-100 text-sky-700",
+  "bg-amber-100 text-amber-700",
+  "bg-violet-100 text-violet-700",
+  "bg-rose-100 text-rose-700",
+  "bg-teal-100 text-teal-700",
+];
+const tintFor = (s) => {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return AV_TINTS[Math.abs(h) % AV_TINTS.length];
+};
+
+// Avatar bulat inisial; hover → popup nama + email + waktu hadir.
+function AttendeeAvatar({ user, uid, at }) {
+  const [tip, setTip] = useState(null); // { left, top, above } | null
+  const name = user ? fullName(user) : uid;
+  const show = (e) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    const vw = window.innerWidth || 1024;
+    const vh = window.innerHeight || 768;
+    const above = r.bottom + 72 > vh;
+    setTip({
+      left: Math.min(Math.max(140, r.left + r.width / 2), vw - 140),
+      top: above ? r.top - 6 : r.bottom + 6,
+      above,
+    });
+  };
+  return (
+    <span
+      className="relative inline-flex"
+      onMouseEnter={show}
+      onMouseLeave={() => setTip(null)}
+    >
+      <span
+        aria-label={name}
+        className={`grid h-9 w-9 cursor-default place-items-center rounded-full text-[11px] font-bold ring-1 ring-inset ring-black/[0.04] ${tintFor(
+          uid || name
+        )}`}
+      >
+        {initialsOf(name)}
+      </span>
+      {tip && (
+        <span
+          className={`pointer-events-none fixed z-50 -translate-x-1/2 rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-left shadow-lg ${
+            tip.above ? "-translate-y-full" : ""
+          }`}
+          style={{ left: tip.left, top: tip.top }}
+        >
+          <span className="block whitespace-nowrap text-xs font-semibold text-zinc-800">
+            {name}
+          </span>
+          {user?.email && (
+            <span className="block whitespace-nowrap text-[11px] text-zinc-400">
+              {user.email}
+            </span>
+          )}
+          <span className="block whitespace-nowrap text-[11px] text-zinc-400">
+            Hadir {fmt(at)}
+          </span>
+        </span>
+      )}
+    </span>
+  );
+}
+
 function PresensiRow({ lesson, usersById }) {
   const [open, setOpen] = useState(false);
   const [rounds, setRounds] = useState(null); // null | [{ ...round, people: [] }]
@@ -211,31 +286,16 @@ function PresensiRow({ lesson, usersById }) {
                     </button>
                   </div>
                   {r.people.length > 0 && (
-                    <ul className="mt-2 flex flex-col gap-0.5 border-t border-zinc-100 pt-2">
-                      {r.people.map((p) => {
-                        const u = usersById.get(p.user_id);
-                        return (
-                          <li
-                            key={p.user_id}
-                            className="flex items-start justify-between gap-3 text-xs"
-                          >
-                            <span className="flex min-w-0 flex-col">
-                              <span className="truncate text-zinc-700">
-                                {u ? fullName(u) : p.user_id}
-                              </span>
-                              {u?.email && (
-                                <span className="truncate text-[11px] text-zinc-400">
-                                  {u.email}
-                                </span>
-                              )}
-                            </span>
-                            <span className="shrink-0 text-zinc-400">
-                              {fmt(p.checked_in_at)}
-                            </span>
-                          </li>
-                        );
-                      })}
-                    </ul>
+                    <div className="mt-2 flex flex-wrap gap-1.5 border-t border-zinc-100 pt-2.5">
+                      {r.people.map((p) => (
+                        <AttendeeAvatar
+                          key={p.user_id}
+                          user={usersById.get(p.user_id)}
+                          uid={p.user_id}
+                          at={p.checked_in_at}
+                        />
+                      ))}
+                    </div>
                   )}
                 </div>
               ))}
