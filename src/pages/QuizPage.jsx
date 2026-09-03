@@ -394,6 +394,18 @@ export default function QuizPage({ review = false }) {
             <div className="flex items-center justify-between gap-2">
               <p className="text-xs text-zinc-400">
                 Soal {current + 1} dari {total}
+                {qStats?.[q.id]?.total ? (
+                  <>
+                    {" · Dijawab benar oleh "}
+                    <span className="font-semibold text-zinc-500">
+                      {Math.round(
+                        (qStats[q.id].correct / qStats[q.id].total) * 100
+                      )}
+                      %
+                    </span>
+                    {" peserta"}
+                  </>
+                ) : null}
               </p>
               {!isAnswered(q) && (
                 <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-400">
@@ -401,22 +413,6 @@ export default function QuizPage({ review = false }) {
                 </span>
               )}
             </div>
-            {qStats?.[q.id]?.total ? (
-              <p className="mt-1.5 text-xs text-zinc-500">
-                Dijawab benar oleh{" "}
-                <span className="font-semibold text-zinc-800">
-                  {Math.round(
-                    (qStats[q.id].correct / qStats[q.id].total) * 100
-                  )}
-                  %
-                </span>{" "}
-                peserta
-                <span className="text-zinc-400">
-                  {" "}
-                  · {qStats[q.id].correct} dari {qStats[q.id].total}
-                </span>
-              </p>
-            ) : null}
             <div className="mt-1.5 text-sm font-medium text-zinc-900">
               <Markdown>{q.prompt}</Markdown>
             </div>
