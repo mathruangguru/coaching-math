@@ -136,24 +136,34 @@ async function sourceUserIds(val, rounds) {
   return [];
 }
 
-// Import kehadiran ke satu ronde dari aktivitas lain di course yang sama.
-function ImportPanel({ round, present, soalSrc, formSrc, rounds, onDone }) {
+// Bikin ronde presensi BARU dari peserta sebuah aktivitas (latihan soal /
+// form / ronde presensi lain di course yang sama).
+function ImportRound({ lessonId, soalSrc, formSrc, rounds, onDone }) {
   const [sel, setSel] = useState("");
-  const [preview, setPreview] = useState(null); // { fresh, ids } | null
+  const [label, setLabel] = useState("");
+  const [edited, setEdited] = useState(false);
+  const [preview, setPreview] = useState(null); // { total, ids } | null
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
-  const otherRounds = rounds.filter((r) => r.id !== round.id);
+
+  const titleOf = (val) => {
+    const [kind, a] = val.split(":");
+    if (kind === "soal" || kind === "form")
+      return [...soalSrc, ...formSrc].find((i) => i.id === a)?.title ?? "";
+    if (kind === "round") return rounds.find((r) => r.id === a)?.label ?? "";
+    return "";
+  };
 
   const pick = async (val) => {
     setSel(val);
     setPreview(null);
     setErr("");
+    if (!edited) setLabel(val ? `Presensi: ${titleOf(val)}` : "");
     if (!val) return;
     setBusy(true);
     try {
       const ids = await sourceUserIds(val, rounds);
-      const has = new Set(present);
-      setPreview({ total: ids.length, fresh: ids.filter((u) => !has.has(u)).length, ids });
+      setPreview({ total: ids.length, ids });
     } catch (e) {
       setErr(e?.message ?? "Gagal memuat sumber.");
     } finally {
@@ -161,28 +171,33 @@ function ImportPanel({ round, present, soalSrc, formSrc, rounds, onDone }) {
     }
   };
 
-  const apply = async () => {
-    if (!preview?.ids?.length) return;
+  const create = async () => {
+    if (!sel || busy) return;
     setBusy(true);
     setErr("");
     try {
-      const n = await bulkCheckIn(round.id, preview.ids);
-      onDone(n);
+      const ids = preview?.ids ?? (await sourceUserIds(sel, rounds));
+      const row = await createRound(lessonId, label.trim() || titleOf(sel));
+      if (ids.length) await bulkCheckIn(row.id, ids);
+      onDone(true);
     } catch (e) {
-      setErr(e?.message ?? "Gagal menandai hadir.");
+      setErr(e?.message ?? "Gagal membuat presensi.");
       setBusy(false);
     }
   };
 
   return (
-    <div className="mt-2 flex flex-col gap-1.5 border-t border-zinc-100 pt-2">
+    <div className="flex flex-col gap-1.5 rounded-lg border border-zinc-200 bg-white p-2.5">
+      <p className="text-[11px] font-semibold text-zinc-500">
+        Presensi baru dari aktivitas
+      </p>
       <select
         value={sel}
         onChange={(e) => pick(e.target.value)}
         disabled={busy}
         className="w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs text-zinc-800 outline-none focus:border-brand-500 disabled:opacity-50"
       >
-        <option value="">Ambil kehadiran dari…</option>
+        <option value="">Ambil peserta dari…</option>
         {soalSrc.length > 0 && (
           <optgroup label="Latihan soal — yang sudah mengerjakan">
             {soalSrc.map((i) => (
@@ -201,9 +216,9 @@ function ImportPanel({ round, present, soalSrc, formSrc, rounds, onDone }) {
             ))}
           </optgroup>
         )}
-        {otherRounds.length > 0 && (
+        {rounds.length > 0 && (
           <optgroup label="Presensi lain — yang hadir">
-            {otherRounds.map((r) => (
+            {rounds.map((r) => (
               <option key={r.id} value={`round:${r.id}`}>
                 {r.label}
               </option>
@@ -212,25 +227,45 @@ function ImportPanel({ round, present, soalSrc, formSrc, rounds, onDone }) {
         )}
       </select>
 
+      <input
+        value={label}
+        onChange={(e) => {
+          setLabel(e.target.value);
+          setEdited(true);
+        }}
+        placeholder="nama presensi baru…"
+        className="rounded-md border border-zinc-300 px-2 py-1 text-xs text-zinc-800 outline-none focus:border-brand-500"
+      />
+
       {err && <p className="text-[11px] text-rose-500">{err}</p>}
-      {busy && !preview && (
-        <p className="text-[11px] text-zinc-400">Memuat…</p>
-      )}
-      {preview && (
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-[11px] text-zinc-500">
-            {preview.total} orang · {preview.fresh} belum tercatat
-          </span>
+
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[11px] text-zinc-500">
+          {busy && !preview
+            ? "Memuat…"
+            : preview
+              ? `${preview.total} orang bakal ditandai hadir`
+              : "Pilih sumbernya dulu"}
+        </span>
+        <div className="flex gap-1.5">
           <button
             type="button"
-            onClick={apply}
-            disabled={busy || preview.fresh === 0}
+            onClick={() => onDone(false)}
+            className="rounded-md border border-zinc-200 px-2 py-1 text-xs font-medium text-zinc-500 transition-colors hover:bg-zinc-50"
+          >
+            Batal
+          </button>
+          <button
+            type="button"
+            onClick={create}
+            disabled={!sel || busy}
             className="inline-flex items-center gap-1 rounded-md bg-emerald-500 px-2 py-1 text-xs font-semibold text-white transition-colors hover:bg-emerald-600 disabled:opacity-50"
           >
-            <UserPlus size={12} /> Tandai {preview.fresh} hadir
+            <Plus size={12} /> Buat presensi
+            {preview ? ` (${preview.total})` : ""}
           </button>
         </div>
-      )}
+      </div>
     </div>
   );
 }
@@ -238,7 +273,7 @@ function ImportPanel({ round, present, soalSrc, formSrc, rounds, onDone }) {
 function PresensiRow({ lesson, usersById, courseItems = [] }) {
   const [open, setOpen] = useState(false);
   const [rounds, setRounds] = useState(null); // null | [{ ...round, people: [] }]
-  const [importing, setImporting] = useState(null); // round id | null
+  const [showImport, setShowImport] = useState(false);
   const [failed, setFailed] = useState(false);
   const [label, setLabel] = useState("");
   const [busy, setBusy] = useState(false);
@@ -511,31 +546,21 @@ function PresensiRow({ lesson, usersById, courseItems = [] }) {
                       ))}
                     </div>
                   )}
-
-                  {hasSrc &&
-                    (importing === r.id ? (
-                      <ImportPanel
-                        round={r}
-                        present={r.people.map((p) => p.user_id)}
-                        soalSrc={soalSrc}
-                        formSrc={formSrc}
-                        rounds={rounds}
-                        onDone={(n) => {
-                          setImporting(null);
-                          if (n > 0) load();
-                        }}
-                      />
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => setImporting(r.id)}
-                        className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-zinc-400 transition-colors hover:text-zinc-700"
-                      >
-                        <UserPlus size={11} /> Tandai hadir dari aktivitas lain
-                      </button>
-                    ))}
                 </div>
               ))}
+
+              {view === "sesi" && hasSrc && showImport && (
+                <ImportRound
+                  lessonId={lesson.id}
+                  soalSrc={soalSrc}
+                  formSrc={formSrc}
+                  rounds={rounds}
+                  onDone={(created) => {
+                    setShowImport(false);
+                    if (created) load();
+                  }}
+                />
+              )}
 
               <div className="flex flex-wrap items-center gap-1.5">
                 {QUICK.map((q) => (
@@ -565,6 +590,16 @@ function PresensiRow({ lesson, usersById, courseItems = [] }) {
                   <Plus size={12} /> Presensi
                 </button>
               </div>
+
+              {view === "sesi" && hasSrc && !showImport && (
+                <button
+                  type="button"
+                  onClick={() => setShowImport(true)}
+                  className="inline-flex w-fit items-center gap-1 text-[11px] font-medium text-zinc-400 transition-colors hover:text-zinc-700"
+                >
+                  <UserPlus size={11} /> Buat presensi dari aktivitas lain
+                </button>
+              )}
             </div>
           )}
         </div>
