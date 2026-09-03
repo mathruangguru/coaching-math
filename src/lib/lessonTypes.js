@@ -6,6 +6,7 @@ export const lessonTypeLabels = {
   meet: "Link Meet",
   recording: "Recording",
   slide: "Google Slide",
+  pdf: "PDF",
   form: "Form",
   presensi: "Presensi",
   refleksi: "Refleksi",

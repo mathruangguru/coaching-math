@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ChevronUp,
   ChevronDown,
@@ -11,6 +11,7 @@ import {
   ListChecks,
   Eye,
   FileText,
+  Upload,
 } from "lucide-react";
 import {
   getCourse,
@@ -25,12 +26,89 @@ import {
 } from "../../lib/courses";
 import { getQuestionSets } from "../../lib/quiz";
 import { getForms } from "../../lib/forms";
+import { uploadLessonPdf, deleteLessonPdf, PDF_MAX_MB } from "../../lib/pdf";
 import { lessonTypeLabels } from "../../lib/lessonTypes";
 import LessonIcon from "../ui/LessonIcon";
 import MateriEditor from "./MateriEditor";
 
 const LESSON_TYPES = Object.keys(lessonTypeLabels);
 const URL_TYPES = ["meet", "recording", "slide", "form"];
+
+function PdfField({ lesson, onChange }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const inputRef = useRef(null);
+
+  const pick = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setBusy(true);
+    setErr("");
+    try {
+      const old = lesson.url;
+      const url = await uploadLessonPdf(lesson.id, file);
+      onChange(url);
+      if (old) deleteLessonPdf(old);
+    } catch (e2) {
+      setErr(e2?.message ?? "Gagal upload.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = () => {
+    if (!window.confirm("Hapus PDF?")) return;
+    const old = lesson.url;
+    onChange(null);
+    deleteLessonPdf(old);
+  };
+
+  return (
+    <div className="mt-1.5 flex flex-wrap items-center gap-2 pl-9">
+      <input
+        ref={inputRef}
+        type="file"
+        accept="application/pdf"
+        className="hidden"
+        onChange={pick}
+      />
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => inputRef.current?.click()}
+        className="inline-flex items-center gap-1.5 rounded-md border border-zinc-200 bg-white px-2 py-1 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-50 disabled:opacity-50"
+      >
+        <Upload size={12} className="text-zinc-400" />
+        {busy ? "Mengupload…" : lesson.url ? "Ganti PDF" : "Upload PDF"}
+      </button>
+      {lesson.url && !busy && (
+        <>
+          <a
+            href={lesson.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs font-medium text-brand-600 hover:text-brand-700"
+          >
+            Lihat PDF
+          </a>
+          <button
+            type="button"
+            onClick={remove}
+            className="text-xs font-medium text-zinc-400 transition-colors hover:text-rose-500"
+          >
+            Hapus
+          </button>
+        </>
+      )}
+      {err ? (
+        <span className="text-xs text-rose-500">{err}</span>
+      ) : (
+        <span className="text-[11px] text-zinc-400">maks {PDF_MAX_MB} MB</span>
+      )}
+    </div>
+  );
+}
 
 const typeTint = {
   materi: "bg-zinc-100 text-zinc-500",
@@ -671,6 +749,16 @@ export default function CurriculumEditor({ courseId }) {
                             {lesson.content ? "Edit isi materi" : "Tulis isi materi"}
                           </button>
                         </div>
+                      )}
+
+                      {lesson.type === "pdf" && (
+                        <PdfField
+                          lesson={lesson}
+                          onChange={(url) => {
+                            patchLessonLocal(editing.id, lesson.id, { url });
+                            saveLesson({ ...lesson, url });
+                          }}
+                        />
                       )}
                     </div>
                   );
