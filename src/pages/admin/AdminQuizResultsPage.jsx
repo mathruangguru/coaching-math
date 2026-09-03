@@ -119,18 +119,31 @@ const th =
   "border border-zinc-100 px-2.5 py-1.5 text-xs font-semibold text-zinc-500";
 const td = "border border-zinc-100 px-2.5 py-1.5";
 
-function Cell({ chosen, keyArr }) {
+function Cell({ chosen, keyArr, n, active, onEnter, onLeave }) {
+  const hover = {
+    title: `Soal ${n}`,
+    onMouseEnter: onEnter,
+    onMouseLeave: onLeave,
+  };
   if (toAnswerArray(chosen).length === 0) {
     return (
-      <td className={`${td} bg-zinc-50 text-center text-xs text-zinc-300`}>–</td>
+      <td
+        {...hover}
+        className={`${td} text-center text-xs text-zinc-300 ${
+          active ? "bg-brand-50" : "bg-zinc-50"
+        }`}
+      >
+        –
+      </td>
     );
   }
   const ok = sameAnswerSet(chosen, keyArr);
   return (
     <td
+      {...hover}
       className={`${td} text-center text-xs font-bold ${
         ok ? "bg-teal-50 text-teal-700" : "bg-rose-50 text-rose-700"
-      }`}
+      } ${active ? "ring-1 ring-inset ring-brand-300" : ""}`}
     >
       {letters(chosen)}
     </td>
@@ -151,6 +164,12 @@ function ResultTable({
   onReset,
   resetBusyId,
 }) {
+  const [hoverCol, setHoverCol] = useState(null);
+  const colProps = (i) => ({
+    onMouseEnter: () => setHoverCol(i),
+    onMouseLeave: () => setHoverCol((c) => (c === i ? null : c)),
+  });
+
   const graded = [...attempts, ...ongoing];
   const stats = questions.map((q) => {
     const correct = graded.filter((a) =>
@@ -180,7 +199,14 @@ function ResultTable({
             <th className={th}>Waktu</th>
             <th className={th}>Skor</th>
             {questions.map((_, i) => (
-              <th key={i} className={`${th} text-center`}>
+              <th
+                key={i}
+                {...colProps(i)}
+                title={`Soal ${i + 1}`}
+                className={`${th} text-center transition-colors ${
+                  hoverCol === i ? "bg-brand-500 text-white" : ""
+                }`}
+              >
                 {i + 1}
               </th>
             ))}
@@ -196,7 +222,11 @@ function ResultTable({
             {questions.map((q, i) => (
               <td
                 key={i}
-                className={`${td} text-center text-xs font-bold text-zinc-600`}
+                {...colProps(i)}
+                title={`Soal ${i + 1}`}
+                className={`${td} text-center text-xs font-bold transition-colors ${
+                  hoverCol === i ? "bg-brand-100 text-brand-700" : "text-zinc-600"
+                }`}
               >
                 {letters(keyOf(q))}
               </td>
@@ -210,7 +240,11 @@ function ResultTable({
             {stats.map((s, i) => (
               <td
                 key={i}
-                className={`${td} text-center text-[11px] font-bold ${toneFor(s)}`}
+                {...colProps(i)}
+                title={`Soal ${i + 1}`}
+                className={`${td} text-center text-[11px] font-bold transition-colors ${toneFor(s)} ${
+                  hoverCol === i ? "bg-brand-50" : ""
+                }`}
               >
                 {s}%
               </td>
@@ -244,7 +278,15 @@ function ResultTable({
                   <ScorePill score={a.score} total={a.total} />
                 </td>
                 {questions.map((q, i) => (
-                  <Cell key={i} chosen={a.answers?.[q.id]} keyArr={keyOf(q)} />
+                  <Cell
+                    key={i}
+                    n={i + 1}
+                    chosen={a.answers?.[q.id]}
+                    keyArr={keyOf(q)}
+                    active={hoverCol === i}
+                    onEnter={() => setHoverCol(i)}
+                    onLeave={() => setHoverCol((c) => (c === i ? null : c))}
+                  />
                 ))}
                 {onReset && (
                   <td className={`${td} whitespace-nowrap`}>
@@ -295,7 +337,15 @@ function ResultTable({
                   {answeredOf(p.answers)}/{questions.length}
                 </td>
                 {questions.map((q, i) => (
-                  <Cell key={i} chosen={p.answers?.[q.id]} keyArr={keyOf(q)} />
+                  <Cell
+                    key={i}
+                    n={i + 1}
+                    chosen={p.answers?.[q.id]}
+                    keyArr={keyOf(q)}
+                    active={hoverCol === i}
+                    onEnter={() => setHoverCol(i)}
+                    onLeave={() => setHoverCol((c) => (c === i ? null : c))}
+                  />
                 ))}
                 {onReset && <td className={td} />}
               </tr>
