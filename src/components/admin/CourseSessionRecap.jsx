@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronDown,
   UserCheck,
@@ -124,7 +124,22 @@ function PresensiRow({ lesson, usersById }) {
   const [failed, setFailed] = useState(false);
   const [label, setLabel] = useState("");
   const [busy, setBusy] = useState(false);
+  const [view, setView] = useState("sesi"); // sesi | rekap
   const loadedRef = useRef(false);
+
+  // Rekap per orang: hadir berapa sesi dari total sesi presensi.
+  const recap = useMemo(() => {
+    if (!rounds || rounds.length === 0) return [];
+    const cnt = new Map();
+    for (const r of rounds)
+      for (const p of r.people) cnt.set(p.user_id, (cnt.get(p.user_id) ?? 0) + 1);
+    return [...cnt.entries()]
+      .map(([uid, n]) => {
+        const u = usersById.get(uid);
+        return { uid, u, name: u ? fullName(u) : uid, n };
+      })
+      .sort((a, b) => b.n - a.n || a.name.localeCompare(b.name));
+  }, [rounds, usersById]);
 
   const load = useCallback(() => {
     getRounds(lesson.id)
@@ -248,7 +263,79 @@ function PresensiRow({ lesson, usersById }) {
                 <p className="text-xs text-zinc-400">Belum ada presensi.</p>
               )}
 
-              {rounds.map((r) => (
+              {rounds.length > 0 && (
+                <div className="inline-flex w-fit rounded-lg border border-zinc-200 bg-white p-0.5 text-xs font-semibold">
+                  {[
+                    ["sesi", "Per sesi"],
+                    ["rekap", "Rekap kehadiran"],
+                  ].map(([k, lbl]) => (
+                    <button
+                      key={k}
+                      type="button"
+                      onClick={() => setView(k)}
+                      className={`rounded-md px-2.5 py-1 transition-colors ${
+                        view === k
+                          ? "bg-brand-500 text-white"
+                          : "text-zinc-500 hover:text-zinc-800"
+                      }`}
+                    >
+                      {lbl}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {view === "rekap" && rounds.length > 0 && (
+                <div className="rounded-lg border border-zinc-200 bg-white">
+                  {recap.length === 0 ? (
+                    <p className="px-3 py-4 text-center text-xs text-zinc-400">
+                      Belum ada yang hadir.
+                    </p>
+                  ) : (
+                    <ul className="divide-y divide-zinc-100">
+                      {recap.map((x) => {
+                        const p = Math.round((x.n / rounds.length) * 100);
+                        return (
+                          <li
+                            key={x.uid}
+                            className="flex items-center gap-3 px-3 py-2"
+                          >
+                            <span
+                              className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-[10px] font-bold ${tintFor(
+                                x.uid
+                              )}`}
+                            >
+                              {initialsOf(x.name)}
+                            </span>
+                            <span className="flex min-w-0 flex-1 flex-col">
+                              <span className="truncate text-xs font-medium text-zinc-800">
+                                {x.name}
+                              </span>
+                              {x.u?.email && (
+                                <span className="truncate text-[11px] text-zinc-400">
+                                  {x.u.email}
+                                </span>
+                              )}
+                            </span>
+                            <span className="h-1.5 w-14 shrink-0 overflow-hidden rounded-full bg-zinc-100">
+                              <span
+                                className="block h-full rounded-full bg-emerald-500"
+                                style={{ width: `${p}%` }}
+                              />
+                            </span>
+                            <span className="w-12 shrink-0 text-right text-xs font-semibold text-zinc-600">
+                              {x.n}/{rounds.length}
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
+              )}
+
+              {view === "sesi" &&
+                rounds.map((r) => (
                 <div
                   key={r.id}
                   className="rounded-lg border border-zinc-200 bg-white p-3"
