@@ -18,7 +18,7 @@ export async function getRounds(lessonId) {
   if (!hasSupabase) return [];
   const { data, error } = await supabase
     .from("coaching_attendance_rounds")
-    .select("id, label, is_open, created_at")
+    .select("id, label, is_open, created_at, source_kind, source_lesson_id")
     .eq("lesson_id", lessonId)
     .order("created_at");
   if (error) throw error;
@@ -84,7 +84,14 @@ export async function checkInRound(roundId) {
 }
 
 // Admin
-export async function createRound(lessonId, label) {
+const ROUND_COLS = "id, label, is_open, created_at, source_kind, source_lesson_id";
+
+/**
+ * Bikin ronde presensi. `source` opsional: { kind: 'soal'|'form', lessonId }
+ * bikin ronde "ter-link" — anggotanya di-maintain trigger DB dari peserta
+ * lesson itu (auto masuk pas beres, auto keluar pas attempt/respons dihapus).
+ */
+export async function createRound(lessonId, label, source) {
   ensure();
   const { data, error } = await supabase
     .from("coaching_attendance_rounds")
@@ -92,11 +99,26 @@ export async function createRound(lessonId, label) {
       id: crypto.randomUUID(),
       lesson_id: lessonId,
       label: label?.trim() || "Presensi",
+      source_kind: source?.kind ?? null,
+      source_lesson_id: source?.lessonId ?? null,
     })
-    .select("id, label, is_open, created_at")
+    .select(ROUND_COLS)
     .single();
   if (error) throw error;
   return data;
+}
+
+/** Lepas / ganti link sumber ronde. `null` = jadiin manual (beku). */
+export async function setRoundSource(roundId, source) {
+  ensure();
+  const { error } = await supabase
+    .from("coaching_attendance_rounds")
+    .update({
+      source_kind: source?.kind ?? null,
+      source_lesson_id: source?.lessonId ?? null,
+    })
+    .eq("id", roundId);
+  if (error) throw error;
 }
 
 export async function setRoundOpen(roundId, isOpen) {

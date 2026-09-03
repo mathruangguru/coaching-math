@@ -3,6 +3,7 @@ import {
   ChevronDown,
   UserCheck,
   UserPlus,
+  Link2,
   NotebookPen,
   Plus,
   Trash2,
@@ -17,6 +18,7 @@ import {
   createRound,
   setRoundOpen,
   renameRound,
+  setRoundSource,
   deleteRound,
   bulkCheckIn,
 } from "../../lib/sessions";
@@ -174,12 +176,20 @@ function ImportRound({ lessonId, soalSrc, formSrc, rounds, onDone }) {
 
   const create = async () => {
     if (!sel || busy) return;
+    const [kind, a] = sel.split(":");
     setBusy(true);
     setErr("");
     try {
-      const ids = preview?.ids ?? (await sourceUserIds(sel, rounds));
-      const row = await createRound(lessonId, label.trim() || titleOf(sel));
-      if (ids.length) await bulkCheckIn(row.id, ids);
+      const name = label.trim() || titleOf(sel);
+      if (kind === "round") {
+        // Ronde lain → salinan sekali jalan (nggak ke-link).
+        const ids = preview?.ids ?? (await sourceUserIds(sel, rounds));
+        const row = await createRound(lessonId, name);
+        if (ids.length) await bulkCheckIn(row.id, ids);
+      } else {
+        // Latihan soal / form → ronde ter-link, isinya dijaga trigger DB.
+        await createRound(lessonId, name, { kind, lessonId: a });
+      }
       onDone(true);
     } catch (e) {
       setErr(e?.message ?? "Gagal membuat presensi.");
@@ -244,9 +254,11 @@ function ImportRound({ lessonId, soalSrc, formSrc, rounds, onDone }) {
         <span className="text-[11px] text-zinc-500">
           {busy && !preview
             ? "Memuat…"
-            : preview
-              ? `${preview.total} orang bakal ditandai hadir`
-              : "Pilih sumbernya dulu"}
+            : !preview
+              ? "Pilih sumbernya dulu"
+              : sel.startsWith("round:")
+                ? `${preview.total} orang bakal ditandai hadir`
+                : `${preview.total} orang sekarang · nyambung otomatis`}
         </span>
         <div className="flex gap-1.5">
           <button
@@ -329,7 +341,7 @@ function PresensiRow({ lesson, usersById, courseItems = [] }) {
     load();
   }, [open, load]);
 
-  // Realtime: check-in murid masuk -> refresh (debounce biar nggak spam).
+  // Realtime: check-in / sync trigger masuk-keluar -> refresh (debounce).
   useEffect(() => {
     if (!open || !hasSupabase) return;
     let t;
@@ -337,7 +349,7 @@ function PresensiRow({ lesson, usersById, courseItems = [] }) {
       .channel(`att:${lesson.id}`)
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "coaching_attendance" },
+        { event: "*", schema: "public", table: "coaching_attendance" },
         () => {
           clearTimeout(t);
           t = setTimeout(load, 400);
@@ -408,6 +420,32 @@ function PresensiRow({ lesson, usersById, courseItems = [] }) {
       await renameRound(r.id, name);
     } catch (err) {
       window.alert(`Gagal ganti nama: ${err?.message ?? err}`);
+      load();
+    }
+  };
+
+  const sourceTitle = (r) =>
+    courseItems.find((i) => i.id === r.source_lesson_id)?.title ??
+    "aktivitas dihapus";
+
+  const unlink = async (r) => {
+    if (
+      !window.confirm(
+        `Lepas link "${r.label}" dari ${sourceTitle(r)}? Daftar hadir yang ada sekarang dibekukan (nggak auto-update lagi).`
+      )
+    )
+      return;
+    setRounds((p) =>
+      p.map((x) =>
+        x.id === r.id
+          ? { ...x, source_kind: null, source_lesson_id: null }
+          : x
+      )
+    );
+    try {
+      await setRoundSource(r.id, null);
+    } catch (err) {
+      window.alert(`Gagal: ${err?.message ?? err}`);
       load();
     }
   };
@@ -553,6 +591,16 @@ function PresensiRow({ lesson, usersById, courseItems = [] }) {
                         className="min-w-0 flex-1 truncate text-left text-sm font-semibold text-zinc-800 transition-colors hover:text-brand-600"
                       >
                         {r.label}
+                      </button>
+                    )}
+                    {r.source_kind && (
+                      <button
+                        type="button"
+                        onClick={() => unlink(r)}
+                        title={`Otomatis dari ${sourceTitle(r)} — klik buat lepas link`}
+                        className="inline-flex shrink-0 items-center gap-1 rounded-full bg-sky-50 px-1.5 py-0.5 text-[10px] font-semibold text-sky-600 transition-colors hover:bg-rose-50 hover:text-rose-600"
+                      >
+                        <Link2 size={10} /> otomatis
                       </button>
                     )}
                     <span className="shrink-0 text-xs text-zinc-400">
