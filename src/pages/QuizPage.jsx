@@ -43,6 +43,7 @@ export default function QuizPage() {
   const [started, setStarted] = useState(false); // udah klik "Mulai" / lanjut sesi
   const [now, setNow] = useState(() => Date.now());
   const [confirmBlanks, setConfirmBlanks] = useState(0); // >0 = modal konfirmasi kirim
+  const [timeUp, setTimeUp] = useState(false); // modal "waktu habis"
   const autoFiredRef = useRef(false);
 
   useEffect(() => {
@@ -181,7 +182,8 @@ export default function QuizPage() {
     const fire = () => {
       if (autoFiredRef.current) return;
       autoFiredRef.current = true;
-      window.alert("Waktu habis — jawaban kamu otomatis dikirim.");
+      setConfirmBlanks(0);
+      setTimeUp(true);
       submit({ silent: true });
     };
     const left = startedAt + limitMs - Date.now();
@@ -208,6 +210,26 @@ export default function QuizPage() {
     >
       <ArrowLeft size={14} /> Kembali ke materi
     </Link>
+  );
+
+  const timeUpModal = timeUp && (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 p-4">
+      <div className="w-full max-w-sm rounded-2xl border border-zinc-200 bg-white p-5 shadow-xl">
+        <p className="text-sm font-bold text-zinc-900">Waktu habis</p>
+        <p className="mt-1.5 text-sm text-zinc-600">
+          Jawaban kamu sudah otomatis dikirim.
+        </p>
+        <div className="mt-4 flex justify-end">
+          <button
+            type="button"
+            onClick={() => setTimeUp(false)}
+            className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-600"
+          >
+            Lihat hasil
+          </button>
+        </div>
+      </div>
+    </div>
   );
 
   if (data.status === "loading") {
@@ -307,6 +329,7 @@ export default function QuizPage() {
             </p>
           )}
         </div>
+        {timeUpModal}
       </div>
     );
   }
@@ -588,6 +611,8 @@ export default function QuizPage() {
           </div>
         </div>
       )}
+
+      {timeUpModal}
     </div>
   );
 }
