@@ -5,7 +5,21 @@ import remarkBreaks from "remark-breaks";
 import rehypeKatex from "rehype-katex";
 
 const remarkPlugins = [remarkGfm, remarkBreaks, remarkMath];
-const rehypePlugins = [rehypeKatex];
+// strict:false biar longgar kayak <MathText> lama (nggak rewel sama unicode dll).
+const rehypePlugins = [[rehypeKatex, { strict: false }]];
+
+// `$$…$$` satu baris ke-render inline (kecil) di react-markdown. Ubah jadi
+// fence multi-baris + baris kosong di sekelilingnya biar remark-math anggap
+// display math (gede + ke-tengah) — sama kayak <MathText> lama. Fence `$$`
+// yang udah multi-baris nggak kesentuh (regex nggak lewat newline).
+function blockifyDisplayMath(src) {
+  return src
+    .replace(
+      /[^\S\n]*\$\$[^\S\n]*([^\n$]+?)[^\S\n]*\$\$[^\S\n]*/g,
+      (_m, body) => `\n\n$$\n${body.trim()}\n$$\n\n`
+    )
+    .replace(/\n{3,}/g, "\n\n");
+}
 
 // Styling elemen hasil render (nggak pakai plugin @tailwindcss/typography).
 // Warna teks body diwarisin dari `className` wrapper — biar 1 komponen bisa
@@ -118,6 +132,9 @@ const inlineComponents = { ...base, p: (p) => <span {...p} /> };
  */
 export default function Markdown({ children, inline = false, className = "" }) {
   const Wrapper = inline ? "span" : "div";
+  const src = inline
+    ? children || ""
+    : blockifyDisplayMath(String(children || ""));
   return (
     <Wrapper className={className}>
       <ReactMarkdown
@@ -125,7 +142,7 @@ export default function Markdown({ children, inline = false, className = "" }) {
         rehypePlugins={rehypePlugins}
         components={inline ? inlineComponents : base}
       >
-        {children || ""}
+        {src}
       </ReactMarkdown>
     </Wrapper>
   );
