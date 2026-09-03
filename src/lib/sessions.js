@@ -108,6 +108,15 @@ export async function setRoundOpen(roundId, isOpen) {
   if (error) throw error;
 }
 
+export async function renameRound(roundId, label) {
+  ensure();
+  const { error } = await supabase
+    .from("coaching_attendance_rounds")
+    .update({ label: label?.trim() || "Presensi" })
+    .eq("id", roundId);
+  if (error) throw error;
+}
+
 export async function deleteRound(roundId) {
   ensure();
   const { error } = await supabase
