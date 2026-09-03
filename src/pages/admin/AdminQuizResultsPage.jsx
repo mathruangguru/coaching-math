@@ -520,6 +520,86 @@ function BackLink({ children, onClick }) {
   );
 }
 
+/**
+ * Detail satu set: header + tab "Jawaban per murid" (matrix) vs
+ * "Analisis butir soal". Cuma satu panel kelihatan biar nggak sesak.
+ */
+function SetDetail({
+  title,
+  stat,
+  rows,
+  detail,
+  ongoing,
+  usersById,
+  onBack,
+  onReset,
+  resetBusyId,
+}) {
+  const [tab, setTab] = useState("matrix"); // matrix | butir
+  const hasQ = (detail?.questions?.length ?? 0) > 0;
+  const canButir = hasQ && rows.length > 0;
+  const active = tab === "butir" && canButir ? "butir" : "matrix";
+
+  return (
+    <div className="flex flex-col gap-3">
+      <BackLink onClick={onBack}>Semua set</BackLink>
+      <div>
+        <h2 className="text-sm font-bold text-zinc-900">
+          Analisis Set Soal — {title}
+        </h2>
+        <p className="mt-0.5 text-xs text-zinc-400">
+          {stat
+            ? `${stat.students} murid · ${stat.attempts} attempt · rata-rata ${stat.avgPct}%`
+            : "Belum ada yang submit."}
+          {ongoing.length > 0 && ` · ${ongoing.length} lagi ngerjain`}
+        </p>
+      </div>
+
+      {canButir && (
+        <div className="inline-flex w-fit rounded-lg border border-zinc-200 bg-white p-0.5 text-xs font-semibold">
+          {[
+            ["matrix", "Jawaban per murid"],
+            ["butir", "Analisis butir soal"],
+          ].map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setTab(key)}
+              className={`rounded-md px-3 py-1.5 transition-colors ${
+                active === key
+                  ? "bg-brand-500 text-white"
+                  : "text-zinc-500 hover:text-zinc-800"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {active === "butir" ? (
+        <QuestionAnalytics questions={detail.questions} attempts={rows} />
+      ) : (
+        <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white">
+          {hasQ ? (
+            <ResultTable
+              questions={detail.questions}
+              attempts={rows}
+              ongoing={ongoing}
+              usersById={usersById}
+              showStudent
+              onReset={onReset}
+              resetBusyId={resetBusyId}
+            />
+          ) : (
+            <PlainRows attempts={rows} usersById={usersById} showStudent />
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AdminQuizResultsPage() {
   const [view, setView] = useState("set"); // set | user
   const [q, setQ] = useState("");
@@ -824,46 +904,18 @@ export default function AdminQuizResultsPage() {
                 (p) => p.set_id === selSet && !doneUsers.has(p.user_id)
               );
               return (
-                <div className="flex flex-col gap-3">
-                  <BackLink onClick={() => setSelSet(null)}>Semua set</BackLink>
-                  <div>
-                    <h2 className="text-sm font-bold text-zinc-900">
-                      Analisis Set Soal — {model.titleOf(selSet)}
-                    </h2>
-                    <p className="mt-0.5 text-xs text-zinc-400">
-                      {s
-                        ? `${s.students} murid · ${s.attempts} attempt · rata-rata ${s.avgPct}%`
-                        : "Belum ada yang submit."}
-                      {ongoing.length > 0 &&
-                        ` · ${ongoing.length} lagi ngerjain`}
-                    </p>
-                  </div>
-                  <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white">
-                    {detail?.questions?.length ? (
-                      <ResultTable
-                        questions={detail.questions}
-                        attempts={rows}
-                        ongoing={ongoing}
-                        usersById={model.usersById}
-                        showStudent
-                        onReset={handleReset}
-                        resetBusyId={resetBusyId}
-                      />
-                    ) : (
-                      <PlainRows
-                        attempts={rows}
-                        usersById={model.usersById}
-                        showStudent
-                      />
-                    )}
-                  </div>
-                  {detail?.questions?.length > 0 && rows.length > 0 && (
-                    <QuestionAnalytics
-                      questions={detail.questions}
-                      attempts={rows}
-                    />
-                  )}
-                </div>
+                <SetDetail
+                  key={selSet}
+                  title={model.titleOf(selSet)}
+                  stat={s}
+                  rows={rows}
+                  detail={detail}
+                  ongoing={ongoing}
+                  usersById={model.usersById}
+                  onBack={() => setSelSet(null)}
+                  onReset={handleReset}
+                  resetBusyId={resetBusyId}
+                />
               );
             })()}
 
