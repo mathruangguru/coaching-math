@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, ExternalLink } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { getCourse } from "../lib/courses";
 import Skeleton from "../components/ui/Skeleton";
 
@@ -66,33 +66,26 @@ export default function PdfPage() {
     <div className="mx-auto flex max-w-4xl flex-col gap-4">
       {backLink}
 
-      <div className="flex flex-wrap items-end justify-between gap-2">
-        <div>
-          <p className="text-xs text-zinc-400">{course.title}</p>
-          <h1 className="mt-1 text-xl font-bold tracking-tight text-zinc-900">
-            {lesson.title}
-          </h1>
-        </div>
-        {lesson.url && (
-          <a
-            href={lesson.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-50"
-          >
-            <ExternalLink size={13} /> Buka di tab baru
-          </a>
-        )}
+      <div>
+        <p className="text-xs text-zinc-400">{course.title}</p>
+        <h1 className="mt-1 text-xl font-bold tracking-tight text-zinc-900">
+          {lesson.title}
+        </h1>
       </div>
 
       {lesson.url ? (
-        <div className="overflow-hidden rounded-xl border border-zinc-200 bg-zinc-100">
-          <iframe
-            src={lesson.url}
-            title={lesson.title}
-            className="h-[80vh] min-h-[520px] w-full"
-          />
-        </div>
+        <>
+          <div className="overflow-hidden rounded-xl border border-zinc-200 bg-zinc-100">
+            <iframe
+              src={`${lesson.url}#toolbar=0&navpanes=0`}
+              title={lesson.title}
+              className="h-[80vh] min-h-[520px] w-full"
+            />
+          </div>
+          <p className="text-[11px] text-zinc-400">
+            Materi ini untuk dibaca di sini.
+          </p>
+        </>
       ) : (
         <p className="rounded-xl border border-dashed border-zinc-300 bg-white px-6 py-10 text-center text-sm text-zinc-400">
           PDF belum tersedia.
