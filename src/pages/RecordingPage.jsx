@@ -1,9 +1,58 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Play } from "lucide-react";
 import { getCourse } from "../lib/courses";
 import { youtubeId } from "../lib/youtube";
 import Skeleton from "../components/ui/Skeleton";
+
+// Poster sendiri + klik buat play — biar nggak ada judul / tombol merede /
+// "Tonton di YouTube" pas belum diputer. Pas jalan, chrome YouTube yang
+// muncul di hover itu punya mereka, nggak bisa dibuang dari embed.
+function YoutubeEmbed({ id, title }) {
+  const [play, setPlay] = useState(false);
+  const [lowRes, setLowRes] = useState(false);
+
+  if (play) {
+    return (
+      <div className="overflow-hidden rounded-xl border border-zinc-200 bg-black">
+        <iframe
+          src={`https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0&modestbranding=1&iv_load_policy=3&playsinline=1`}
+          title={title}
+          allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+          allowFullScreen
+          className="aspect-video w-full"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => setPlay(true)}
+      aria-label="Putar rekaman"
+      className="group relative block aspect-video w-full overflow-hidden rounded-xl border border-zinc-200 bg-black"
+    >
+      <img
+        src={`https://i.ytimg.com/vi/${id}/${
+          lowRes ? "hqdefault" : "maxresdefault"
+        }.jpg`}
+        alt=""
+        onError={() => setLowRes(true)}
+        className="h-full w-full object-cover opacity-90 transition-opacity group-hover:opacity-100"
+      />
+      <span className="absolute inset-0 grid place-items-center">
+        <span className="grid h-16 w-16 place-items-center rounded-full bg-white/95 shadow-lg transition-transform group-hover:scale-105">
+          <Play
+            size={26}
+            className="translate-x-0.5 text-zinc-900"
+            fill="currentColor"
+          />
+        </span>
+      </span>
+    </button>
+  );
+}
 
 export default function RecordingPage() {
   const { courseId, lessonId } = useParams();
@@ -91,15 +140,7 @@ export default function RecordingPage() {
       </div>
 
       {vid ? (
-        <div className="overflow-hidden rounded-xl border border-zinc-200 bg-black">
-          <iframe
-            src={`https://www.youtube-nocookie.com/embed/${vid}`}
-            title={lesson.title}
-            allow="encrypted-media; picture-in-picture; fullscreen"
-            allowFullScreen
-            className="aspect-video w-full"
-          />
-        </div>
+        <YoutubeEmbed id={vid} title={lesson.title} />
       ) : lesson.url ? (
         <p className="rounded-xl border border-dashed border-zinc-300 bg-white px-6 py-10 text-center text-sm text-zinc-500">
           Link rekaman belum berupa video YouTube yang bisa diputar di sini.{" "}
