@@ -117,6 +117,31 @@ export async function deleteRound(roundId) {
   if (error) throw error;
 }
 
+/**
+ * Bulk tandai hadir (admin) — import dari aktivitas lain. Skip user yang
+ * udah tercatat di ronde ini. Balikin jumlah baris baru.
+ * Butuh RLS policy "coaching_attendance insert admin" (sessions.sql).
+ */
+export async function bulkCheckIn(roundId, userIds) {
+  ensure();
+  const ids = [...new Set((userIds ?? []).filter(Boolean))];
+  if (!ids.length) return 0;
+  const { data: existing, error: e1 } = await supabase
+    .from("coaching_attendance")
+    .select("user_id")
+    .eq("round_id", roundId)
+    .in("user_id", ids);
+  if (e1) throw e1;
+  const have = new Set((existing ?? []).map((r) => r.user_id));
+  const rows = ids
+    .filter((u) => !have.has(u))
+    .map((u) => ({ round_id: roundId, user_id: u }));
+  if (!rows.length) return 0;
+  const { error } = await supabase.from("coaching_attendance").insert(rows);
+  if (error) throw error;
+  return rows.length;
+}
+
 /** Siapa aja yang hadir di satu ronde — rekap admin. */
 export async function getRoundAttendance(roundId) {
   ensure();

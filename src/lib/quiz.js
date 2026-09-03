@@ -457,6 +457,20 @@ export async function getAllAttempts() {
 }
 
 /**
+ * user_id[] yang punya attempt submit di sebuah lesson soal (admin read).
+ * Buat import kehadiran presensi dari "yang udah ngerjain latihan".
+ */
+export async function getAttemptUserIdsByLesson(lessonId) {
+  ensure();
+  const { data, error } = await supabase
+    .from("coaching_quiz_attempts")
+    .select("user_id")
+    .eq("lesson_id", lessonId);
+  if (error) throw error;
+  return [...new Set(data.map((r) => r.user_id).filter(Boolean))];
+}
+
+/**
  * Hapus 1 attempt (admin) — murid jadi bisa ngerjain set itu lagi.
  * Dijaga RLS "coaching_quiz_attempts admin delete".
  */

@@ -73,6 +73,13 @@ create policy "coaching_attendance insert own"
     )
   );
 
+-- Admin bisa tandai hadir siapa aja (import dari latihan soal / form / ronde
+-- lain), termasuk ke ronde yang udah ditutup.
+drop policy if exists "coaching_attendance insert admin" on public.coaching_attendance;
+create policy "coaching_attendance insert admin"
+  on public.coaching_attendance for insert
+  with check (public.is_admin());
+
 -- Realtime: murid ngikutin buka/tutup ronde; admin ngikutin check-in masuk.
 do $$
 begin
