@@ -388,6 +388,126 @@ function PlainRows({ attempts, usersById, showStudent }) {
   );
 }
 
+const optLetter = (i) => String.fromCharCode(65 + i);
+
+/**
+ * Analisis butir soal: tiap soal diranking dari % benar terendah, plus
+ * sebaran jawaban (berapa % yang milih tiap opsi + yang ngosongin).
+ * Cuma pakai attempt yang udah submit — sesi ongoing nggak dihitung.
+ */
+function QuestionAnalytics({ questions, attempts }) {
+  const rows = useMemo(() => {
+    const n = attempts.length;
+    return questions
+      .map((q, idx) => {
+        const keyArr = keyOf(q);
+        const opts = (q.options ?? []).map(() => 0);
+        let correct = 0;
+        let blank = 0;
+        for (const a of attempts) {
+          const picked = toAnswerArray(a.answers?.[q.id]);
+          if (picked.length === 0) {
+            blank += 1;
+            continue;
+          }
+          if (sameAnswerSet(picked, keyArr)) correct += 1;
+          for (const oi of picked)
+            if (oi >= 0 && oi < opts.length) opts[oi] += 1;
+        }
+        return {
+          id: q.id,
+          num: idx + 1,
+          prompt: (q.prompt ?? "").trim(),
+          options: q.options ?? [],
+          keyArr,
+          n,
+          correct,
+          blank,
+          opts,
+          pct: n ? Math.round((correct / n) * 100) : 0,
+        };
+      })
+      .sort((a, b) => a.pct - b.pct || a.num - b.num);
+  }, [questions, attempts]);
+
+  if (attempts.length === 0 || questions.length === 0) return null;
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white">
+      <div className="border-b border-zinc-100 px-4 py-3">
+        <p className="text-sm font-bold text-zinc-900">Analisis butir soal</p>
+        <p className="mt-0.5 text-xs text-zinc-400">
+          Diurut dari soal tersulit · {attempts.length} attempt selesai
+        </p>
+      </div>
+      <ul className="divide-y divide-zinc-100">
+        {rows.map((r) => (
+          <li
+            key={r.id}
+            className="flex flex-col gap-2.5 px-4 py-3 sm:flex-row sm:gap-4"
+          >
+            <div className="flex items-start gap-2 sm:w-[44%]">
+              <span className="mt-px inline-flex h-5 shrink-0 items-center rounded-md bg-zinc-100 px-1.5 text-[11px] font-bold text-zinc-500">
+                #{r.num}
+              </span>
+              <p
+                className="line-clamp-2 text-xs leading-relaxed text-zinc-600"
+                title={r.prompt || undefined}
+              >
+                {r.prompt || "(tanpa teks)"}
+              </p>
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <div className="mb-1.5 flex items-baseline gap-2">
+                <span className={`text-sm font-bold ${toneFor(r.pct)}`}>
+                  {r.pct}%
+                </span>
+                <span className="text-[11px] text-zinc-400">
+                  {r.correct}/{r.n} benar
+                  {r.blank > 0 && ` · ${r.blank} kosong`}
+                </span>
+              </div>
+              <div className="flex flex-col gap-1">
+                {r.options.map((opt, oi) => {
+                  const isKey = r.keyArr.includes(oi);
+                  const c = r.opts[oi] ?? 0;
+                  const p = r.n ? Math.round((c / r.n) * 100) : 0;
+                  return (
+                    <div key={oi} className="flex items-center gap-2">
+                      <span
+                        className={`w-4 shrink-0 text-center text-[11px] font-bold ${
+                          isKey ? "text-teal-600" : "text-zinc-400"
+                        }`}
+                      >
+                        {optLetter(oi)}
+                      </span>
+                      <div className="h-2 flex-1 overflow-hidden rounded-full bg-zinc-100">
+                        <div
+                          className={`h-full rounded-full ${
+                            isKey ? "bg-teal-500" : "bg-zinc-300"
+                          }`}
+                          style={{ width: `${p}%` }}
+                        />
+                      </div>
+                      <span className="w-8 shrink-0 text-right text-[11px] tabular-nums text-zinc-400">
+                        {p}%
+                      </span>
+                      <span className="w-8 shrink-0 text-[10px] font-semibold uppercase tracking-wide text-teal-600">
+                        {isKey ? "kunci" : ""}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function BackLink({ children, onClick }) {
   return (
     <button
@@ -737,6 +857,12 @@ export default function AdminQuizResultsPage() {
                       />
                     )}
                   </div>
+                  {detail?.questions?.length > 0 && rows.length > 0 && (
+                    <QuestionAnalytics
+                      questions={detail.questions}
+                      attempts={rows}
+                    />
+                  )}
                 </div>
               );
             })()}
