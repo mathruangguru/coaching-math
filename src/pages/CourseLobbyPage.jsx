@@ -8,10 +8,12 @@ import {
   UserCheck,
   HelpCircle,
   CalendarClock,
+  NotebookPen,
 } from "lucide-react";
 import { useCourse } from "../hooks/useCourse";
 import { getMyAttendanceByLesson } from "../lib/sessions";
 import { getMyAttemptsByLesson } from "../lib/quiz";
+import { getMyRefleksiEntries } from "../lib/forms";
 import Skeleton from "../components/ui/Skeleton";
 
 const fmtMeet = (iso) =>
@@ -22,6 +24,23 @@ const fmtMeet = (iso) =>
     hour: "2-digit",
     minute: "2-digit",
   });
+
+const fmtDate = (iso) =>
+  new Date(iso).toLocaleDateString("id-ID", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+
+const fmtAnswer = (a) => {
+  const v = a.value;
+  if (v == null || v === "" || (Array.isArray(v) && v.length === 0)) return "—";
+  if (a.type === "rating") {
+    const n = Math.max(0, Math.min(5, Math.round(Number(v) || 0)));
+    return "★".repeat(n) + "☆".repeat(5 - n);
+  }
+  return Array.isArray(v) ? v.join(", ") : String(v);
+};
 
 export default function CourseLobbyPage() {
   const { courseId } = useParams();
@@ -36,7 +55,7 @@ export default function CourseLobbyPage() {
   } = useCourse(courseId);
   const [passcode, setPasscode] = useState("");
   const [enrollErr, setEnrollErr] = useState("");
-  const [recap, setRecap] = useState(null); // { hasPresensi, ronde, hadir, hasQuiz, quizDone, quizTotal, avgPct }
+  const [recap, setRecap] = useState(null); // { hasPresensi, ronde, hadir, hasQuiz, quizDone, quizTotal, avgPct, hasRefleksi, refleksi[] }
   const [now] = useState(() => Date.now());
 
   const submitEnroll = async (e) => {
@@ -55,11 +74,15 @@ export default function CourseLobbyPage() {
     const sIds = items
       .filter((it) => it.type === "soal" && it.question_set_id)
       .map((it) => it.id);
+    const rLessons = items
+      .filter((it) => it.type === "refleksi" && it.form_id)
+      .map((it) => ({ id: it.id, title: it.title, form_id: it.form_id }));
     let alive = true;
     Promise.allSettled([
       pIds.length ? getMyAttendanceByLesson(pIds) : Promise.resolve({}),
       sIds.length ? getMyAttemptsByLesson(sIds) : Promise.resolve({}),
-    ]).then(([a, s]) => {
+      rLessons.length ? getMyRefleksiEntries(rLessons) : Promise.resolve([]),
+    ]).then(([a, s, r]) => {
       if (!alive) return;
       const att = a.status === "fulfilled" ? a.value : {};
       const score = s.status === "fulfilled" ? s.value : {};
@@ -75,6 +98,8 @@ export default function CourseLobbyPage() {
         quizDone: sv.length,
         quizTotal: sIds.length,
         avgPct: sumTotal ? Math.round((sumScore / sumTotal) * 100) : null,
+        hasRefleksi: rLessons.length > 0,
+        refleksi: r.status === "fulfilled" ? r.value : [],
       });
     });
     return () => {
@@ -288,6 +313,59 @@ export default function CourseLobbyPage() {
               </div>
             )}
           </div>
+
+          {recap?.hasRefleksi && (
+            <div className="rounded-2xl border border-zinc-200/80 bg-white">
+              <div className="flex items-center gap-2.5 border-b border-zinc-100 px-5 py-3.5">
+                <span className="grid h-8 w-8 place-items-center rounded-lg bg-rose-50 text-rose-600">
+                  <NotebookPen size={16} />
+                </span>
+                <p className="text-sm font-bold tracking-tight text-zinc-900">
+                  Refleksi kamu
+                </p>
+                {recap.refleksi.length > 0 && (
+                  <span className="ml-auto rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold text-zinc-500">
+                    {recap.refleksi.length} terkirim
+                  </span>
+                )}
+              </div>
+
+              {recap.refleksi.length === 0 ? (
+                <p className="px-5 py-8 text-center text-xs text-zinc-400">
+                  Kamu belum pernah mengirim refleksi di course ini.
+                </p>
+              ) : (
+                <ul className="max-h-[460px] divide-y divide-zinc-100 overflow-y-auto">
+                  {recap.refleksi.map((e) => (
+                    <li key={`${e.lessonId}-${e.at}`} className="px-5 py-4">
+                      <div className="flex items-baseline justify-between gap-3">
+                        <p className="text-sm font-semibold text-zinc-900">
+                          {e.title}
+                        </p>
+                        <span className="shrink-0 text-[11px] text-zinc-400">
+                          {fmtDate(e.at)}
+                        </span>
+                      </div>
+                      {e.answers.length > 0 && (
+                        <dl className="mt-2 flex flex-col gap-2.5">
+                          {e.answers.map((a, i) => (
+                            <div key={i}>
+                              <dt className="text-[11px] font-medium uppercase tracking-wide text-zinc-400">
+                                {a.label}
+                              </dt>
+                              <dd className="mt-0.5 whitespace-pre-wrap text-sm leading-relaxed text-zinc-700">
+                                {fmtAnswer(a)}
+                              </dd>
+                            </div>
+                          ))}
+                        </dl>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
