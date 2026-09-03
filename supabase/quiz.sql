@@ -189,3 +189,24 @@ drop policy if exists "coaching_quiz_attempts admin delete" on public.coaching_q
 create policy "coaching_quiz_attempts admin delete"
   on public.coaching_quiz_attempts for delete
   using (public.is_admin());
+
+-- ── Statistik butir soal (buat murid, di halaman review) ─────────────
+-- Per soal: berapa attempt total & berapa yang jawab benar (dari kolom
+-- `results` yang udah dihitung Edge Function). security definer supaya
+-- murid bisa lihat agregatnya tanpa bisa baca attempt orang lain.
+create or replace function public.quiz_question_stats(p_set text)
+returns table (question_id text, total bigint, correct bigint)
+language sql security definer set search_path = public stable as $$
+  select
+    q.id,
+    count(a.id),
+    count(*) filter (where (a.results ->> q.id) = 'true')
+  from public.coaching_questions q
+  left join public.coaching_quiz_attempts a
+    on a.set_id = p_set and a.results <> '{}'::jsonb
+  where q.set_id = p_set
+  group by q.id;
+$$;
+
+revoke execute on function public.quiz_question_stats(text) from anon;
+grant execute on function public.quiz_question_stats(text) to authenticated;
