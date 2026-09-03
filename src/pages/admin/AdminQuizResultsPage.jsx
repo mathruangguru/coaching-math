@@ -1,5 +1,5 @@
 import { Suspense, lazy, useEffect, useMemo, useState } from "react";
-import { Search, ArrowLeft, ArrowRight, RotateCcw } from "lucide-react";
+import { Search, ArrowLeft, ArrowRight, RotateCcw, Check } from "lucide-react";
 import { getUsers } from "../../lib/users";
 import {
   getQuestionSets,
@@ -513,21 +513,42 @@ function QuestionAnalytics({ questions, attempts }) {
                   {r.blank > 0 && ` · ${r.blank} kosong`}
                 </span>
               </div>
-              <div className="flex flex-col gap-1">
+              <div className="flex flex-col gap-2.5">
                 {r.options.map((opt, oi) => {
                   const isKey = r.keyArr.includes(oi);
                   const c = r.opts[oi] ?? 0;
                   const p = r.n ? Math.round((c / r.n) * 100) : 0;
                   return (
-                    <div key={oi} className="flex items-center gap-2">
-                      <span
-                        className={`w-4 shrink-0 text-center text-[11px] font-bold ${
-                          isKey ? "text-teal-600" : "text-zinc-400"
-                        }`}
-                      >
-                        {optLetter(oi)}
-                      </span>
-                      <div className="h-2 flex-1 overflow-hidden rounded-full bg-zinc-100">
+                    <div key={oi}>
+                      <div className="flex items-baseline gap-1.5 text-[11px]">
+                        <span
+                          className={`shrink-0 font-bold ${
+                            isKey ? "text-teal-600" : "text-zinc-400"
+                          }`}
+                        >
+                          {optLetter(oi)}
+                        </span>
+                        <span
+                          className={`min-w-0 flex-1 ${
+                            isKey
+                              ? "font-medium text-teal-700"
+                              : "text-zinc-600"
+                          }`}
+                        >
+                          <Markdown inline>{opt || "—"}</Markdown>
+                        </span>
+                        {isKey && (
+                          <Check
+                            size={13}
+                            strokeWidth={3}
+                            className="shrink-0 translate-y-0.5 text-teal-600"
+                          />
+                        )}
+                        <span className="shrink-0 tabular-nums text-zinc-400">
+                          {p}%
+                        </span>
+                      </div>
+                      <div className="ml-4 mt-1 h-2 overflow-hidden rounded-full bg-zinc-100">
                         <div
                           className={`h-full rounded-full ${
                             isKey ? "bg-teal-500" : "bg-zinc-300"
@@ -535,12 +556,6 @@ function QuestionAnalytics({ questions, attempts }) {
                           style={{ width: `${p}%` }}
                         />
                       </div>
-                      <span className="w-8 shrink-0 text-right text-[11px] tabular-nums text-zinc-400">
-                        {p}%
-                      </span>
-                      <span className="w-8 shrink-0 text-[10px] font-semibold uppercase tracking-wide text-teal-600">
-                        {isKey ? "kunci" : ""}
-                      </span>
                     </div>
                   );
                 })}
