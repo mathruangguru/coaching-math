@@ -211,6 +211,56 @@ export async function getMyFormResponseLessonIds(lessonIds) {
 }
 
 /**
+ * Jawaban refleksi/form milik user ini sendiri buat sekumpulan lesson,
+ * lengkap dengan label field-nya. Dipakai di lobby course buat nampilin
+ * daftar refleksi yang pernah dikirim.
+ * `lessons`: [{ id, title, form_id }]. Balikin entri urut terbaru:
+ *   { lessonId, title, at, answers: [{ label, type, value }] }
+ */
+export async function getMyRefleksiEntries(lessons) {
+  if (!hasSupabase || !lessons?.length) return [];
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const byId = new Map(lessons.map((l) => [l.id, l]));
+  const { data: rows, error } = await supabase
+    .from("coaching_form_responses")
+    .select("lesson_id, answers, created_at")
+    .eq("user_id", user.id)
+    .in("lesson_id", [...byId.keys()])
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  if (!rows.length) return [];
+
+  const formIds = [...new Set(lessons.map((l) => l.form_id).filter(Boolean))];
+  const forms = await Promise.all(
+    formIds.map((id) => getForm(id).catch(() => null))
+  );
+  const fieldsByForm = new Map(
+    forms.filter(Boolean).map((f) => [f.id, f.fields])
+  );
+
+  return rows.map((r) => {
+    const lesson = byId.get(r.lesson_id);
+    const fields = fieldsByForm.get(lesson?.form_id) ?? [];
+    return {
+      lessonId: r.lesson_id,
+      title: lesson?.title ?? "Refleksi",
+      at: r.created_at,
+      answers: fields
+        .filter((f) => f.type !== "name" && f.type !== "email")
+        .map((f) => ({
+          label: f.label || "Pertanyaan",
+          type: f.type,
+          value: r.answers?.[f.id],
+        })),
+    };
+  });
+}
+
+/**
  * Semua respons sebuah form — buat rekap admin (RLS admin read).
  * Kalau `lessonId` dikasih, dibatasi ke respons yang masuk lewat lesson itu
  * (satu form bisa dipasang di beberapa lesson).
