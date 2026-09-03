@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronDown,
   UserCheck,
+  UserPlus,
   NotebookPen,
   Plus,
   Trash2,
@@ -16,6 +17,7 @@ import {
   createRound,
   setRoundOpen,
   deleteRound,
+  bulkCheckIn,
 } from "../../lib/sessions";
 import {
   getForm,
@@ -23,6 +25,7 @@ import {
   deleteFormResponse,
   responsesToCsv,
 } from "../../lib/forms";
+import { getAttemptUserIdsByLesson } from "../../lib/quiz";
 import Skeleton from "../ui/Skeleton";
 
 const fullName = (u) =>
@@ -118,9 +121,124 @@ function AttendeeAvatar({ user, uid, at }) {
   );
 }
 
-function PresensiRow({ lesson, usersById }) {
+// user_id[] peserta sebuah sumber (latihan soal / form / ronde presensi lain).
+async function sourceUserIds(val, rounds) {
+  const [kind, a, b] = val.split(":");
+  if (kind === "soal") return getAttemptUserIdsByLesson(a);
+  if (kind === "form") {
+    const rows = await getFormResponses(b, a); // (formId, lessonId)
+    return [...new Set(rows.map((r) => r.user_id).filter(Boolean))];
+  }
+  if (kind === "round") {
+    const r = rounds.find((x) => x.id === a);
+    return [...new Set((r?.people ?? []).map((p) => p.user_id))];
+  }
+  return [];
+}
+
+// Import kehadiran ke satu ronde dari aktivitas lain di course yang sama.
+function ImportPanel({ round, present, soalSrc, formSrc, rounds, onDone }) {
+  const [sel, setSel] = useState("");
+  const [preview, setPreview] = useState(null); // { fresh, ids } | null
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const otherRounds = rounds.filter((r) => r.id !== round.id);
+
+  const pick = async (val) => {
+    setSel(val);
+    setPreview(null);
+    setErr("");
+    if (!val) return;
+    setBusy(true);
+    try {
+      const ids = await sourceUserIds(val, rounds);
+      const has = new Set(present);
+      setPreview({ total: ids.length, fresh: ids.filter((u) => !has.has(u)).length, ids });
+    } catch (e) {
+      setErr(e?.message ?? "Gagal memuat sumber.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const apply = async () => {
+    if (!preview?.ids?.length) return;
+    setBusy(true);
+    setErr("");
+    try {
+      const n = await bulkCheckIn(round.id, preview.ids);
+      onDone(n);
+    } catch (e) {
+      setErr(e?.message ?? "Gagal menandai hadir.");
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="mt-2 flex flex-col gap-1.5 border-t border-zinc-100 pt-2">
+      <select
+        value={sel}
+        onChange={(e) => pick(e.target.value)}
+        disabled={busy}
+        className="w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs text-zinc-800 outline-none focus:border-brand-500 disabled:opacity-50"
+      >
+        <option value="">Ambil kehadiran dari…</option>
+        {soalSrc.length > 0 && (
+          <optgroup label="Latihan soal — yang sudah mengerjakan">
+            {soalSrc.map((i) => (
+              <option key={i.id} value={`soal:${i.id}`}>
+                {i.title}
+              </option>
+            ))}
+          </optgroup>
+        )}
+        {formSrc.length > 0 && (
+          <optgroup label="Form / Refleksi — yang sudah mengisi">
+            {formSrc.map((i) => (
+              <option key={i.id} value={`form:${i.id}:${i.form_id}`}>
+                {i.title}
+              </option>
+            ))}
+          </optgroup>
+        )}
+        {otherRounds.length > 0 && (
+          <optgroup label="Presensi lain — yang hadir">
+            {otherRounds.map((r) => (
+              <option key={r.id} value={`round:${r.id}`}>
+                {r.label}
+              </option>
+            ))}
+          </optgroup>
+        )}
+      </select>
+
+      {err && <p className="text-[11px] text-rose-500">{err}</p>}
+      {busy && !preview && (
+        <p className="text-[11px] text-zinc-400">Memuat…</p>
+      )}
+      {preview && (
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[11px] text-zinc-500">
+            {preview.total} orang · {preview.fresh} belum tercatat
+          </span>
+          <button
+            type="button"
+            onClick={apply}
+            disabled={busy || preview.fresh === 0}
+            className="inline-flex items-center gap-1 rounded-md bg-emerald-500 px-2 py-1 text-xs font-semibold text-white transition-colors hover:bg-emerald-600 disabled:opacity-50"
+          >
+            <UserPlus size={12} /> Tandai {preview.fresh} hadir
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PresensiRow({ lesson, usersById, courseItems = [] }) {
   const [open, setOpen] = useState(false);
   const [rounds, setRounds] = useState(null); // null | [{ ...round, people: [] }]
+  const [importing, setImporting] = useState(null); // round id | null
   const [failed, setFailed] = useState(false);
   const [label, setLabel] = useState("");
   const [busy, setBusy] = useState(false);
@@ -140,6 +258,15 @@ function PresensiRow({ lesson, usersById }) {
       })
       .sort((a, b) => b.n - a.n || a.name.localeCompare(b.name));
   }, [rounds, usersById]);
+
+  // Aktivitas lain di course yang bisa jadi sumber kehadiran.
+  const soalSrc = courseItems.filter(
+    (i) => i.type === "soal" && i.question_set_id
+  );
+  const formSrc = courseItems.filter(
+    (i) => (i.type === "form" || i.type === "refleksi") && i.form_id
+  );
+  const hasSrc = soalSrc.length > 0 || formSrc.length > 0;
 
   const load = useCallback(() => {
     getRounds(lesson.id)
@@ -384,6 +511,29 @@ function PresensiRow({ lesson, usersById }) {
                       ))}
                     </div>
                   )}
+
+                  {hasSrc &&
+                    (importing === r.id ? (
+                      <ImportPanel
+                        round={r}
+                        present={r.people.map((p) => p.user_id)}
+                        soalSrc={soalSrc}
+                        formSrc={formSrc}
+                        rounds={rounds}
+                        onDone={(n) => {
+                          setImporting(null);
+                          if (n > 0) load();
+                        }}
+                      />
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setImporting(r.id)}
+                        className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-zinc-400 transition-colors hover:text-zinc-700"
+                      >
+                        <UserPlus size={11} /> Tandai hadir dari aktivitas lain
+                      </button>
+                    ))}
                 </div>
               ))}
 
@@ -612,6 +762,7 @@ function RefleksiRow({ lesson, usersById }) {
 export default function CourseSessionRecap({ courseId, only }) {
   const [status, setStatus] = useState("loading");
   const [lessons, setLessons] = useState([]);
+  const [courseItems, setCourseItems] = useState([]);
   const [usersById, setUsersById] = useState(new Map());
 
   const kinds = only ? [only] : ["presensi", "refleksi"];
@@ -621,14 +772,27 @@ export default function CourseSessionRecap({ courseId, only }) {
     Promise.all([getCourse(courseId), getUsers()])
       .then(([course, users]) => {
         if (!alive) return;
-        const items = (course?.sections ?? [])
-          .flatMap((s) => s.items)
-          .filter((it) =>
-            only
-              ? it.type === only
-              : it.type === "presensi" || it.type === "refleksi"
-          );
+        const all = (course?.sections ?? []).flatMap((s) => s.items ?? []);
+        const items = all.filter((it) =>
+          only
+            ? it.type === only
+            : it.type === "presensi" || it.type === "refleksi"
+        );
         setLessons(items);
+        setCourseItems(
+          all
+            .filter(
+              (i) =>
+                i.type === "soal" || i.type === "form" || i.type === "refleksi"
+            )
+            .map((i) => ({
+              id: i.id,
+              type: i.type,
+              title: i.title,
+              question_set_id: i.question_set_id,
+              form_id: i.form_id,
+            }))
+        );
         setUsersById(new Map(users.map((u) => [u.id, u])));
         setStatus("ready");
       })
@@ -676,7 +840,12 @@ export default function CourseSessionRecap({ courseId, only }) {
           <ul className="divide-y divide-zinc-100">
             {lessons.map((l) =>
               l.type === "presensi" ? (
-                <PresensiRow key={l.id} lesson={l} usersById={usersById} />
+                <PresensiRow
+                  key={l.id}
+                  lesson={l}
+                  usersById={usersById}
+                  courseItems={courseItems}
+                />
               ) : (
                 <RefleksiRow key={l.id} lesson={l} usersById={usersById} />
               )
