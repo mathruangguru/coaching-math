@@ -64,6 +64,10 @@ export default function App() {
             element={<QuizPage />}
           />
           <Route
+            path="course/:courseId/soal/:lessonId/review"
+            element={<QuizPage review />}
+          />
+          <Route
             path="course/:courseId/form/:lessonId"
             element={<FormPage />}
           />

@@ -1,5 +1,5 @@
 import { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, Navigate, useParams } from "react-router-dom";
 import { ArrowLeft, ChevronLeft, ChevronRight, Clock } from "lucide-react";
 import { getCourse } from "../lib/courses";
 import {
@@ -32,7 +32,7 @@ const fmtClock = (ms) => {
   return h > 0 ? `${h}:${p(m)}:${p(s % 60)}` : `${p(m)}:${p(s % 60)}`;
 };
 
-export default function QuizPage() {
+export default function QuizPage({ review = false }) {
   const { courseId, lessonId } = useParams();
   const [data, setData] = useState({ status: "loading" });
   const [answers, setAnswers] = useState({}); // { qid: idx }
@@ -72,6 +72,9 @@ export default function QuizPage() {
             total: attempt.total,
             duration_sec: attempt.duration_sec ?? null,
           });
+          if (attempt.answers && typeof attempt.answers === "object") {
+            setAnswers(attempt.answers);
+          }
         } else if (set) {
           // Sesi udah jalan (dari sebelumnya / device lain)? -> lanjut,
           // lewati lobby. Belum -> tampilkan lobby dulu.
@@ -303,6 +306,145 @@ export default function QuizPage() {
     );
   }
 
+  // ── Review: lihat soal + jawaban sendiri (halaman terpisah) ──────
+  if (review) {
+    if (!result)
+      return (
+        <Navigate replace to={`/course/${courseId}/soal/${lessonId}`} />
+      );
+    const gStart = Math.floor(current / GROUP) * GROUP;
+    const gEnd = Math.min(gStart + GROUP, total);
+    const q = questions[current];
+    const chosen = answers[q.id];
+    const picked = (oi) =>
+      Array.isArray(chosen) ? chosen.includes(oi) : chosen === oi;
+    return (
+      <div className="mx-auto flex max-w-2xl flex-col gap-5">
+        <Link
+          to={`/course/${courseId}/soal/${lessonId}`}
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-500 transition-colors hover:text-zinc-800"
+        >
+          <ArrowLeft size={14} /> Kembali ke hasil
+        </Link>
+        {header}
+
+        {/* Strip nomor soal, per 10 — sama kaya pas ngerjain */}
+        <div className="flex items-center justify-center gap-1.5">
+          {gStart > 0 && (
+            <button
+              type="button"
+              onClick={() => setCurrent(gStart - GROUP)}
+              aria-label="10 soal sebelumnya"
+              className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-zinc-200 text-zinc-500 transition-colors hover:bg-zinc-50"
+            >
+              <ChevronLeft size={15} />
+            </button>
+          )}
+          <div className="flex flex-wrap justify-center gap-1.5">
+            {Array.from({ length: gEnd - gStart }, (_, k) => {
+              const idx = gStart + k;
+              const answered = isAnswered(questions[idx]);
+              const active = idx === current;
+              return (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => setCurrent(idx)}
+                  className={`h-8 w-8 shrink-0 rounded-lg border text-xs font-semibold transition-colors ${
+                    active
+                      ? "border-brand-500 bg-brand-500 text-white"
+                      : answered
+                        ? "border-teal-300 bg-teal-50 text-teal-700"
+                        : "border-zinc-200 bg-white text-zinc-500 hover:bg-zinc-50"
+                  }`}
+                >
+                  {idx + 1}
+                </button>
+              );
+            })}
+          </div>
+          {gEnd < total && (
+            <button
+              type="button"
+              onClick={() => setCurrent(gEnd)}
+              aria-label="10 soal berikutnya"
+              className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-zinc-200 text-zinc-500 transition-colors hover:bg-zinc-50"
+            >
+              <ChevronRight size={15} />
+            </button>
+          )}
+        </div>
+
+        <Suspense fallback={<Skeleton className="h-40 w-full rounded-2xl" />}>
+          <div className="rounded-2xl border border-zinc-200/80 bg-white p-5">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs text-zinc-400">
+                Soal {current + 1} dari {total}
+              </p>
+              {!isAnswered(q) && (
+                <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-400">
+                  Belum dijawab
+                </span>
+              )}
+            </div>
+            <div className="mt-1.5 text-sm font-medium text-zinc-900">
+              <Markdown>{q.prompt}</Markdown>
+            </div>
+            <div className="mt-3 flex flex-col gap-2">
+              {q.options.map((opt, oi) => (
+                <div
+                  key={oi}
+                  className={`flex items-center gap-2.5 rounded-lg border px-3 py-2 text-sm ${
+                    picked(oi)
+                      ? "border-brand-500 bg-brand-50 text-brand-800"
+                      : "border-zinc-200 text-zinc-600"
+                  }`}
+                >
+                  <span
+                    className={`grid h-6 w-6 shrink-0 place-items-center border text-xs font-bold ${
+                      q.type === "multi" ? "rounded-md" : "rounded-full"
+                    } ${
+                      picked(oi)
+                        ? "border-brand-500 bg-brand-500 text-white"
+                        : "border-zinc-300 text-zinc-400"
+                    }`}
+                  >
+                    {String.fromCharCode(65 + oi)}
+                  </span>
+                  <Markdown inline>{opt}</Markdown>
+                  {picked(oi) && (
+                    <span className="ml-auto shrink-0 rounded bg-brand-500 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                      Jawaban kamu
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </Suspense>
+
+        <div className="flex items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={() => setCurrent((c) => c - 1)}
+            disabled={current === 0}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3.5 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 disabled:opacity-40"
+          >
+            <ChevronLeft size={15} /> Sebelumnya
+          </button>
+          <button
+            type="button"
+            onClick={() => setCurrent((c) => c + 1)}
+            disabled={current === total - 1}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3.5 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 disabled:opacity-40"
+          >
+            Berikutnya <ChevronRight size={15} />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   // ── Hasil ─────────────────────────────────────────────────────────
   if (result) {
     // Sampai 2 desimal, tapi buang nol di belakang (50 bukan 50.00; 3.33; 66.67).
@@ -328,6 +470,12 @@ export default function QuizPage() {
               Waktu pengerjaan: {fmtDur(result.duration_sec)}
             </p>
           )}
+          <Link
+            to={`/course/${courseId}/soal/${lessonId}/review`}
+            className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3.5 py-2 text-xs font-semibold text-zinc-600 transition-colors hover:bg-zinc-50"
+          >
+            Lihat Soal
+          </Link>
         </div>
         {timeUpModal}
       </div>
