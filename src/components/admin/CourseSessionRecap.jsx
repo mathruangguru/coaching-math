@@ -217,10 +217,17 @@ function PresensiRow({ lesson, usersById }) {
                         return (
                           <li
                             key={p.user_id}
-                            className="flex items-baseline justify-between gap-3 text-xs"
+                            className="flex items-start justify-between gap-3 text-xs"
                           >
-                            <span className="text-zinc-700">
-                              {u ? fullName(u) : p.user_id}
+                            <span className="flex min-w-0 flex-col">
+                              <span className="truncate text-zinc-700">
+                                {u ? fullName(u) : p.user_id}
+                              </span>
+                              {u?.email && (
+                                <span className="truncate text-[11px] text-zinc-400">
+                                  {u.email}
+                                </span>
+                              )}
                             </span>
                             <span className="shrink-0 text-zinc-400">
                               {fmt(p.checked_in_at)}
