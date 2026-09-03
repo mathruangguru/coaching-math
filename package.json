@@ -12,7 +12,7 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.112.4",
     "@tailwindcss/vite": "^4.3.3",
-    "katex": "^0.18.4",
+    "katex": "0.16.47",
     "lucide-react": "^1.35.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
