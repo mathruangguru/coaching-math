@@ -80,7 +80,9 @@ export default function MateriContentPage() {
           <Suspense
             fallback={<Skeleton className="h-40 w-full rounded" />}
           >
-            <Markdown>{lesson.content}</Markdown>
+            <Markdown className="text-sm text-zinc-700">
+              {lesson.content}
+            </Markdown>
           </Suspense>
         </div>
       ) : (

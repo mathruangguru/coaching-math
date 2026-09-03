@@ -156,7 +156,7 @@ export default function MateriEditor({ lesson, onClose, onSaved }) {
           >
             {text.trim() ? (
               <Suspense fallback={<Skeleton className="h-32 w-full rounded" />}>
-                <Markdown>{text}</Markdown>
+                <Markdown className="text-sm text-zinc-700">{text}</Markdown>
               </Suspense>
             ) : (
               <p className="text-xs text-zinc-300">Preview muncul di sini.</p>
