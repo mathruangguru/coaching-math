@@ -11,7 +11,6 @@ import {
   saveQuizDraft,
 } from "../lib/quiz";
 import Skeleton from "../components/ui/Skeleton";
-import MathText from "../components/ui/MathText";
 
 const Markdown = lazy(() => import("../components/ui/Markdown"));
 
@@ -324,16 +323,14 @@ export default function QuizPage() {
           </div>
 
           {set.intro && (
-            <div className="mt-4 flex flex-col gap-1.5 border-t border-zinc-100 pt-4 text-sm text-zinc-700">
-              {set.intro.split(/\r?\n/).map((line, i) =>
-                line.trim() ? (
-                  <p key={i}>
-                    <MathText>{line}</MathText>
-                  </p>
-                ) : (
-                  <div key={i} className="h-2" />
-                )
-              )}
+            <div className="mt-4 border-t border-zinc-100 pt-4">
+              <Suspense
+                fallback={<Skeleton className="h-16 w-full rounded" />}
+              >
+                <Markdown className="text-sm text-zinc-700">
+                  {set.intro}
+                </Markdown>
+              </Suspense>
             </div>
           )}
 
