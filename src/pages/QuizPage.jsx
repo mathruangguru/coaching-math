@@ -341,25 +341,70 @@ export default function QuizPage() {
           </button>
         </div>
 
-        {showReview && (
-          <Suspense
-            fallback={<Skeleton className="h-40 w-full rounded-2xl" />}
-          >
-            <div className="flex flex-col gap-3">
-              {questions.map((q, qi) => {
-                const chosen = answers[q.id];
-                const picked = (oi) =>
-                  Array.isArray(chosen)
-                    ? chosen.includes(oi)
-                    : chosen === oi;
-                return (
-                  <div
-                    key={q.id}
-                    className="rounded-2xl border border-zinc-200/80 bg-white p-5"
-                  >
+        {showReview &&
+          (() => {
+            const gStart = Math.floor(current / GROUP) * GROUP;
+            const gEnd = Math.min(gStart + GROUP, total);
+            const q = questions[current];
+            const chosen = answers[q.id];
+            const picked = (oi) =>
+              Array.isArray(chosen) ? chosen.includes(oi) : chosen === oi;
+            return (
+              <>
+                {/* Strip nomor soal, per 10 — sama kaya pas ngerjain */}
+                <div className="flex items-center justify-center gap-1.5">
+                  {gStart > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setCurrent(gStart - GROUP)}
+                      aria-label="10 soal sebelumnya"
+                      className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-zinc-200 text-zinc-500 transition-colors hover:bg-zinc-50"
+                    >
+                      <ChevronLeft size={15} />
+                    </button>
+                  )}
+                  <div className="flex flex-wrap justify-center gap-1.5">
+                    {Array.from({ length: gEnd - gStart }, (_, k) => {
+                      const idx = gStart + k;
+                      const answered = isAnswered(questions[idx]);
+                      const active = idx === current;
+                      return (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => setCurrent(idx)}
+                          className={`h-8 w-8 shrink-0 rounded-lg border text-xs font-semibold transition-colors ${
+                            active
+                              ? "border-brand-500 bg-brand-500 text-white"
+                              : answered
+                                ? "border-teal-300 bg-teal-50 text-teal-700"
+                                : "border-zinc-200 bg-white text-zinc-500 hover:bg-zinc-50"
+                          }`}
+                        >
+                          {idx + 1}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {gEnd < total && (
+                    <button
+                      type="button"
+                      onClick={() => setCurrent(gEnd)}
+                      aria-label="10 soal berikutnya"
+                      className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-zinc-200 text-zinc-500 transition-colors hover:bg-zinc-50"
+                    >
+                      <ChevronRight size={15} />
+                    </button>
+                  )}
+                </div>
+
+                <Suspense
+                  fallback={<Skeleton className="h-40 w-full rounded-2xl" />}
+                >
+                  <div className="rounded-2xl border border-zinc-200/80 bg-white p-5">
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-xs text-zinc-400">
-                        Soal {qi + 1} dari {total}
+                        Soal {current + 1} dari {total}
                       </p>
                       {!isAnswered(q) && (
                         <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-400">
@@ -401,11 +446,29 @@ export default function QuizPage() {
                       ))}
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          </Suspense>
-        )}
+                </Suspense>
+
+                <div className="flex items-center justify-between gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setCurrent((c) => c - 1)}
+                    disabled={current === 0}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3.5 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 disabled:opacity-40"
+                  >
+                    <ChevronLeft size={15} /> Sebelumnya
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCurrent((c) => c + 1)}
+                    disabled={current === total - 1}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3.5 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 disabled:opacity-40"
+                  >
+                    Berikutnya <ChevronRight size={15} />
+                  </button>
+                </div>
+              </>
+            );
+          })()}
         {timeUpModal}
       </div>
     );
