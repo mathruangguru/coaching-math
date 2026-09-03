@@ -549,16 +549,30 @@ export default function QuizPage({ review = false }) {
         {backLink}
         {header}
 
-        {startedAt != null && (
-          <p
-            className={`flex items-center justify-center gap-1.5 text-xs font-semibold tabular-nums ${timerTone}`}
+        <div className="flex items-center justify-between gap-3">
+          {startedAt != null ? (
+            <p
+              className={`inline-flex items-center gap-1.5 text-xs font-semibold tabular-nums ${timerTone}`}
+            >
+              <Clock size={13} />
+              {remainingMs != null
+                ? `Sisa waktu ${fmtClock(remainingMs)}`
+                : `Waktu ${fmtClock(elapsedMs)}`}
+            </p>
+          ) : (
+            <span />
+          )}
+          <button
+            type="button"
+            onClick={() => submit()}
+            disabled={busy}
+            className="shrink-0 rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-600 disabled:opacity-50"
           >
-            <Clock size={13} />
-            {remainingMs != null
-              ? `Sisa waktu ${fmtClock(remainingMs)}`
-              : `Waktu ${fmtClock(elapsedMs)}`}
-          </p>
-        )}
+            {busy
+              ? "Mengirim…"
+              : `Kirim jawaban · ${answeredCount}/${total}`}
+          </button>
+        </div>
 
         {/* Strip nomor soal, per 10 */}
         <div className="flex items-center justify-center gap-1.5">
@@ -683,38 +697,25 @@ export default function QuizPage({ review = false }) {
         </div>
 
         {/* Navigasi */}
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center justify-between gap-3">
-            <button
-              type="button"
-              onClick={() => setCurrent((c) => c - 1)}
-              disabled={current === 0}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3.5 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 disabled:opacity-40"
-            >
-              <ChevronLeft size={15} /> Sebelumnya
-            </button>
-
-            {!isLast && (
-              <button
-                type="button"
-                onClick={() => setCurrent((c) => c + 1)}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3.5 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50"
-              >
-                Berikutnya <ChevronRight size={15} />
-              </button>
-            )}
-          </div>
-
+        <div className="flex items-center justify-between gap-3">
           <button
             type="button"
-            onClick={() => submit()}
-            disabled={busy}
-            className="rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-600 disabled:opacity-50"
+            onClick={() => setCurrent((c) => c - 1)}
+            disabled={current === 0}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3.5 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 disabled:opacity-40"
           >
-            {busy
-              ? "Mengirim…"
-              : `Kirim jawaban · ${answeredCount}/${total} terjawab`}
+            <ChevronLeft size={15} /> Sebelumnya
           </button>
+
+          {!isLast && (
+            <button
+              type="button"
+              onClick={() => setCurrent((c) => c + 1)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3.5 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50"
+            >
+              Berikutnya <ChevronRight size={15} />
+            </button>
+          )}
         </div>
       </div>
 
