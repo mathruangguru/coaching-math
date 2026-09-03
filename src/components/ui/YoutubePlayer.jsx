@@ -73,6 +73,17 @@ export default function YoutubePlayer({ id, title }) {
         events: {
           onReady: (e) => {
             if (dead) return;
+            // YT.Player nge-replace elemen host jadi <iframe> — className kita
+            // ilang. Set langsung: isi penuh + pointer-events none biar hover
+            // nggak munculin chrome YouTube.
+            const f = e.target.getIframe?.();
+            if (f) {
+              f.style.position = "absolute";
+              f.style.inset = "0";
+              f.style.width = "100%";
+              f.style.height = "100%";
+              f.style.pointerEvents = "none";
+            }
             setReady(true);
             setDur(e.target.getDuration() || 0);
             setMuted(e.target.isMuted?.() ?? false);
@@ -164,10 +175,7 @@ export default function YoutubePlayer({ id, title }) {
       onMouseLeave={() => playing && setUi(false)}
       className="group relative aspect-video w-full overflow-hidden rounded-xl border border-zinc-200 bg-black [&:fullscreen]:aspect-auto [&:fullscreen]:h-full [&:fullscreen]:rounded-none [&:fullscreen]:border-0"
     >
-      <div
-        ref={hostRef}
-        className="pointer-events-none absolute inset-0 [&>iframe]:h-full [&>iframe]:w-full"
-      />
+      <div ref={hostRef} className="absolute inset-0" />
 
       {/* area klik play/pause */}
       <button
@@ -178,13 +186,11 @@ export default function YoutubePlayer({ id, title }) {
         className="absolute inset-0"
       />
 
-      {/* Bar hitam atas nutup judul + channel YouTube yang nongol pas
-          paused. Pas main, overlay udah nangkep hover jadi nggak perlu. */}
-      <div
-        className={`pointer-events-none absolute inset-x-0 top-0 h-14 bg-black transition-opacity duration-200 ${
-          playing ? "opacity-0" : "opacity-100"
-        }`}
-      />
+      {/* Bar hitam permanen atas & bawah nutup judul / channel / logo /
+          tombol share YouTube yang nongol tiap kali chrome-nya aktif
+          (mulai main, jeda, seek). */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-14 bg-black" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-black" />
 
       {!playing && ready && (
         <div className="pointer-events-none absolute inset-0 grid place-items-center bg-black/75">
