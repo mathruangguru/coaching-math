@@ -30,9 +30,9 @@ export async function getCourse(id) {
   const { data, error } = await supabase
     .from("coaching_courses")
     .select(
-      `id, title, description, icon,
+      `id, title, description, icon, announcement,
        sections:coaching_course_sections (
-         id, title, position,
+         id, title, position, meet_at,
          items:coaching_lessons ( id, type, title, duration, url, question_set_id, form_id, prompt, content, publish_status, position )
        )`
     )
@@ -55,7 +55,7 @@ export async function getCourse(id) {
 
 // ── Admin: tulis katalog (butuh login + role admin, dijaga RLS) ──────
 
-const COURSE_COLS = "id, title, description, icon";
+const COURSE_COLS = "id, title, description, icon, announcement";
 
 /**
  * Buat course baru. `payload`: { id, title, description, icon }

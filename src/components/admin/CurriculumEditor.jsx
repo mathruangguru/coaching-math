@@ -131,6 +131,16 @@ function move(arr, from, to) {
   return next;
 }
 
+// ISO <-> value <input type="datetime-local"> (YYYY-MM-DDTHH:mm, waktu lokal).
+const toLocalInput = (iso) => {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const p = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(
+    d.getHours()
+  )}:${p(d.getMinutes())}`;
+};
+
 function ReorderBtns({ onUp, onDown, first, last, label }) {
   const btn =
     "grid h-4 w-5 place-items-center rounded text-zinc-300 transition-colors hover:bg-zinc-100 hover:text-zinc-600 disabled:opacity-0";
@@ -512,6 +522,27 @@ export default function CurriculumEditor({ courseId }) {
                 onBlur={() => saveSectionTitle(editing)}
                 className={`${cell} mt-1.5 w-full text-sm font-semibold`}
                 placeholder="Nama pertemuan"
+              />
+            </label>
+
+            <label className="block">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-zinc-400">
+                Jadwal pertemuan
+                <span className="ml-2 font-normal normal-case tracking-normal text-zinc-400">
+                  buat "pertemuan berikutnya" di lobby
+                </span>
+              </span>
+              <input
+                type="datetime-local"
+                value={toLocalInput(editing.meet_at)}
+                onChange={(e) => {
+                  const meet_at = e.target.value
+                    ? new Date(e.target.value).toISOString()
+                    : null;
+                  patchSectionLocal(editing.id, { meet_at });
+                  run(() => updateSection(editing.id, { meet_at }));
+                }}
+                className={`${cell} mt-1.5 w-full text-sm sm:w-64`}
               />
             </label>
 

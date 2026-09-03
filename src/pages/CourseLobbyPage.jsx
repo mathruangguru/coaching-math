@@ -7,11 +7,21 @@ import {
   Lock,
   UserCheck,
   HelpCircle,
+  CalendarClock,
 } from "lucide-react";
 import { useCourse } from "../hooks/useCourse";
 import { getMyAttendanceByLesson } from "../lib/sessions";
 import { getMyAttemptsByLesson } from "../lib/quiz";
 import Skeleton from "../components/ui/Skeleton";
+
+const fmtMeet = (iso) =>
+  new Date(iso).toLocaleString("id-ID", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 
 export default function CourseLobbyPage() {
   const { courseId } = useParams();
@@ -27,6 +37,7 @@ export default function CourseLobbyPage() {
   const [passcode, setPasscode] = useState("");
   const [enrollErr, setEnrollErr] = useState("");
   const [recap, setRecap] = useState(null); // { hasPresensi, ronde, hadir, hasQuiz, quizDone, quizTotal, avgPct }
+  const [now] = useState(() => Date.now());
 
   const submitEnroll = async (e) => {
     e.preventDefault();
@@ -101,11 +112,15 @@ export default function CourseLobbyPage() {
 
   const totalMateri = visibleSections.reduce(
     (n, s) => n + (s.items?.length ?? 0),
-    0
+    0,
   );
 
   const cardCls =
     "flex flex-col rounded-2xl border border-zinc-200/80 bg-white p-5";
+
+  const nextMeet = (course?.sections ?? [])
+    .filter((s) => s.meet_at && new Date(s.meet_at).getTime() > now)
+    .sort((a, b) => new Date(a.meet_at) - new Date(b.meet_at))[0];
 
   return (
     <div className="mx-auto flex max-w-[1180px] flex-col gap-6">
@@ -124,6 +139,17 @@ export default function CourseLobbyPage() {
           {course.description}
         </p>
       </div>
+
+      {course.announcement && (
+        <div className="rounded-2xl border border-brand-200 bg-brand-50/60 px-4 py-3">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-brand-600">
+            Pengumuman
+          </p>
+          <p className="mt-0.5 whitespace-pre-wrap text-sm text-zinc-700">
+            {course.announcement}
+          </p>
+        </div>
+      )}
 
       {!canView ? (
         <form
@@ -165,82 +191,103 @@ export default function CourseLobbyPage() {
           )}
         </form>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <Link
-            to="materi"
-            className={`group transition hover:border-zinc-300 hover:shadow-sm ${cardCls}`}
-          >
-            <span className="grid h-10 w-10 place-items-center rounded-xl bg-sky-50 text-sky-600">
-              <BookOpen size={20} />
-            </span>
-            <p className="mt-4 text-sm font-bold tracking-tight text-zinc-900">
-              Materi
-            </p>
-            <p className="mt-1 text-xs text-zinc-500">
-              {visibleSections.length} pertemuan · {totalMateri} materi
-            </p>
-            <span className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-brand-600">
-              Lihat materi
-              <ArrowRight
-                size={13}
-                strokeWidth={2.5}
-                className="transition-transform group-hover:translate-x-0.5"
-              />
-            </span>
-          </Link>
-
-          {recap?.hasPresensi && (
-            <div className={cardCls}>
-              <span className="grid h-10 w-10 place-items-center rounded-xl bg-emerald-50 text-emerald-600">
-                <UserCheck size={20} />
+        <div className="flex flex-col gap-3">
+          {nextMeet && (
+            <div className="flex items-center gap-3 rounded-2xl border border-zinc-200/80 bg-white px-4 py-3">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-600">
+                <CalendarClock size={20} />
               </span>
-              <p className="mt-4 text-sm font-bold tracking-tight text-zinc-900">
-                Kehadiran
-              </p>
-              {recap.ronde > 0 ? (
-                <>
-                  <p className="mt-1 text-2xl font-bold text-zinc-900">
-                    {recap.hadir}
-                    <span className="text-base font-semibold text-zinc-400">
-                      /{recap.ronde}
-                    </span>
-                  </p>
-                  <p className="mt-0.5 text-xs text-zinc-500">
-                    sesi presensi kamu hadiri
-                  </p>
-                </>
-              ) : (
-                <p className="mt-1 text-xs text-zinc-400">
-                  Belum ada sesi presensi.
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
+                  Pertemuan berikutnya
                 </p>
-              )}
+                <p className="truncate text-sm font-semibold text-zinc-900">
+                  {nextMeet.title}
+                </p>
+                <p className="text-xs capitalize text-zinc-500">
+                  {fmtMeet(nextMeet.meet_at)}
+                </p>
+              </div>
             </div>
           )}
 
-          {recap?.hasQuiz && (
-            <div className={cardCls}>
-              <span className="grid h-10 w-10 place-items-center rounded-xl bg-amber-50 text-amber-600">
-                <HelpCircle size={20} />
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <Link
+              to="materi"
+              className={`group transition hover:border-zinc-300 hover:shadow-sm ${cardCls}`}
+            >
+              <span className="grid h-10 w-10 place-items-center rounded-xl bg-sky-50 text-sky-600">
+                <BookOpen size={20} />
               </span>
               <p className="mt-4 text-sm font-bold tracking-tight text-zinc-900">
-                Rata-rata skor
+                Materi
               </p>
-              {recap.avgPct != null ? (
-                <>
-                  <p className="mt-1 text-2xl font-bold text-zinc-900">
-                    {recap.avgPct}%
-                  </p>
-                  <p className="mt-0.5 text-xs text-zinc-500">
-                    {recap.quizDone} dari {recap.quizTotal} kuis dikerjakan
-                  </p>
-                </>
-              ) : (
-                <p className="mt-1 text-xs text-zinc-400">
-                  Belum ada kuis yang dikerjakan.
+              <p className="mt-1 text-xs text-zinc-500">
+                {visibleSections.length} pertemuan · {totalMateri} materi
+              </p>
+              <span className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-brand-600">
+                Lihat materi
+                <ArrowRight
+                  size={13}
+                  strokeWidth={2.5}
+                  className="transition-transform group-hover:translate-x-0.5"
+                />
+              </span>
+            </Link>
+
+            {recap?.hasPresensi && (
+              <div className={cardCls}>
+                <span className="grid h-10 w-10 place-items-center rounded-xl bg-emerald-50 text-emerald-600">
+                  <UserCheck size={20} />
+                </span>
+                <p className="mt-4 text-sm font-bold tracking-tight text-zinc-900">
+                  Kehadiran
                 </p>
-              )}
-            </div>
-          )}
+                {recap.ronde > 0 ? (
+                  <>
+                    <p className="mt-1 text-2xl font-bold text-zinc-900">
+                      {recap.hadir}
+                      <span className="text-base font-semibold text-zinc-400">
+                        /{recap.ronde}
+                      </span>
+                    </p>
+                    <p className="mt-0.5 text-xs text-zinc-500">
+                      sesi presensi kamu hadiri
+                    </p>
+                  </>
+                ) : (
+                  <p className="mt-1 text-xs text-zinc-400">
+                    Belum ada sesi presensi.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {recap?.hasQuiz && (
+              <div className={cardCls}>
+                <span className="grid h-10 w-10 place-items-center rounded-xl bg-amber-50 text-amber-600">
+                  <HelpCircle size={20} />
+                </span>
+                <p className="mt-4 text-sm font-bold tracking-tight text-zinc-900">
+                  Rata-rata skor
+                </p>
+                {recap.avgPct != null ? (
+                  <>
+                    <p className="mt-1 text-2xl font-bold text-zinc-900">
+                      {recap.avgPct}%
+                    </p>
+                    <p className="mt-0.5 text-xs text-zinc-500">
+                      {recap.quizDone} dari {recap.quizTotal} kuis dikerjakan
+                    </p>
+                  </>
+                ) : (
+                  <p className="mt-1 text-xs text-zinc-400">
+                    Belum ada kuis yang dikerjakan.
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

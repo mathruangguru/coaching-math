@@ -44,6 +44,7 @@ export default function CourseFormPage() {
     id: "",
     title: "",
     description: "",
+    announcement: "",
     icon: "sigma",
     passcode: "",
   });
@@ -85,6 +86,7 @@ export default function CourseFormPage() {
           id: data.id,
           title: data.title ?? "",
           description: data.description ?? "",
+          announcement: data.announcement ?? "",
           icon: data.icon ?? "sigma",
           passcode: passcode ?? "",
         });
@@ -122,11 +124,17 @@ export default function CourseFormPage() {
     }
 
     const description = form.description.trim() || null;
+    const announcement = form.announcement.trim() || null;
 
     setBusy(true);
     try {
       if (isEdit) {
-        await updateCourse(courseId, { title, description, icon: form.icon });
+        await updateCourse(courseId, {
+          title,
+          description,
+          announcement,
+          icon: form.icon,
+        });
         await saveCourseSecret(courseId, form.passcode);
         setBusy(false);
         setSaved(true);
@@ -136,6 +144,7 @@ export default function CourseFormPage() {
           id: effectiveId,
           title,
           description,
+          announcement,
           icon: form.icon,
         });
         if (form.passcode.trim())
@@ -279,6 +288,19 @@ export default function CourseFormPage() {
                 rows={3}
                 className={`${inputCls} resize-y`}
                 placeholder="Pathway to Mastery Matematika 2026/2027 Term 1"
+              />
+            </Field>
+
+            <Field
+              label="Pengumuman"
+              hint="tampil di lobby course buat murid — kosongin kalau nggak ada"
+            >
+              <textarea
+                value={form.announcement}
+                onChange={(e) => set("announcement", e.target.value)}
+                rows={2}
+                className={`${inputCls} resize-y`}
+                placeholder="mis. Pertemuan 3 dimajukan ke Rabu 19.00."
               />
             </Field>
 
