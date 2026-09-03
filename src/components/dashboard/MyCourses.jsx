@@ -64,29 +64,28 @@ export default function MyCourses() {
 
         {status === "ready" &&
           courses.map((course) => (
-            <div
+            <Link
               key={course.id}
-              className="flex flex-col gap-3 rounded-xl border border-zinc-200 px-4 py-3 sm:flex-row sm:items-center"
+              to={`/course/${course.id}`}
+              className="group flex items-center gap-3 rounded-xl border border-zinc-200 px-4 py-3 transition hover:border-zinc-300 hover:shadow-sm"
             >
               <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-sky-50 text-sky-600">
                 <SubjectIcon name={course.icon} size={17} />
               </span>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-zinc-900">
+                <p className="truncate text-sm font-semibold text-zinc-900 group-hover:text-brand-700">
                   {course.title}
                 </p>
                 <p className="truncate text-xs text-zinc-500">
                   {course.description}
                 </p>
               </div>
-              <Link
-                to={`/course/${course.id}`}
-                className="inline-flex w-fit shrink-0 items-center gap-1.5 rounded-lg bg-brand-500 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-brand-600"
-              >
-                Buka Course
-                <ArrowRight size={13} strokeWidth={2.5} />
-              </Link>
-            </div>
+              <ArrowRight
+                size={15}
+                strokeWidth={2.5}
+                className="shrink-0 text-zinc-300 transition-all group-hover:translate-x-0.5 group-hover:text-brand-500"
+              />
+            </Link>
           ))}
       </div>
     </section>
