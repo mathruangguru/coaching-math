@@ -495,6 +495,24 @@ export async function getMyAttemptsByLesson(lessonIds) {
 }
 
 /**
+ * set_id[] yang user ini punya sesi kuis lagi jalan (udah Mulai, belum
+ * submit). Buat state "sedang dikerjakan" di daftar materi.
+ */
+export async function getMyQuizProgressSetIds() {
+  if (!hasSupabase) return [];
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+  const { data, error } = await supabase
+    .from("coaching_quiz_progress")
+    .select("set_id")
+    .eq("user_id", user.id);
+  if (error) throw error;
+  return data.map((r) => r.set_id);
+}
+
+/**
  * Attempt terakhir user di lesson ini (buat nampilin skor sebelumnya).
  */
 export async function getLastAttempt(lessonId) {

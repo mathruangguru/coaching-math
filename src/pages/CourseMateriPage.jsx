@@ -4,7 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { useCourse } from "../hooks/useCourse";
 import { getMyFormResponseLessonIds } from "../lib/forms";
 import { getMyAttendanceByLesson } from "../lib/sessions";
-import { getMyAttemptsByLesson } from "../lib/quiz";
+import { getMyAttemptsByLesson, getMyQuizProgressSetIds } from "../lib/quiz";
 import Skeleton from "../components/ui/Skeleton";
 import CourseSection from "../components/course/CourseSection";
 
@@ -16,6 +16,7 @@ export default function CourseMateriPage() {
     done: new Set(), // lessonId form/refleksi yang udah diisi
     att: {}, // lessonId presensi -> { rounds, mine }
     score: {}, // lessonId soal -> { score, total }
+    quizStarted: new Set(), // set_id soal yang sesinya lagi jalan
   });
 
   useEffect(() => {
@@ -38,13 +39,15 @@ export default function CourseMateriPage() {
       formIds.length ? getMyFormResponseLessonIds(formIds) : [],
       presensiIds.length ? getMyAttendanceByLesson(presensiIds) : {},
       soalIds.length ? getMyAttemptsByLesson(soalIds) : {},
-    ]).then(([f, a, s]) => {
+      soalIds.length ? getMyQuizProgressSetIds() : [],
+    ]).then(([f, a, s, p]) => {
       if (!alive) return;
       const val = (r, fallback) => (r.status === "fulfilled" ? r.value : fallback);
       setProgress({
         done: new Set(val(f, [])),
         att: val(a, {}),
         score: val(s, {}),
+        quizStarted: new Set(val(p, [])),
       });
     });
     return () => {

@@ -28,6 +28,17 @@ const scorePillCls = (score) => {
   return r >= 0.7 ? pillTeal : r >= 0.4 ? pillAmber : pillRose;
 };
 
+// Persen skor sampai 2 desimal, nol di belakang dibuang.
+const scorePct = (score) =>
+  score.total ? +(((score.score ?? 0) / score.total) * 100).toFixed(2) : 0;
+
+const scoreLabel = (score) =>
+  score.total != null
+    ? `Sudah dikerjakan · Skor ${score.score ?? 0}/${score.total} (${scorePct(
+        score
+      )}%)`
+    : "Sudah dikerjakan";
+
 function DoneBadge({ children }) {
   return (
     <span className={`inline-flex items-center gap-0.5 ${pillTeal}`}>
@@ -37,7 +48,7 @@ function DoneBadge({ children }) {
   );
 }
 
-function CardInner({ item, done, att, score }) {
+function CardInner({ item, done, att, score, quizStarted }) {
   const soon =
     (item.type === "soal" && !item.question_set_id) ||
     (item.type === "form" && !item.form_id && !item.url) ||
@@ -83,11 +94,9 @@ function CardInner({ item, done, att, score }) {
 
             {isQuiz &&
               (score ? (
-                <span className={scorePillCls(score)}>
-                  {score.total != null
-                    ? `Skor ${score.score ?? 0}/${score.total}`
-                    : "Sudah dikerjakan"}
-                </span>
+                <span className={scorePillCls(score)}>{scoreLabel(score)}</span>
+              ) : quizStarted ? (
+                <span className={pillAmber}>Sedang dikerjakan</span>
               ) : (
                 <span className={pillMuted}>Belum dikerjakan</span>
               ))}
@@ -115,7 +124,12 @@ const cardCls =
   "group flex items-start gap-3 rounded-xl border border-zinc-200/80 bg-white p-3.5 transition";
 const clickableCls = " hover:border-zinc-300 hover:shadow-sm";
 
-const EMPTY_PROGRESS = { done: new Set(), att: {}, score: {} };
+const EMPTY_PROGRESS = {
+  done: new Set(),
+  att: {},
+  score: {},
+  quizStarted: new Set(),
+};
 
 export default function CourseSection({
   section,
@@ -162,6 +176,10 @@ export default function CourseSection({
             const done = inAppForm && !!progress.done?.has(item.id);
             const att = presensi ? progress.att?.[item.id] : null;
             const score = quiz ? progress.score?.[item.id] : null;
+            const quizStarted =
+              quiz &&
+              !score &&
+              !!progress.quizStarted?.has(item.question_set_id);
 
             if (external) {
               return (
@@ -197,7 +215,13 @@ export default function CourseSection({
                         : `/course/${courseId}/soal/${item.id}`;
               return (
                 <Link key={item.id} to={to} className={cardCls + clickableCls}>
-                  <CardInner item={item} done={done} att={att} score={score} />
+                  <CardInner
+                    item={item}
+                    done={done}
+                    att={att}
+                    score={score}
+                    quizStarted={quizStarted}
+                  />
                 </Link>
               );
             }
