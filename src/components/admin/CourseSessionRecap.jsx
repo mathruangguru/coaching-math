@@ -362,7 +362,10 @@ function PresensiRow({ lesson, usersById, courseItems = [] }) {
     };
   }, [open, load, lesson.id]);
 
-  const total = rounds?.reduce((n, r) => n + r.people.length, 0) ?? 0;
+  // Orang unik yang pernah hadir di ronde mana pun (bukan total check-in).
+  const total = rounds
+    ? new Set(rounds.flatMap((r) => r.people.map((p) => p.user_id))).size
+    : 0;
 
   const toggle = async (r) => {
     setRounds((p) =>
