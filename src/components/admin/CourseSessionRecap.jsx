@@ -16,6 +16,7 @@ import {
   getRoundAttendance,
   createRound,
   setRoundOpen,
+  renameRound,
   deleteRound,
   bulkCheckIn,
 } from "../../lib/sessions";
@@ -278,6 +279,9 @@ function PresensiRow({ lesson, usersById, courseItems = [] }) {
   const [label, setLabel] = useState("");
   const [busy, setBusy] = useState(false);
   const [view, setView] = useState("sesi"); // sesi | rekap
+  const [editId, setEditId] = useState(null); // ronde yang lagi diganti namanya
+  const [draft, setDraft] = useState("");
+  const escRef = useRef(false);
   const loadedRef = useRef(false);
 
   // Rekap per orang: hadir berapa sesi dari total sesi presensi.
@@ -382,6 +386,29 @@ function PresensiRow({ lesson, usersById, courseItems = [] }) {
       setRounds((p) => p.filter((x) => x.id !== r.id));
     } catch (err) {
       window.alert(`Gagal: ${err?.message ?? err}`);
+    }
+  };
+
+  const startRename = (r) => {
+    escRef.current = false;
+    setDraft(r.label);
+    setEditId(r.id);
+  };
+
+  const commitRename = async (r) => {
+    setEditId(null);
+    if (escRef.current) {
+      escRef.current = false;
+      return;
+    }
+    const name = draft.trim();
+    if (!name || name === r.label) return;
+    setRounds((p) => p.map((x) => (x.id === r.id ? { ...x, label: name } : x)));
+    try {
+      await renameRound(r.id, name);
+    } catch (err) {
+      window.alert(`Gagal ganti nama: ${err?.message ?? err}`);
+      load();
     }
   };
 
@@ -503,10 +530,32 @@ function PresensiRow({ lesson, usersById, courseItems = [] }) {
                   className="rounded-lg border border-zinc-200 bg-white p-3"
                 >
                   <div className="flex items-center gap-2">
-                    <span className="flex-1 text-sm font-semibold text-zinc-800">
-                      {r.label}
-                    </span>
-                    <span className="text-xs text-zinc-400">
+                    {editId === r.id ? (
+                      <input
+                        autoFocus
+                        value={draft}
+                        onChange={(e) => setDraft(e.target.value)}
+                        onBlur={() => commitRename(r)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") e.currentTarget.blur();
+                          else if (e.key === "Escape") {
+                            escRef.current = true;
+                            e.currentTarget.blur();
+                          }
+                        }}
+                        className="min-w-0 flex-1 rounded border border-brand-400 px-1.5 py-0.5 text-sm font-semibold text-zinc-800 outline-none"
+                      />
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => startRename(r)}
+                        title="Klik buat ganti nama"
+                        className="min-w-0 flex-1 truncate text-left text-sm font-semibold text-zinc-800 transition-colors hover:text-brand-600"
+                      >
+                        {r.label}
+                      </button>
+                    )}
+                    <span className="shrink-0 text-xs text-zinc-400">
                       {r.people.length} hadir
                     </span>
                     <button
