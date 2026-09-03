@@ -178,17 +178,17 @@ export default function YoutubePlayer({ id, title }) {
         className="absolute inset-0"
       />
 
-      {/* scrim atas — nutup judul YouTube kalau sempet nongol */}
+      {/* Bar hitam atas nutup judul + channel YouTube yang nongol pas
+          paused. Pas main, overlay udah nangkep hover jadi nggak perlu. */}
       <div
-        className={`pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-black/50 to-transparent transition-opacity duration-200 ${
-          ui ? "opacity-100" : "opacity-0"
+        className={`pointer-events-none absolute inset-x-0 top-0 h-14 bg-black transition-opacity duration-200 ${
+          playing ? "opacity-0" : "opacity-100"
         }`}
       />
 
-      {/* tombol play besar pas paused */}
       {!playing && ready && (
-        <div className="pointer-events-none absolute inset-0 grid place-items-center">
-          <span className="grid h-14 w-14 place-items-center rounded-full bg-black/45 text-white backdrop-blur-sm">
+        <div className="pointer-events-none absolute inset-0 grid place-items-center bg-black/75">
+          <span className="grid h-14 w-14 place-items-center rounded-full bg-white/95 text-zinc-900 shadow-lg">
             <Play size={26} fill="currentColor" className="translate-x-0.5" />
           </span>
         </div>
@@ -200,9 +200,10 @@ export default function YoutubePlayer({ id, title }) {
         </div>
       )}
 
-      {/* bar kontrol bawah */}
+      {/* bar kontrol bawah — cukup tinggi & pekat buat nutup logo YouTube +
+          tombol share / watch-later yang nongol di kiri-bawah pas paused. */}
       <div
-        className={`absolute inset-x-0 bottom-0 flex items-center gap-2.5 bg-gradient-to-t from-black/70 to-transparent px-3 pb-2 pt-8 text-white transition-opacity duration-200 sm:gap-3 ${
+        className={`absolute inset-x-0 bottom-0 flex items-center gap-2.5 bg-gradient-to-t from-black via-black/90 to-transparent px-3 pb-2.5 pt-14 text-white transition-opacity duration-200 sm:gap-3 ${
           ui || !playing ? "opacity-100" : "pointer-events-none opacity-0"
         }`}
       >
