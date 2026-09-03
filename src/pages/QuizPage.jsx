@@ -9,6 +9,7 @@ import {
   openQuizProgress,
   getQuizProgress,
   saveQuizDraft,
+  getQuestionStats,
 } from "../lib/quiz";
 import Skeleton from "../components/ui/Skeleton";
 
@@ -44,6 +45,7 @@ export default function QuizPage({ review = false }) {
   const [now, setNow] = useState(() => Date.now());
   const [confirmBlanks, setConfirmBlanks] = useState(0); // >0 = modal konfirmasi kirim
   const [timeUp, setTimeUp] = useState(false); // modal "waktu habis"
+  const [qStats, setQStats] = useState(null); // { [qid]: { total, correct } } — review
   const autoFiredRef = useRef(false);
 
   useEffect(() => {
@@ -205,6 +207,18 @@ export default function QuizPage({ review = false }) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [confirmBlanks]);
+
+  // Statistik % benar per soal — cuma di halaman review.
+  useEffect(() => {
+    if (!review || data.status !== "ready" || !data.set) return;
+    let alive = true;
+    getQuestionStats(data.set.id)
+      .then((s) => alive && setQStats(s))
+      .catch((e) => console.warn("[QuizPage] statistik soal gagal:", e));
+    return () => {
+      alive = false;
+    };
+  }, [review, data]);
 
   const backLink = (
     <Link
@@ -387,6 +401,22 @@ export default function QuizPage({ review = false }) {
                 </span>
               )}
             </div>
+            {qStats?.[q.id]?.total ? (
+              <p className="mt-1.5 text-xs text-zinc-500">
+                Dijawab benar oleh{" "}
+                <span className="font-semibold text-zinc-800">
+                  {Math.round(
+                    (qStats[q.id].correct / qStats[q.id].total) * 100
+                  )}
+                  %
+                </span>{" "}
+                peserta
+                <span className="text-zinc-400">
+                  {" "}
+                  · {qStats[q.id].correct} dari {qStats[q.id].total}
+                </span>
+              </p>
+            ) : null}
             <div className="mt-1.5 text-sm font-medium text-zinc-900">
               <Markdown>{q.prompt}</Markdown>
             </div>

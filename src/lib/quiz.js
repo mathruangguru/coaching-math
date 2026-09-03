@@ -471,6 +471,24 @@ export async function getAttemptUserIdsByLesson(lessonId) {
 }
 
 /**
+ * Statistik per soal buat halaman review murid — { [qid]: { total, correct } }.
+ * Lewat RPC quiz_question_stats (security definer) biar murid bisa lihat
+ * agregat tanpa akses attempt orang lain.
+ */
+export async function getQuestionStats(setId) {
+  if (!hasSupabase || !setId) return {};
+  const { data, error } = await supabase.rpc("quiz_question_stats", {
+    p_set: setId,
+  });
+  if (error) throw error;
+  const out = {};
+  for (const r of data ?? []) {
+    out[r.question_id] = { total: Number(r.total), correct: Number(r.correct) };
+  }
+  return out;
+}
+
+/**
  * Hapus 1 attempt (admin) — murid jadi bisa ngerjain set itu lagi.
  * Dijaga RLS "coaching_quiz_attempts admin delete".
  */
