@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, lazy, useEffect, useMemo, useState } from "react";
 import { Search, ArrowLeft, ArrowRight, RotateCcw } from "lucide-react";
 import { getUsers } from "../../lib/users";
 import {
@@ -11,6 +11,8 @@ import {
   sameAnswerSet,
 } from "../../lib/quiz";
 import Skeleton from "../../components/ui/Skeleton";
+
+const Markdown = lazy(() => import("../../components/ui/Markdown"));
 
 const keyOf = (q) => q.answers ?? [q.answer ?? 0];
 const letters = (v) =>
@@ -446,16 +448,21 @@ function QuestionAnalytics({ questions, attempts }) {
             key={r.id}
             className="flex flex-col gap-2.5 px-4 py-3 sm:flex-row sm:gap-4"
           >
-            <div className="flex items-start gap-2 sm:w-[44%]">
+            <div className="flex min-w-0 items-start gap-2 sm:w-[44%]">
               <span className="mt-px inline-flex h-5 shrink-0 items-center rounded-md bg-zinc-100 px-1.5 text-[11px] font-bold text-zinc-500">
                 #{r.num}
               </span>
-              <p
-                className="line-clamp-2 text-xs leading-relaxed text-zinc-600"
-                title={r.prompt || undefined}
-              >
-                {r.prompt || "(tanpa teks)"}
-              </p>
+              {r.prompt ? (
+                <Suspense
+                  fallback={<span className="text-xs text-zinc-300">…</span>}
+                >
+                  <div className="scroll-slim min-w-0 flex-1 overflow-auto text-xs leading-relaxed [&_.katex-display]:my-1.5 [&_.katex-display]:text-left">
+                    <Markdown className="text-zinc-600">{r.prompt}</Markdown>
+                  </div>
+                </Suspense>
+              ) : (
+                <p className="text-xs text-zinc-300">(tanpa teks)</p>
+              )}
             </div>
 
             <div className="min-w-0 flex-1">
