@@ -42,6 +42,7 @@ export default function QuizPage() {
   const [startedAt, setStartedAt] = useState(null); // ms epoch, dari server
   const [started, setStarted] = useState(false); // udah klik "Mulai" / lanjut sesi
   const [now, setNow] = useState(() => Date.now());
+  const [confirmBlanks, setConfirmBlanks] = useState(0); // >0 = modal konfirmasi kirim
   const autoFiredRef = useRef(false);
 
   useEffect(() => {
@@ -104,14 +105,13 @@ export default function QuizPage() {
           const v = answers[qq.id];
           return Array.isArray(v) ? v.length === 0 : v == null;
         }).length;
-        if (
-          blanks > 0 &&
-          !window.confirm(
-            `Masih ada ${blanks} soal belum dijawab. Kirim sekarang?`
-          )
-        )
+        // Ada yang kosong -> minta konfirmasi lewat modal, jangan submit dulu.
+        if (blanks > 0) {
+          setConfirmBlanks(blanks);
           return;
+        }
       }
+      setConfirmBlanks(0);
       setBusy(true);
       try {
         const durationMs = startedAt != null ? Date.now() - startedAt : null;
@@ -192,6 +192,14 @@ export default function QuizPage() {
     const t = setTimeout(fire, left);
     return () => clearTimeout(t);
   }, [data, result, submit, startedAt, limitMs]);
+
+  // Esc nutup modal konfirmasi kirim.
+  useEffect(() => {
+    if (!confirmBlanks) return;
+    const onKey = (e) => e.key === "Escape" && setConfirmBlanks(0);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [confirmBlanks]);
 
   const backLink = (
     <Link
@@ -538,6 +546,48 @@ export default function QuizPage() {
           </button>
         </div>
       </div>
+
+      {confirmBlanks > 0 && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 p-4"
+          onClick={() => setConfirmBlanks(0)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl border border-zinc-200 bg-white p-5 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="text-sm font-bold text-zinc-900">
+              Kirim jawaban sekarang?
+            </p>
+            <p className="mt-1.5 text-sm text-zinc-600">
+              Masih ada{" "}
+              <span className="font-semibold text-zinc-900">
+                {confirmBlanks} soal
+              </span>{" "}
+              yang belum dijawab.
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmBlanks(0)}
+                className="rounded-lg border border-zinc-200 px-3.5 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50"
+              >
+                Lanjut kerjakan
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmBlanks(0);
+                  submit({ silent: true });
+                }}
+                className="rounded-lg bg-brand-500 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-600"
+              >
+                Kirim sekarang
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
