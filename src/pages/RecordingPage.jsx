@@ -4,27 +4,15 @@ import { ArrowLeft, Play } from "lucide-react";
 import { getCourse } from "../lib/courses";
 import { youtubeId } from "../lib/youtube";
 import Skeleton from "../components/ui/Skeleton";
+import YoutubePlayer from "../components/ui/YoutubePlayer";
 
-// Poster sendiri + klik buat play — biar nggak ada judul / tombol merede /
-// "Tonton di YouTube" pas belum diputer. Pas jalan, chrome YouTube yang
-// muncul di hover itu punya mereka, nggak bisa dibuang dari embed.
+// Poster sendiri + klik buat play. Pas jalan pakai player custom
+// (YoutubePlayer) — tanpa judul / logo / share YouTube.
 function YoutubeEmbed({ id, title }) {
   const [play, setPlay] = useState(false);
   const [lowRes, setLowRes] = useState(false);
 
-  if (play) {
-    return (
-      <div className="overflow-hidden rounded-xl border border-zinc-200 bg-black">
-        <iframe
-          src={`https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0&modestbranding=1&iv_load_policy=3&playsinline=1`}
-          title={title}
-          allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-          allowFullScreen
-          className="aspect-video w-full"
-        />
-      </div>
-    );
-  }
+  if (play) return <YoutubePlayer id={id} title={title} />;
 
   return (
     <button
