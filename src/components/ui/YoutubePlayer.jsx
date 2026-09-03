@@ -186,11 +186,18 @@ export default function YoutubePlayer({ id, title }) {
         className="absolute inset-0"
       />
 
-      {/* Bar hitam permanen atas & bawah nutup judul / channel / logo /
-          tombol share YouTube yang nongol tiap kali chrome-nya aktif
-          (mulai main, jeda, seek). */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-14 bg-black" />
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-black" />
+      {/* Bar hitam atas & bawah cuma muncul pas chrome YouTube bisa nongol
+          (jeda / abis interaksi). Pas nonton santai — ilang, video full. */}
+      <div
+        className={`pointer-events-none absolute inset-x-0 top-0 h-12 bg-black transition-opacity duration-300 ${
+          ui || !playing ? "opacity-100" : "opacity-0"
+        }`}
+      />
+      <div
+        className={`pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-black transition-opacity duration-300 ${
+          ui || !playing ? "opacity-100" : "opacity-0"
+        }`}
+      />
 
       {!playing && ready && (
         <div className="pointer-events-none absolute inset-0 grid place-items-center bg-black/75">
