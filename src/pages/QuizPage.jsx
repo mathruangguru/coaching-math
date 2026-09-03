@@ -44,6 +44,7 @@ export default function QuizPage() {
   const [now, setNow] = useState(() => Date.now());
   const [confirmBlanks, setConfirmBlanks] = useState(0); // >0 = modal konfirmasi kirim
   const [timeUp, setTimeUp] = useState(false); // modal "waktu habis"
+  const [showReview, setShowReview] = useState(false); // lihat soal + jawaban sendiri
   const autoFiredRef = useRef(false);
 
   useEffect(() => {
@@ -72,6 +73,9 @@ export default function QuizPage() {
             total: attempt.total,
             duration_sec: attempt.duration_sec ?? null,
           });
+          if (attempt.answers && typeof attempt.answers === "object") {
+            setAnswers(attempt.answers);
+          }
         } else if (set) {
           // Sesi udah jalan (dari sebelumnya / device lain)? -> lanjut,
           // lewati lobby. Belum -> tampilkan lobby dulu.
@@ -328,7 +332,75 @@ export default function QuizPage() {
               Waktu pengerjaan: {fmtDur(result.duration_sec)}
             </p>
           )}
+          <button
+            type="button"
+            onClick={() => setShowReview((v) => !v)}
+            className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3.5 py-2 text-xs font-semibold text-zinc-600 transition-colors hover:bg-zinc-50"
+          >
+            {showReview ? "Sembunyikan soal" : "Lihat Soal"}
+          </button>
         </div>
+
+        {showReview && (
+          <Suspense
+            fallback={<Skeleton className="h-40 w-full rounded-2xl" />}
+          >
+            <div className="flex flex-col gap-3">
+              {questions.map((q, qi) => {
+                const chosen = answers[q.id];
+                const picked = (oi) =>
+                  Array.isArray(chosen)
+                    ? chosen.includes(oi)
+                    : chosen === oi;
+                return (
+                  <div
+                    key={q.id}
+                    className="rounded-2xl border border-zinc-200/80 bg-white p-5"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs text-zinc-400">
+                        Soal {qi + 1} dari {total}
+                      </p>
+                      {!isAnswered(q) && (
+                        <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-400">
+                          Belum dijawab
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-1.5 text-sm font-medium text-zinc-900">
+                      <Markdown>{q.prompt}</Markdown>
+                    </div>
+                    <div className="mt-3 flex flex-col gap-2">
+                      {q.options.map((opt, oi) => (
+                        <div
+                          key={oi}
+                          className={`flex items-center gap-2.5 rounded-lg border px-3 py-2 text-sm ${
+                            picked(oi)
+                              ? "border-brand-500 bg-brand-50 text-brand-800"
+                              : "border-zinc-200 text-zinc-600"
+                          }`}
+                        >
+                          <span
+                            className={`grid h-6 w-6 shrink-0 place-items-center border text-xs font-bold ${
+                              q.type === "multi" ? "rounded-md" : "rounded-full"
+                            } ${
+                              picked(oi)
+                                ? "border-brand-500 bg-brand-500 text-white"
+                                : "border-zinc-300 text-zinc-400"
+                            }`}
+                          >
+                            {String.fromCharCode(65 + oi)}
+                          </span>
+                          <Markdown inline>{opt}</Markdown>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </Suspense>
+        )}
         {timeUpModal}
       </div>
     );
