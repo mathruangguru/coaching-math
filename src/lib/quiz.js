@@ -338,7 +338,9 @@ export async function openQuizProgress(lessonId) {
   });
   if (error) {
     if ((error.message || "").includes("AKSES_DITUTUP")) {
-      throw new Error("Latihan ini lagi ditutup aksesnya sama pengajar.");
+      throw new Error(
+        "Akses latihan ini ditutup karena sesi pengerjaan belum dimulai atau sudah berakhir."
+      );
     }
     throw error;
   }
