@@ -33,10 +33,11 @@ const fmt = (sec) => {
 };
 
 /**
- * Player YouTube tanpa chrome-nya: controls=0 + kontrol buatan sendiri
- * (play/pause, seek, waktu, mute, fullscreen). Judul, logo, tombol share
- * "Tonton di YouTube" — nggak muncul. Overlay nangkep semua pointer jadi
- * iframe-nya nggak pernah nampilin UI-nya.
+ * Player YouTube minimalis: controls=0 + kontrol buatan sendiri (play/pause,
+ * seek, waktu, mute, fullscreen). Iframe di-set pointer-events:none biar hover
+ * nggak munculin chrome YouTube. Chrome-nya masih kelihatan sebentar (~3 dtk)
+ * tiap state change (mulai / jeda / seek) — itu batas embed YouTube, nggak
+ * bisa dimatiin. Pas nonton lancar = bersih.
  */
 export default function YoutubePlayer({ id, title }) {
   const wrapRef = useRef(null);
@@ -186,14 +187,10 @@ export default function YoutubePlayer({ id, title }) {
         className="absolute inset-0"
       />
 
-      {/* Bar hitam permanen atas & bawah nutup judul / channel / logo /
-          tombol share YouTube yang nongol tiap kali chrome-nya aktif
-          (mulai main, jeda, seek). */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-14 bg-black" />
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-black" />
-
+      {/* Pas dijeda: dim + tombol play kita (pola player biasa, sekalian
+          nutup tombol pause tengah YouTube). */}
       {!playing && ready && (
-        <div className="pointer-events-none absolute inset-0 grid place-items-center bg-black/75">
+        <div className="pointer-events-none absolute inset-0 grid place-items-center bg-black/60">
           <span className="grid h-14 w-14 place-items-center rounded-full bg-white/95 text-zinc-900 shadow-lg">
             <Play size={26} fill="currentColor" className="translate-x-0.5" />
           </span>
@@ -206,10 +203,9 @@ export default function YoutubePlayer({ id, title }) {
         </div>
       )}
 
-      {/* bar kontrol bawah — cukup tinggi & pekat buat nutup logo YouTube +
-          tombol share / watch-later yang nongol di kiri-bawah pas paused. */}
+      {/* bar kontrol bawah */}
       <div
-        className={`absolute inset-x-0 bottom-0 flex items-center gap-2.5 bg-gradient-to-t from-black via-black/90 to-transparent px-3 pb-2.5 pt-14 text-white transition-opacity duration-200 sm:gap-3 ${
+        className={`absolute inset-x-0 bottom-0 flex items-center gap-2.5 bg-gradient-to-t from-black/80 to-transparent px-3 pb-2.5 pt-10 text-white transition-opacity duration-200 sm:gap-3 ${
           ui || !playing ? "opacity-100" : "pointer-events-none opacity-0"
         }`}
       >
