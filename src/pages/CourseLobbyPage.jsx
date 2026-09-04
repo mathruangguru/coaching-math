@@ -25,6 +25,45 @@ const fmtMeet = (iso) =>
     minute: "2-digit",
   });
 
+const cardCls =
+  "flex flex-col rounded-2xl border border-zinc-200/80 bg-white p-5";
+
+// Kartu rekap yang bisa diklik ke halaman detailnya (skor / kehadiran /
+// refleksi). `big` opsional — angka gede kalau ada datanya.
+function StatCard({ to, icon: Icon, tint, title, big, sub, cta }) {
+  return (
+    <Link
+      to={to}
+      className={`group transition hover:border-zinc-300 hover:shadow-sm ${cardCls}`}
+    >
+      <span
+        className={`grid h-10 w-10 place-items-center rounded-xl ${tint}`}
+      >
+        <Icon size={20} />
+      </span>
+      <p className="mt-4 text-sm font-bold tracking-tight text-zinc-900">
+        {title}
+      </p>
+      {big != null && (
+        <p className="mt-1 text-2xl font-bold text-zinc-900">{big}</p>
+      )}
+      <p
+        className={`text-xs ${big != null ? "mt-0.5 text-zinc-500" : "mt-1 text-zinc-400"}`}
+      >
+        {sub}
+      </p>
+      <span className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-brand-600">
+        {cta}
+        <ArrowRight
+          size={13}
+          strokeWidth={2.5}
+          className="transition-transform group-hover:translate-x-0.5"
+        />
+      </span>
+    </Link>
+  );
+}
+
 export default function CourseLobbyPage() {
   const { courseId } = useParams();
   const {
@@ -124,9 +163,6 @@ export default function CourseLobbyPage() {
     0,
   );
 
-  const cardCls =
-    "flex flex-col rounded-2xl border border-zinc-200/80 bg-white p-5";
-
   const nextMeet = (course?.sections ?? [])
     .filter((s) => s.meet_at && new Date(s.meet_at).getTime() > now)
     .sort((a, b) => new Date(a.meet_at) - new Date(b.meet_at))[0];
@@ -220,108 +256,88 @@ export default function CourseLobbyPage() {
             </div>
           )}
 
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <Link
-              to="materi"
-              className={`group transition hover:border-zinc-300 hover:shadow-sm ${cardCls}`}
-            >
-              <span className="grid h-10 w-10 place-items-center rounded-xl bg-sky-50 text-sky-600">
-                <BookOpen size={20} />
-              </span>
-              <p className="mt-4 text-sm font-bold tracking-tight text-zinc-900">
+          {/* Materi — section sendiri */}
+          <Link
+            to="materi"
+            className="group flex items-center gap-4 rounded-2xl border border-zinc-200/80 bg-white p-5 transition hover:border-zinc-300 hover:shadow-sm"
+          >
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-sky-50 text-sky-600">
+              <BookOpen size={22} />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-bold tracking-tight text-zinc-900">
                 Materi
               </p>
-              <p className="mt-1 text-xs text-zinc-500">
+              <p className="mt-0.5 text-xs text-zinc-500">
                 {visibleSections.length} pertemuan · {totalMateri} materi
               </p>
-              <span className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-brand-600">
-                Lihat materi
-                <ArrowRight
-                  size={13}
-                  strokeWidth={2.5}
-                  className="transition-transform group-hover:translate-x-0.5"
-                />
-              </span>
-            </Link>
+            </div>
+            <span className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-brand-600">
+              Lihat materi
+              <ArrowRight
+                size={13}
+                strokeWidth={2.5}
+                className="transition-transform group-hover:translate-x-0.5"
+              />
+            </span>
+          </Link>
+
+          {/* Rekap — skor, presensi, refleksi */}
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {recap?.hasQuiz && (
+              <StatCard
+                to="skor"
+                icon={HelpCircle}
+                tint="bg-amber-50 text-amber-600"
+                title="Rata-rata skor"
+                big={recap.avgPct != null ? `${recap.avgPct}%` : null}
+                sub={
+                  recap.avgPct != null
+                    ? `${recap.quizDone} dari ${recap.quizTotal} kuis dikerjakan`
+                    : "Belum ada kuis yang dikerjakan"
+                }
+                cta="Lihat skor saya"
+              />
+            )}
 
             {recap?.hasPresensi && (
-              <div className={cardCls}>
-                <span className="grid h-10 w-10 place-items-center rounded-xl bg-emerald-50 text-emerald-600">
-                  <UserCheck size={20} />
-                </span>
-                <p className="mt-4 text-sm font-bold tracking-tight text-zinc-900">
-                  Kehadiran
-                </p>
-                {recap.ronde > 0 ? (
-                  <>
-                    <p className="mt-1 text-2xl font-bold text-zinc-900">
+              <StatCard
+                to="kehadiran"
+                icon={UserCheck}
+                tint="bg-emerald-50 text-emerald-600"
+                title="Kehadiran"
+                big={
+                  recap.ronde > 0 ? (
+                    <>
                       {recap.hadir}
                       <span className="text-base font-semibold text-zinc-400">
                         /{recap.ronde}
                       </span>
-                    </p>
-                    <p className="mt-0.5 text-xs text-zinc-500">
-                      sesi presensi kamu hadiri
-                    </p>
-                  </>
-                ) : (
-                  <p className="mt-1 text-xs text-zinc-400">
-                    Belum ada sesi presensi.
-                  </p>
-                )}
-              </div>
-            )}
-
-            {recap?.hasQuiz && (
-              <div className={cardCls}>
-                <span className="grid h-10 w-10 place-items-center rounded-xl bg-amber-50 text-amber-600">
-                  <HelpCircle size={20} />
-                </span>
-                <p className="mt-4 text-sm font-bold tracking-tight text-zinc-900">
-                  Rata-rata skor
-                </p>
-                {recap.avgPct != null ? (
-                  <>
-                    <p className="mt-1 text-2xl font-bold text-zinc-900">
-                      {recap.avgPct}%
-                    </p>
-                    <p className="mt-0.5 text-xs text-zinc-500">
-                      {recap.quizDone} dari {recap.quizTotal} kuis dikerjakan
-                    </p>
-                  </>
-                ) : (
-                  <p className="mt-1 text-xs text-zinc-400">
-                    Belum ada kuis yang dikerjakan.
-                  </p>
-                )}
-              </div>
+                    </>
+                  ) : null
+                }
+                sub={
+                  recap.ronde > 0
+                    ? "sesi presensi kamu hadiri"
+                    : "Belum ada sesi presensi"
+                }
+                cta="Lihat presensi saya"
+              />
             )}
 
             {recap?.hasRefleksi && (
-              <Link
+              <StatCard
                 to="refleksi"
-                className={`group transition hover:border-zinc-300 hover:shadow-sm ${cardCls}`}
-              >
-                <span className="grid h-10 w-10 place-items-center rounded-xl bg-rose-50 text-rose-600">
-                  <NotebookPen size={20} />
-                </span>
-                <p className="mt-4 text-sm font-bold tracking-tight text-zinc-900">
-                  Refleksi
-                </p>
-                <p className="mt-1 text-xs text-zinc-500">
-                  {recap.refleksiDone > 0
+                icon={NotebookPen}
+                tint="bg-rose-50 text-rose-600"
+                title="Refleksi"
+                sub={
+                  recap.refleksiDone > 0
                     ? `${recap.refleksiDone} dari ${recap.refleksiTotal} refleksi kamu isi`
-                    : "Belum ada yang kamu isi"}
-                </p>
-                <span className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-brand-600">
-                  Lihat refleksi saya
-                  <ArrowRight
-                    size={13}
-                    strokeWidth={2.5}
-                    className="transition-transform group-hover:translate-x-0.5"
-                  />
-                </span>
-              </Link>
+                    : "Belum ada yang kamu isi"
+                }
+                cta="Lihat refleksi saya"
+              />
             )}
           </div>
         </div>

@@ -8,6 +8,8 @@ import CourseLobbyPage from "./pages/CourseLobbyPage";
 import CourseMateriPage from "./pages/CourseMateriPage";
 import MateriContentPage from "./pages/MateriContentPage";
 import MyRefleksiPage from "./pages/MyRefleksiPage";
+import MyScoresPage from "./pages/MyScoresPage";
+import MyAttendancePage from "./pages/MyAttendancePage";
 import RecordingPage from "./pages/RecordingPage";
 import SlidePage from "./pages/SlidePage";
 import PdfPage from "./pages/PdfPage";
@@ -84,6 +86,11 @@ export default function App() {
           <Route
             path="course/:courseId/refleksi"
             element={<MyRefleksiPage />}
+          />
+          <Route path="course/:courseId/skor" element={<MyScoresPage />} />
+          <Route
+            path="course/:courseId/kehadiran"
+            element={<MyAttendancePage />}
           />
           <Route
             path="course/:courseId/refleksi/:lessonId"
