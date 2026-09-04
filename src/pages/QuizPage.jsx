@@ -544,7 +544,8 @@ export default function QuizPage({ review = false }) {
             <div className="mt-5 flex items-center gap-2.5 rounded-lg border border-dashed border-zinc-300 bg-zinc-50 px-4 py-3">
               <Lock size={15} className="shrink-0 text-zinc-400" />
               <p className="text-xs font-medium text-zinc-500">
-                Akses latihan ini lagi ditutup pengajar. Coba lagi nanti.
+                Akses latihan ini ditutup karena sesi pengerjaan belum
+                dimulai atau sudah berakhir.
               </p>
             </div>
           ) : (
