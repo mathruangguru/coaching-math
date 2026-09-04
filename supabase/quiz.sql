@@ -210,3 +210,66 @@ $$;
 
 revoke execute on function public.quiz_question_stats(text) from anon;
 grant execute on function public.quiz_question_stats(text) to authenticated;
+
+-- ── Buka/tutup akses pengerjaan ───────────────────────────────────────
+-- Beda dari publish_status: soal tetap published (kelihatan di materi),
+-- tapi kalau access_open = false, murid yang BELUM pernah mulai ketahan
+-- di lobby (nggak bisa klik "Mulai"). Yang udah mulai/submit tetap bisa
+-- lanjut ngerjain / lihat hasil seperti biasa -- akses cuma nge-gate
+-- SESI BARU, bukan yang lagi/udah jalan.
+alter table public.coaching_lessons
+  add column if not exists access_open boolean not null default true;
+
+-- Mulai / lanjut sesi kuis. Ganti upsert client-side lama (rawan race +
+-- nggak bisa nge-gate access_open karena coaching_quiz_progress cuma
+-- punya set_id, bukan lesson_id). security definer: satu query atomik
+-- yang cek access_open lewat lesson_id lalu insert-if-absent.
+create or replace function public.open_quiz_progress(p_lesson_id text)
+returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid     uuid := auth.uid();
+  v_set_id  text;
+  v_open    boolean;
+  v_started timestamptz;
+  v_answers jsonb;
+begin
+  if v_uid is null then
+    raise exception 'BELUM_LOGIN';
+  end if;
+
+  select l.question_set_id, coalesce(l.access_open, true)
+    into v_set_id, v_open
+  from public.coaching_lessons l
+  where l.id = p_lesson_id;
+
+  if v_set_id is null then
+    raise exception 'SOAL_TIDAK_ADA';
+  end if;
+
+  select started_at, answers into v_started, v_answers
+  from public.coaching_quiz_progress
+  where user_id = v_uid and set_id = v_set_id;
+
+  -- Belum pernah mulai & akses ditutup -> tolak. Udah pernah mulai ->
+  -- selalu boleh lanjut, akses_open nggak relevan lagi.
+  if v_started is null and not v_open then
+    raise exception 'AKSES_DITUTUP';
+  end if;
+
+  if v_started is null then
+    insert into public.coaching_quiz_progress (user_id, set_id)
+    values (v_uid, v_set_id)
+    on conflict (user_id, set_id) do nothing;
+
+    select started_at, answers into v_started, v_answers
+    from public.coaching_quiz_progress
+    where user_id = v_uid and set_id = v_set_id;
+  end if;
+
+  return jsonb_build_object('started_at', v_started, 'answers', v_answers);
+end;
+$$;
+
+revoke execute on function public.open_quiz_progress(text) from anon;
+grant execute on function public.open_quiz_progress(text) to authenticated;
