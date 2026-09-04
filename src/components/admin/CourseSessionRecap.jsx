@@ -29,6 +29,7 @@ import {
   responsesToCsv,
 } from "../../lib/forms";
 import { getAttemptUserIdsByLesson } from "../../lib/quiz";
+import FormSummary from "./FormSummary";
 import Skeleton from "../ui/Skeleton";
 
 const fullName = (u) =>
@@ -830,6 +831,10 @@ function RefleksiRow({ lesson, usersById }) {
                   <Download size={12} /> CSV
                 </button>
               </div>
+              <FormSummary form={data.form} responses={data.responses} />
+              <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+                Jawaban per murid
+              </p>
               <div className="overflow-x-auto rounded-lg border border-zinc-200 bg-white">
                 <table className="min-w-full border-collapse text-xs">
                   <thead>

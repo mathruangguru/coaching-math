@@ -8,6 +8,7 @@ import {
   deleteFormResponse,
   responsesToCsv,
 } from "../../lib/forms";
+import FormSummary from "../../components/admin/FormSummary";
 import Skeleton from "../../components/ui/Skeleton";
 
 const th =
@@ -126,61 +127,71 @@ export default function AdminFormResponsesPage() {
           Belum ada yang mengisi.
         </p>
       ) : (
-        <div className="no-scrollbar overflow-x-auto rounded-xl border border-zinc-200 bg-white">
-          <table className="min-w-full border-collapse">
-            <thead>
-              <tr className="bg-zinc-50">
-                <th className={th}>Waktu</th>
-                <th className={th}>Nama</th>
-                {form.fields.map((f) => (
-                  <th key={f.id} className={th}>
-                    {f.label || "(tanpa label)"}
-                  </th>
-                ))}
-                <th className={th} />
-              </tr>
-            </thead>
-            <tbody>
-              {responses.map((r) => {
-                const u = usersById.get(r.user_id);
-                const name = u
-                  ? [u.first_name, u.last_name].filter(Boolean).join(" ") ||
-                    u.email
-                  : r.user_id;
-                return (
-                  <tr key={r.id}>
-                    <td className={`${td} whitespace-nowrap text-xs text-zinc-400`}>
-                      {new Date(r.created_at).toLocaleString("id-ID")}
-                    </td>
-                    <td className={`${td} whitespace-nowrap`}>
-                      {name}
-                      {u?.email && (
-                        <span className="ml-1.5 text-xs text-zinc-400">
-                          {u.email}
-                        </span>
-                      )}
-                    </td>
+        <div className="flex flex-col gap-5">
+          <FormSummary form={form} responses={responses} />
+          <div>
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+              Jawaban per murid
+            </p>
+            <div className="no-scrollbar overflow-x-auto rounded-xl border border-zinc-200 bg-white">
+              <table className="min-w-full border-collapse">
+                <thead>
+                  <tr className="bg-zinc-50">
+                    <th className={th}>Waktu</th>
+                    <th className={th}>Nama</th>
                     {form.fields.map((f) => (
-                      <td key={f.id} className={td}>
-                        {cellText(r.answers?.[f.id])}
-                      </td>
+                      <th key={f.id} className={th}>
+                        {f.label || "(tanpa label)"}
+                      </th>
                     ))}
-                    <td className={`${td} whitespace-nowrap`}>
-                      <button
-                        type="button"
-                        onClick={() => remove(r.id)}
-                        disabled={busyId === r.id}
-                        aria-label="Hapus respons"
-                        className="grid h-6 w-6 place-items-center rounded text-zinc-300 transition-colors hover:bg-rose-50 hover:text-rose-500 disabled:opacity-40"
-                      >
-                        <Trash2 size={12} />
-                      </button>
-                    </td>
+                    <th className={th} />
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                </thead>
+                <tbody>
+                  {responses.map((r) => {
+                    const u = usersById.get(r.user_id);
+                    const name = u
+                      ? [u.first_name, u.last_name].filter(Boolean).join(" ") ||
+                        u.email
+                      : r.user_id;
+                    return (
+                      <tr key={r.id}>
+                        <td
+                          className={`${td} whitespace-nowrap text-xs text-zinc-400`}
+                        >
+                          {new Date(r.created_at).toLocaleString("id-ID")}
+                        </td>
+                        <td className={`${td} whitespace-nowrap`}>
+                          {name}
+                          {u?.email && (
+                            <span className="ml-1.5 text-xs text-zinc-400">
+                              {u.email}
+                            </span>
+                          )}
+                        </td>
+                        {form.fields.map((f) => (
+                          <td key={f.id} className={td}>
+                            {cellText(r.answers?.[f.id])}
+                          </td>
+                        ))}
+                        <td className={`${td} whitespace-nowrap`}>
+                          <button
+                            type="button"
+                            onClick={() => remove(r.id)}
+                            disabled={busyId === r.id}
+                            aria-label="Hapus respons"
+                            className="grid h-6 w-6 place-items-center rounded text-zinc-300 transition-colors hover:bg-rose-50 hover:text-rose-500 disabled:opacity-40"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       )}
     </div>
