@@ -40,6 +40,35 @@ export async function getMyCheckins(roundIds) {
 }
 
 /**
+ * Detail kehadiran user ini per lesson presensi — buat halaman "Kehadiran
+ * Saya" di lobby. `lessons`: [{ id, title }]. Balikin:
+ *   [{ lessonId, title, rounds: [{ id, label, attended }] }]
+ */
+export async function getMyAttendanceDetail(lessons) {
+  if (!hasSupabase || !lessons?.length) return [];
+  const perLesson = await Promise.all(
+    lessons.map((l) =>
+      getRounds(l.id)
+        .catch(() => [])
+        .then((rounds) => ({ id: l.id, title: l.title, rounds }))
+    )
+  );
+  const allRoundIds = perLesson.flatMap((x) => x.rounds.map((r) => r.id));
+  const mine = new Set(
+    allRoundIds.length ? await getMyCheckins(allRoundIds) : []
+  );
+  return perLesson.map((x) => ({
+    lessonId: x.id,
+    title: x.title,
+    rounds: x.rounds.map((r) => ({
+      id: r.id,
+      label: r.label,
+      attended: mine.has(r.id),
+    })),
+  }));
+}
+
+/**
  * Dari daftar lesson presensi, balikin { [lessonId]: { rounds, mine } } —
  * jumlah ronde & berapa yang udah di-check-in user ini. Buat keterangan
  * kehadiran di daftar materi.
