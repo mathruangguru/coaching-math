@@ -321,28 +321,27 @@ export async function reorderQuestions(orderedIds) {
  * Mulai / lanjut sesi kuis. Bikin baris progress kalau belum ada
  * (started_at cuma di-stamp sekali), balikin { started_at, answers }.
  * Ini yang bikin timer & draft jawaban lanjut walau pindah device.
+ *
+ * Lewat RPC open_quiz_progress (security definer) -- kalau lesson-nya
+ * access_open = false DAN murid ini belum pernah mulai, ditolak
+ * (AKSES_DITUTUP). Murid yang udah mulai/submit tetap bisa lanjut.
  */
-export async function openQuizProgress(setId) {
+export async function openQuizProgress(lessonId) {
   if (!hasSupabase) return null;
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return null;
 
-  await supabase
-    .from("coaching_quiz_progress")
-    .upsert(
-      { user_id: user.id, set_id: setId },
-      { onConflict: "user_id,set_id", ignoreDuplicates: true }
-    );
-
-  const { data, error } = await supabase
-    .from("coaching_quiz_progress")
-    .select("started_at, answers")
-    .eq("user_id", user.id)
-    .eq("set_id", setId)
-    .maybeSingle();
-  if (error) throw error;
+  const { data, error } = await supabase.rpc("open_quiz_progress", {
+    p_lesson_id: lessonId,
+  });
+  if (error) {
+    if ((error.message || "").includes("AKSES_DITUTUP")) {
+      throw new Error("Latihan ini lagi ditutup aksesnya sama pengajar.");
+    }
+    throw error;
+  }
   return data;
 }
 

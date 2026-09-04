@@ -12,6 +12,7 @@ import {
   Eye,
   FileText,
   Upload,
+  Lock,
 } from "lucide-react";
 import {
   getCourse,
@@ -360,6 +361,7 @@ export default function CurriculumEditor({ courseId }) {
         form_id: lesson.form_id ?? null,
         prompt: lesson.prompt ?? null,
         publish_status: lesson.publish_status ?? "none",
+        access_open: lesson.access_open ?? true,
       }),
     );
 
@@ -484,6 +486,12 @@ export default function CurriculumEditor({ courseId }) {
                           Not publish
                         </span>
                       )}
+                      {lesson.type === "soal" &&
+                        lesson.access_open === false && (
+                          <span className="shrink-0 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-600">
+                            Akses ditutup
+                          </span>
+                        )}
                       <span className="shrink-0 text-xs text-zinc-400">
                         {lessonTypeLabels[lesson.type]}
                         {lesson.duration ? ` · ${lesson.duration}` : ""}
@@ -728,6 +736,49 @@ export default function CurriculumEditor({ courseId }) {
                               </option>
                             ))}
                           </select>
+                        </div>
+                      )}
+
+                      {lesson.type === "soal" && (
+                        <div className="mt-1.5 flex items-center gap-2 pl-9">
+                          <Lock size={12} className="shrink-0 text-zinc-400" />
+                          {(() => {
+                            const open = lesson.access_open !== false;
+                            const toggle = () => {
+                              const next = !open;
+                              patchLessonLocal(editing.id, lesson.id, {
+                                access_open: next,
+                              });
+                              saveLesson({ ...lesson, access_open: next });
+                            };
+                            return (
+                              <>
+                                <button
+                                  type="button"
+                                  role="switch"
+                                  aria-checked={open}
+                                  onClick={toggle}
+                                  className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
+                                    open ? "bg-emerald-500" : "bg-zinc-300"
+                                  }`}
+                                >
+                                  <span
+                                    className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                                      open ? "translate-x-4" : "translate-x-0.5"
+                                    }`}
+                                  />
+                                </button>
+                                <span className="text-xs text-zinc-600">
+                                  {open ? "Akses dibuka" : "Akses ditutup"}
+                                </span>
+                                <span className="text-[11px] text-zinc-400">
+                                  {open
+                                    ? "murid bisa mulai ngerjain"
+                                    : "yang belum mulai ketahan di lobby"}
+                                </span>
+                              </>
+                            );
+                          })()}
                         </div>
                       )}
 

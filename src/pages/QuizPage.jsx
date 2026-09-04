@@ -1,6 +1,6 @@
 import { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
-import { ArrowLeft, ChevronLeft, ChevronRight, Clock } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Clock, Lock } from "lucide-react";
 import { getCourse } from "../lib/courses";
 import {
   getQuestionSet,
@@ -142,7 +142,7 @@ export default function QuizPage({ review = false }) {
     if (busy || data.status !== "ready" || !data.set) return;
     setBusy(true);
     try {
-      const prog = await openQuizProgress(data.set.id);
+      const prog = await openQuizProgress(lessonId);
       if (prog?.started_at) setStartedAt(new Date(prog.started_at).getTime());
       if (prog?.answers && typeof prog.answers === "object") {
         setAnswers(prog.answers);
@@ -511,6 +511,7 @@ export default function QuizPage({ review = false }) {
   // ── Lobby (instruksi + tombol Mulai) ────────────────────────────
   if (!started) {
     const limitMin = set.time_limit_min ?? null;
+    const closed = lesson.access_open === false;
     return (
       <div className="mx-auto flex max-w-2xl flex-col gap-5">
         {backLink}
@@ -539,14 +540,23 @@ export default function QuizPage({ review = false }) {
             </div>
           )}
 
-          <button
-            type="button"
-            onClick={handleStart}
-            disabled={busy}
-            className="mt-5 w-full rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-brand-600 disabled:opacity-50"
-          >
-            {busy ? "Memulai…" : "MULAI SEKARANG"}
-          </button>
+          {closed ? (
+            <div className="mt-5 flex items-center gap-2.5 rounded-lg border border-dashed border-zinc-300 bg-zinc-50 px-4 py-3">
+              <Lock size={15} className="shrink-0 text-zinc-400" />
+              <p className="text-xs font-medium text-zinc-500">
+                Akses latihan ini lagi ditutup pengajar. Coba lagi nanti.
+              </p>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={handleStart}
+              disabled={busy}
+              className="mt-5 w-full rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-brand-600 disabled:opacity-50"
+            >
+              {busy ? "Memulai…" : "MULAI SEKARANG"}
+            </button>
+          )}
         </div>
       </div>
     );
