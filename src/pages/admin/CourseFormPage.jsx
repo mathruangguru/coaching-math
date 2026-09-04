@@ -14,6 +14,7 @@ import Skeleton from "../../components/ui/Skeleton";
 import CurriculumEditor from "../../components/admin/CurriculumEditor";
 import EnrolledStudents from "../../components/admin/EnrolledStudents";
 import CourseSessionRecap from "../../components/admin/CourseSessionRecap";
+import CourseGradebook from "../../components/admin/CourseGradebook";
 
 const ICONS = Object.keys(subjectIcons);
 
@@ -21,6 +22,7 @@ const TABS = [
   ["detail", "Detail"],
   ["kurikulum", "Kurikulum"],
   ["murid", "Murid"],
+  ["nilai", "Nilai"],
   ["presensi", "Presensi"],
   ["refleksi", "Refleksi"],
 ];
@@ -384,6 +386,11 @@ export default function CourseFormPage() {
       {isEdit && status === "ready" && seen.has("murid") && (
         <div className={tab === "murid" ? "" : "hidden"}>
           <EnrolledStudents courseId={courseId} />
+        </div>
+      )}
+      {isEdit && status === "ready" && seen.has("nilai") && (
+        <div className={tab === "nilai" ? "" : "hidden"}>
+          <CourseGradebook courseId={courseId} />
         </div>
       )}
       {isEdit && status === "ready" && seen.has("presensi") && (
