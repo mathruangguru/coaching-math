@@ -457,6 +457,25 @@ export async function getAllAttempts() {
 }
 
 /**
+ * Semua attempt buat sekumpulan lesson soal (satu course) — buat gradebook
+ * admin. Dijaga RLS "coaching_quiz_attempts admin read".
+ * Bentuk: { id, user_id, lesson_id, set_id, score, total, duration_sec, created_at }[]
+ * Urut terbaru dulu, jadi attempt pertama per (user, lesson) = yang terakhir.
+ */
+export async function getCourseAttempts(lessonIds) {
+  if (!hasSupabase || !lessonIds?.length) return [];
+  const { data, error } = await supabase
+    .from("coaching_quiz_attempts")
+    .select(
+      "id, user_id, lesson_id, set_id, score, total, duration_sec, created_at"
+    )
+    .in("lesson_id", lessonIds)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
+/**
  * user_id[] yang punya attempt submit di sebuah lesson soal (admin read).
  * Buat import kehadiran presensi dari "yang udah ngerjain latihan".
  */
