@@ -716,6 +716,7 @@ function RefleksiRow({ lesson, usersById }) {
   const [open, setOpen] = useState(false);
   const [data, setData] = useState(null); // { form, responses } | null
   const [failed, setFailed] = useState(false);
+  const [tab, setTab] = useState("ringkasan"); // ringkasan | jawaban
   const loadedRef = useRef(false);
 
   const load = useCallback(() => {
@@ -822,75 +823,97 @@ function RefleksiRow({ lesson, usersById }) {
 
           {data && data.responses.length > 0 && (
             <div className="flex flex-col gap-2">
-              <div className="flex justify-end">
+              <div className="flex items-center justify-between gap-2">
+                <div className="inline-flex w-fit rounded-lg border border-zinc-200 bg-white p-0.5 text-xs font-semibold">
+                  {[
+                    ["ringkasan", "Ringkasan"],
+                    ["jawaban", "Jawaban"],
+                  ].map(([k, label]) => (
+                    <button
+                      key={k}
+                      type="button"
+                      onClick={() => setTab(k)}
+                      className={`rounded-md px-2.5 py-1 transition-colors ${
+                        tab === k
+                          ? "bg-brand-500 text-white"
+                          : "text-zinc-500 hover:text-zinc-800"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
                 <button
                   type="button"
                   onClick={downloadCsv}
-                  className="inline-flex items-center gap-1.5 rounded-md border border-zinc-200 bg-white px-2 py-1 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-50"
+                  className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-zinc-200 bg-white px-2 py-1 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-50"
                 >
                   <Download size={12} /> CSV
                 </button>
               </div>
-              <FormSummary form={data.form} responses={data.responses} />
-              <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
-                Jawaban per murid
-              </p>
-              <div className="overflow-x-auto rounded-lg border border-zinc-200 bg-white">
-                <table className="min-w-full border-collapse text-xs">
-                  <thead>
-                    <tr className="bg-zinc-50 text-left text-zinc-500">
-                      <th className="whitespace-nowrap border-b border-zinc-100 px-2.5 py-1.5 font-semibold">
-                        Nama
-                      </th>
-                      <th className="whitespace-nowrap border-b border-zinc-100 px-2.5 py-1.5 font-semibold">
-                        Waktu
-                      </th>
-                      {fields.map((f) => (
-                        <th
-                          key={f.id}
-                          className="border-b border-zinc-100 px-2.5 py-1.5 font-semibold"
-                        >
-                          {f.label || "(tanpa label)"}
+
+              {tab === "ringkasan" && (
+                <FormSummary form={data.form} responses={data.responses} paged />
+              )}
+
+              {tab === "jawaban" && (
+                <div className="overflow-x-auto rounded-lg border border-zinc-200 bg-white">
+                  <table className="min-w-full border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-zinc-50 text-left text-zinc-500">
+                        <th className="whitespace-nowrap border-b border-zinc-100 px-2.5 py-1.5 font-semibold">
+                          Nama
                         </th>
-                      ))}
-                      <th className="border-b border-zinc-100" />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.responses.map((r) => {
-                      const u = usersById.get(r.user_id);
-                      return (
-                        <tr key={r.id} className="align-top">
-                          <td className="whitespace-nowrap border-b border-zinc-100 px-2.5 py-1.5 text-zinc-700">
-                            {u ? fullName(u) : r.user_id}
-                          </td>
-                          <td className="whitespace-nowrap border-b border-zinc-100 px-2.5 py-1.5 text-zinc-400">
-                            {fmt(r.created_at)}
-                          </td>
-                          {fields.map((f) => (
-                            <td
-                              key={f.id}
-                              className="border-b border-zinc-100 px-2.5 py-1.5 text-zinc-700"
-                            >
-                              {answerText(r.answers?.[f.id])}
+                        <th className="whitespace-nowrap border-b border-zinc-100 px-2.5 py-1.5 font-semibold">
+                          Waktu
+                        </th>
+                        {fields.map((f) => (
+                          <th
+                            key={f.id}
+                            className="border-b border-zinc-100 px-2.5 py-1.5 font-semibold"
+                          >
+                            {f.label || "(tanpa label)"}
+                          </th>
+                        ))}
+                        <th className="border-b border-zinc-100" />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.responses.map((r) => {
+                        const u = usersById.get(r.user_id);
+                        return (
+                          <tr key={r.id} className="align-top">
+                            <td className="whitespace-nowrap border-b border-zinc-100 px-2.5 py-1.5 text-zinc-700">
+                              {u ? fullName(u) : r.user_id}
                             </td>
-                          ))}
-                          <td className="border-b border-zinc-100 px-1.5 py-1.5">
-                            <button
-                              type="button"
-                              onClick={() => removeResp(r.id)}
-                              aria-label="Hapus respons"
-                              className="grid h-6 w-6 place-items-center rounded text-zinc-300 transition-colors hover:bg-rose-50 hover:text-rose-500"
-                            >
-                              <Trash2 size={11} />
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                            <td className="whitespace-nowrap border-b border-zinc-100 px-2.5 py-1.5 text-zinc-400">
+                              {fmt(r.created_at)}
+                            </td>
+                            {fields.map((f) => (
+                              <td
+                                key={f.id}
+                                className="border-b border-zinc-100 px-2.5 py-1.5 text-zinc-700"
+                              >
+                                {answerText(r.answers?.[f.id])}
+                              </td>
+                            ))}
+                            <td className="border-b border-zinc-100 px-1.5 py-1.5">
+                              <button
+                                type="button"
+                                onClick={() => removeResp(r.id)}
+                                aria-label="Hapus respons"
+                                className="grid h-6 w-6 place-items-center rounded text-zinc-300 transition-colors hover:bg-rose-50 hover:text-rose-500"
+                              >
+                                <Trash2 size={11} />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
         </div>

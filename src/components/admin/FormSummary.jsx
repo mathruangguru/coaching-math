@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Star } from "lucide-react";
+import { Star, ChevronLeft, ChevronRight } from "lucide-react";
 
 // Field auto — nggak ada yang perlu diringkas.
 const SKIP = new Set(["name", "email", "date"]);
@@ -48,8 +48,11 @@ function TextAnswers({ texts }) {
  *   single/multi/check → % tiap opsi (bar)
  *   short/long     → daftar semua jawaban, anonim
  * `form` harus bawa `.fields`. `responses` = [{ answers, ... }].
+ * `paged` = true -> satu pertanyaan per layar (nav Sebelumnya/Berikutnya),
+ * dipakai pas ini salah satu tab (nggak perlu semua keliatan sekaligus).
  */
-export default function FormSummary({ form, responses }) {
+export default function FormSummary({ form, responses, paged = false }) {
+  const [idx, setIdx] = useState(0);
   const rows = useMemo(() => {
     const fields = (form?.fields ?? []).filter((f) => !SKIP.has(f.type));
     return fields.map((f) => {
@@ -104,14 +107,44 @@ export default function FormSummary({ form, responses }) {
 
   if (rows.length === 0) return null;
 
+  const clampedIdx = Math.min(idx, rows.length - 1);
+  const shown = paged ? [rows[clampedIdx]] : rows;
+
   return (
     <div className="rounded-lg border border-zinc-200 bg-white">
       <div className="border-b border-zinc-100 px-3 py-2">
         <p className="text-sm font-bold text-zinc-900">Ringkasan</p>
         <p className="mt-0.5 text-xs text-zinc-400">{responses.length} respons</p>
       </div>
+
+      {paged && rows.length > 1 && (
+        <div className="flex items-center justify-between gap-2 border-b border-zinc-100 px-3 py-2">
+          <button
+            type="button"
+            onClick={() => setIdx((i) => Math.max(0, i - 1))}
+            disabled={clampedIdx === 0}
+            aria-label="Pertanyaan sebelumnya"
+            className="grid h-6 w-6 place-items-center rounded-md border border-zinc-200 text-zinc-500 transition-colors hover:bg-zinc-50 disabled:opacity-30"
+          >
+            <ChevronLeft size={13} />
+          </button>
+          <span className="text-xs font-medium text-zinc-500">
+            Pertanyaan {clampedIdx + 1} dari {rows.length}
+          </span>
+          <button
+            type="button"
+            onClick={() => setIdx((i) => Math.min(rows.length - 1, i + 1))}
+            disabled={clampedIdx === rows.length - 1}
+            aria-label="Pertanyaan berikutnya"
+            className="grid h-6 w-6 place-items-center rounded-md border border-zinc-200 text-zinc-500 transition-colors hover:bg-zinc-50 disabled:opacity-30"
+          >
+            <ChevronRight size={13} />
+          </button>
+        </div>
+      )}
+
       <ul className="divide-y divide-zinc-100">
-        {rows.map(({ f, ...r }) => (
+        {shown.map(({ f, ...r }) => (
           <li key={f.id} className="px-3 py-3">
             <p className="text-xs font-semibold text-zinc-700">
               {f.label || "Pertanyaan"}
