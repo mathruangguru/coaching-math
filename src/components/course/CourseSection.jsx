@@ -59,15 +59,22 @@ function CardInner({ item, done, att, score, quizStarted, isFeedbackTarget }) {
     (item.type === "feedback" && (!item.form_id || !item.target_user_id)) ||
     (item.type === "slide" && !item.url) ||
     (item.type === "pdf" && !item.url);
-  const meta = [item.duration || null, soon ? "segera" : null]
-    .filter(Boolean)
-    .join(" · ");
   const notPublish = item.publish_status && item.publish_status !== "all";
 
   const isForm =
     (item.type === "form" || item.type === "refleksi") && !!item.form_id;
   const isFeedback =
     item.type === "feedback" && !!item.form_id && !!item.target_user_id;
+
+  const meta = [
+    item.duration || null,
+    soon ? "segera" : null,
+    isFeedback && !isFeedbackTarget && item.target_name
+      ? `buat ${item.target_name}`
+      : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
   const isQuiz = item.type === "soal" && !!item.question_set_id;
   const isPresensi = !!att && att.rounds > 0;
   const hadirPenuh = isPresensi && att.mine >= att.rounds;
