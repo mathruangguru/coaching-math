@@ -30,7 +30,7 @@ import {
   responsesToCsv,
 } from "../../lib/forms";
 import { getAttemptUserIdsByLesson } from "../../lib/quiz";
-import FormSummary from "./FormSummary";
+import FormSummary from "../ui/FormSummary";
 import Skeleton from "../ui/Skeleton";
 
 const fullName = (u) =>

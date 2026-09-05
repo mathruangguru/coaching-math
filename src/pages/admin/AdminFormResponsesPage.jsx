@@ -8,7 +8,7 @@ import {
   deleteFormResponse,
   responsesToCsv,
 } from "../../lib/forms";
-import FormSummary from "../../components/admin/FormSummary";
+import FormSummary from "../../components/ui/FormSummary";
 import Skeleton from "../../components/ui/Skeleton";
 
 const th =
