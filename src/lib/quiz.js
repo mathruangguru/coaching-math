@@ -338,13 +338,37 @@ export async function reorderQuestions(orderedIds) {
 // ── Murid ngerjakan ─────────────────────────────────────────────────
 
 /**
+ * Status akses "sekarang" buat lesson soal -- cuma buat tampilan
+ * (banner lobby / badge admin). Gate sungguhan ada di RPC
+ * open_quiz_progress, dievaluasi server-side pakai now() Postgres.
+ * `lesson`: { access_open, access_opens_at, access_closes_at }.
+ * Balikin { open, reason, at }: reason "manual" = ditutup toggle,
+ * "before"/"after" = di luar jadwal (`at` = batas jadwal terkait).
+ */
+export function quizAccessNow(lesson, now = Date.now()) {
+  if (lesson?.access_open === false) return { open: false, reason: "manual" };
+  const opensAt = lesson?.access_opens_at
+    ? new Date(lesson.access_opens_at).getTime()
+    : null;
+  const closesAt = lesson?.access_closes_at
+    ? new Date(lesson.access_closes_at).getTime()
+    : null;
+  if (opensAt != null && now < opensAt)
+    return { open: false, reason: "before", at: opensAt };
+  if (closesAt != null && now >= closesAt)
+    return { open: false, reason: "after", at: closesAt };
+  return { open: true, reason: null, at: null };
+}
+
+/**
  * Mulai / lanjut sesi kuis. Bikin baris progress kalau belum ada
  * (started_at cuma di-stamp sekali), balikin { started_at, answers }.
  * Ini yang bikin timer & draft jawaban lanjut walau pindah device.
  *
  * Lewat RPC open_quiz_progress (security definer) -- kalau lesson-nya
- * access_open = false DAN murid ini belum pernah mulai, ditolak
- * (AKSES_DITUTUP). Murid yang udah mulai/submit tetap bisa lanjut.
+ * ditutup manual ATAU di luar jadwal (access_opens_at/access_closes_at)
+ * DAN murid ini belum pernah mulai, ditolak (AKSES_DITUTUP). Murid yang
+ * udah mulai/submit tetap bisa lanjut.
  */
 export async function openQuizProgress(lessonId) {
   if (!hasSupabase) return null;

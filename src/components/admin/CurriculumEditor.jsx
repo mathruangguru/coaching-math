@@ -13,6 +13,7 @@ import {
   FileText,
   Upload,
   Lock,
+  Clock,
 } from "lucide-react";
 import {
   getCourse,
@@ -25,7 +26,7 @@ import {
   deleteLesson,
   reorderLessons,
 } from "../../lib/courses";
-import { getQuestionSets } from "../../lib/quiz";
+import { getQuestionSets, quizAccessNow } from "../../lib/quiz";
 import { getForms } from "../../lib/forms";
 import { uploadLessonPdf, deleteLessonPdf, PDF_MAX_MB } from "../../lib/pdf";
 import { lessonTypeLabels } from "../../lib/lessonTypes";
@@ -219,6 +220,7 @@ export default function CurriculumEditor({ courseId }) {
   const [questionSets, setQuestionSets] = useState([]);
   const [forms, setForms] = useState([]);
   const [contentLesson, setContentLesson] = useState(null); // lesson materi yg lagi diedit isinya
+  const [now] = useState(() => Date.now()); // buat badge "Akses ditutup" (jadwal)
 
   const closeModal = useCallback(() => setEditingId(null), []);
 
@@ -362,6 +364,8 @@ export default function CurriculumEditor({ courseId }) {
         prompt: lesson.prompt ?? null,
         publish_status: lesson.publish_status ?? "none",
         access_open: lesson.access_open ?? true,
+        access_opens_at: lesson.access_opens_at ?? null,
+        access_closes_at: lesson.access_closes_at ?? null,
       }),
     );
 
@@ -487,7 +491,7 @@ export default function CurriculumEditor({ courseId }) {
                         </span>
                       )}
                       {lesson.type === "soal" &&
-                        lesson.access_open === false && (
+                        !quizAccessNow(lesson, now).open && (
                           <span className="shrink-0 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-600">
                             Akses ditutup
                           </span>
@@ -779,6 +783,48 @@ export default function CurriculumEditor({ courseId }) {
                               </>
                             );
                           })()}
+                        </div>
+                      )}
+
+                      {lesson.type === "soal" && (
+                        <div className="mt-1.5 flex flex-wrap items-center gap-1.5 pl-9">
+                          <Clock size={12} className="shrink-0 text-zinc-400" />
+                          <input
+                            type="datetime-local"
+                            value={toLocalInput(lesson.access_opens_at)}
+                            onChange={(e) => {
+                              const v = e.target.value
+                                ? new Date(e.target.value).toISOString()
+                                : null;
+                              patchLessonLocal(editing.id, lesson.id, {
+                                access_opens_at: v,
+                              });
+                              saveLesson({ ...lesson, access_opens_at: v });
+                            }}
+                            title="Buka mulai (opsional)"
+                            className={`${cell} text-xs`}
+                          />
+                          <span className="shrink-0 text-[11px] text-zinc-400">
+                            s/d
+                          </span>
+                          <input
+                            type="datetime-local"
+                            value={toLocalInput(lesson.access_closes_at)}
+                            onChange={(e) => {
+                              const v = e.target.value
+                                ? new Date(e.target.value).toISOString()
+                                : null;
+                              patchLessonLocal(editing.id, lesson.id, {
+                                access_closes_at: v,
+                              });
+                              saveLesson({ ...lesson, access_closes_at: v });
+                            }}
+                            title="Tutup pada (opsional)"
+                            className={`${cell} text-xs`}
+                          />
+                          <span className="shrink-0 text-[11px] text-zinc-400">
+                            jadwal opsional, kosongin = ikut toggle di atas
+                          </span>
                         </div>
                       )}
 
