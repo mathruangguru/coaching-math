@@ -64,21 +64,15 @@ export default function MyFeedbackPage() {
   if (!canView) return <Navigate replace to={`/course/${courseId}`} />;
 
   const { rounds } = state;
-  const totalResponses = rounds.reduce((n, r) => n + r.responses.length, 0);
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-5">
       <div>
         {backLink}
         <h1 className="mt-3 text-xl font-bold tracking-tight text-zinc-900">
-          Feedback Buat Saya
+          Feedback untuk Saya
         </h1>
-        <p className="mt-1 text-xs text-zinc-500">
-          {course.title}
-          <span className="ml-1.5 text-zinc-400">
-            · pengirim disamarkan, nggak ketahuan siapa
-          </span>
-        </p>
+        <p className="mt-1 text-xs text-zinc-500">{course.title}</p>
       </div>
 
       {state.status === "loading" ? (
@@ -96,9 +90,6 @@ export default function MyFeedbackPage() {
         </div>
       ) : (
         <div className="flex flex-col gap-4">
-          <p className="text-xs text-zinc-400">
-            {totalResponses} feedback · {rounds.length} ronde
-          </p>
           {rounds.map((round) => (
             <div key={round.lessonId} className="flex flex-col gap-2">
               <p className="text-sm font-bold tracking-tight text-zinc-900">
