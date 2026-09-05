@@ -5,6 +5,7 @@ import {
   UserPlus,
   Link2,
   NotebookPen,
+  MessageSquareHeart,
   Plus,
   Trash2,
   Download,
@@ -712,12 +713,24 @@ function PresensiRow({ lesson, usersById, courseItems = [] }) {
 const answerText = (v) =>
   Array.isArray(v) ? v.join(", ") : v == null || v === "" ? "—" : String(v);
 
-function RefleksiRow({ lesson, usersById }) {
+// Dipakai buat lesson tipe 'refleksi' MAUPUN 'feedback' -- struktur data
+// & submission-nya identik (form in-app), cuma beda label + (buat
+// feedback) subjudul "buat {target_name}".
+function FormLessonRow({ lesson, usersById }) {
   const [open, setOpen] = useState(false);
   const [data, setData] = useState(null); // { form, responses } | null
   const [failed, setFailed] = useState(false);
   const [tab, setTab] = useState("ringkasan"); // ringkasan | jawaban
   const loadedRef = useRef(false);
+
+  const isFeedback = lesson.type === "feedback";
+  const noun = isFeedback ? "Feedback" : "Refleksi";
+  const tint = isFeedback
+    ? "bg-indigo-50 text-indigo-600"
+    : "bg-rose-50 text-rose-600";
+  const Icon = isFeedback ? MessageSquareHeart : NotebookPen;
+  const subtitle =
+    isFeedback && lesson.target_name ? ` · buat ${lesson.target_name}` : "";
 
   const load = useCallback(() => {
     Promise.all([
@@ -760,24 +773,26 @@ function RefleksiRow({ lesson, usersById }) {
     );
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${lesson.title.replace(/[^\w.-]+/g, "_")}-refleksi.csv`;
+    a.download = `${lesson.title.replace(/[^\w.-]+/g, "_")}-${noun.toLowerCase()}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
 
-  if (!lesson.form_id)
+  if (!lesson.form_id || (isFeedback && !lesson.target_user_id))
     return (
       <li className="flex items-center gap-3 px-4 py-2.5">
-        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-rose-50 text-rose-600">
-          <NotebookPen size={15} />
+        <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${tint}`}>
+          <Icon size={15} />
         </span>
         <span className="min-w-0 flex-1 truncate text-sm font-medium text-zinc-800">
           {lesson.title}
           <span className="ml-1.5 text-xs font-normal text-zinc-400">
-            Refleksi
+            {noun}
           </span>
         </span>
-        <span className="shrink-0 text-xs text-zinc-400">belum ada form</span>
+        <span className="shrink-0 text-xs text-zinc-400">
+          {!lesson.form_id ? "belum ada form" : "belum ada target"}
+        </span>
       </li>
     );
 
@@ -790,13 +805,14 @@ function RefleksiRow({ lesson, usersById }) {
         onClick={() => setOpen((v) => !v)}
         className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-zinc-50"
       >
-        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-rose-50 text-rose-600">
-          <NotebookPen size={15} />
+        <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${tint}`}>
+          <Icon size={15} />
         </span>
         <span className="min-w-0 flex-1 truncate text-sm font-medium text-zinc-800">
           {lesson.title}
           <span className="ml-1.5 text-xs font-normal text-zinc-400">
-            Refleksi
+            {noun}
+            {subtitle}
           </span>
         </span>
         {data && (
@@ -928,7 +944,7 @@ export default function CourseSessionRecap({ courseId, only }) {
   const [courseItems, setCourseItems] = useState([]);
   const [usersById, setUsersById] = useState(new Map());
 
-  const kinds = only ? [only] : ["presensi", "refleksi"];
+  const kinds = only ? [only] : ["presensi", "refleksi", "feedback"];
 
   useEffect(() => {
     let alive = true;
@@ -939,7 +955,9 @@ export default function CourseSessionRecap({ courseId, only }) {
         const items = all.filter((it) =>
           only
             ? it.type === only
-            : it.type === "presensi" || it.type === "refleksi"
+            : it.type === "presensi" ||
+              it.type === "refleksi" ||
+              it.type === "feedback"
         );
         setLessons(items);
         setCourseItems(
@@ -973,7 +991,9 @@ export default function CourseSessionRecap({ courseId, only }) {
       ? "Presensi"
       : only === "refleksi"
         ? "Refleksi"
-        : "Presensi & Refleksi";
+        : only === "feedback"
+          ? "Feedback"
+          : "Presensi & Refleksi";
 
   return (
     <div className="overflow-hidden rounded-2xl border border-zinc-200/80 bg-white">
@@ -995,7 +1015,16 @@ export default function CourseSessionRecap({ courseId, only }) {
         )}
         {status === "ready" && lessons.length === 0 && (
           <p className="p-3 text-sm text-zinc-400">
-            Belum ada item {kinds.map((k) => (k === "presensi" ? "Presensi" : "Refleksi")).join(" / ")}{" "}
+            Belum ada item{" "}
+            {kinds
+              .map((k) =>
+                k === "presensi"
+                  ? "Presensi"
+                  : k === "feedback"
+                    ? "Feedback"
+                    : "Refleksi",
+              )
+              .join(" / ")}{" "}
             di course ini. Tambahin lewat editor kurikulum.
           </p>
         )}
@@ -1010,7 +1039,7 @@ export default function CourseSessionRecap({ courseId, only }) {
                   courseItems={courseItems}
                 />
               ) : (
-                <RefleksiRow key={l.id} lesson={l} usersById={usersById} />
+                <FormLessonRow key={l.id} lesson={l} usersById={usersById} />
               )
             )}
           </ul>

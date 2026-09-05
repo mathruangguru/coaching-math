@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, Navigate, useParams } from "react-router-dom";
 import { ArrowLeft, Check, Star } from "lucide-react";
 import { getCourse } from "../lib/courses";
 import {
@@ -190,8 +190,20 @@ export default function FormPage() {
     );
 
   const { course, lesson, form } = data;
+
+  // Feedback buat diri sendiri nggak masuk akal -- lempar ke halaman
+  // hasil (anonim) alih-alih nampilin form isian.
+  if (lesson.type === "feedback" && profile?.id === lesson.target_user_id) {
+    return <Navigate replace to={`/course/${courseId}/feedback`} />;
+  }
+
   const submitted = sent || !!doneAt;
-  const noun = lesson.type === "refleksi" ? "refleksi" : "form";
+  const noun =
+    lesson.type === "refleksi"
+      ? "refleksi"
+      : lesson.type === "feedback"
+        ? "feedback"
+        : "form";
 
   const header = (
     <div>
@@ -199,6 +211,11 @@ export default function FormPage() {
       <h1 className="mt-1 text-xl font-bold tracking-tight text-zinc-900">
         {lesson.title}
       </h1>
+      {lesson.type === "feedback" && lesson.target_name && (
+        <p className="mt-1 text-xs font-semibold text-brand-600">
+          Buat {lesson.target_name}
+        </p>
+      )}
       {form?.description && (
         <p className="mt-1 text-xs text-zinc-500">{form.description}</p>
       )}

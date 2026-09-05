@@ -261,6 +261,48 @@ export async function getMyRefleksiEntries(lessons) {
 }
 
 /**
+ * Feedback yang MASUK buat user ini (dia = target_user_id di lesson
+ * tipe 'feedback'), satu course. Lewat RPC get_my_feedback (security
+ * definer) yang SENGAJA nggak nyertain user_id sama sekali -- anonim
+ * beneran, bukan cuma disembunyiin di tampilan. Balikin urut terbaru,
+ * SATU ENTRI PER RESPONS (bukan per lesson -- satu ronde bisa punya
+ * banyak pengirim):
+ *   { lessonId, title, at, answers: [{ label, type, value }] }
+ */
+export async function getMyFeedback(courseId) {
+  if (!hasSupabase || !courseId) return [];
+  const { data: rows, error } = await supabase.rpc("get_my_feedback", {
+    p_course_id: courseId,
+  });
+  if (error) throw error;
+  if (!rows?.length) return [];
+
+  const formIds = [...new Set(rows.map((r) => r.form_id).filter(Boolean))];
+  const forms = await Promise.all(
+    formIds.map((id) => getForm(id).catch(() => null))
+  );
+  const fieldsByForm = new Map(
+    forms.filter(Boolean).map((f) => [f.id, f.fields])
+  );
+
+  return rows.map((r) => {
+    const fields = fieldsByForm.get(r.form_id) ?? [];
+    return {
+      lessonId: r.lesson_id,
+      title: r.lesson_title ?? "Feedback",
+      at: r.created_at,
+      answers: fields
+        .filter((f) => f.type !== "name" && f.type !== "email")
+        .map((f) => ({
+          label: f.label || "Pertanyaan",
+          type: f.type,
+          value: r.answers?.[f.id],
+        })),
+    };
+  });
+}
+
+/**
  * Semua respons sebuah form — buat rekap admin (RLS admin read).
  * Kalau `lessonId` dikasih, dibatasi ke respons yang masuk lewat lesson itu
  * (satu form bisa dipasang di beberapa lesson).

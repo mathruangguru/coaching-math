@@ -25,6 +25,7 @@ const TABS = [
   ["nilai", "Nilai"],
   ["presensi", "Presensi"],
   ["refleksi", "Refleksi"],
+  ["feedback", "Feedback"],
 ];
 
 const inputCls =
@@ -401,6 +402,11 @@ export default function CourseFormPage() {
       {isEdit && status === "ready" && seen.has("refleksi") && (
         <div className={tab === "refleksi" ? "" : "hidden"}>
           <CourseSessionRecap courseId={courseId} only="refleksi" />
+        </div>
+      )}
+      {isEdit && status === "ready" && seen.has("feedback") && (
+        <div className={tab === "feedback" ? "" : "hidden"}>
+          <CourseSessionRecap courseId={courseId} only="feedback" />
         </div>
       )}
     </div>

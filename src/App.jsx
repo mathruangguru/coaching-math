@@ -10,6 +10,7 @@ import MateriContentPage from "./pages/MateriContentPage";
 import MyRefleksiPage from "./pages/MyRefleksiPage";
 import MyScoresPage from "./pages/MyScoresPage";
 import MyAttendancePage from "./pages/MyAttendancePage";
+import MyFeedbackPage from "./pages/MyFeedbackPage";
 import RecordingPage from "./pages/RecordingPage";
 import SlidePage from "./pages/SlidePage";
 import PdfPage from "./pages/PdfPage";
@@ -94,6 +95,14 @@ export default function App() {
           />
           <Route
             path="course/:courseId/refleksi/:lessonId"
+            element={<FormPage />}
+          />
+          <Route
+            path="course/:courseId/feedback"
+            element={<MyFeedbackPage />}
+          />
+          <Route
+            path="course/:courseId/feedback/:lessonId"
             element={<FormPage />}
           />
           <Route path="profile" element={<ProfilePage />} />
