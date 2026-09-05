@@ -45,7 +45,7 @@ export async function getForm(id) {
     .from("coaching_forms")
     .select(
       `id, title, description, open,
-       fields:coaching_form_fields ( id, type, label, options, required, position )`
+       fields:coaching_form_fields ( id, type, label, options, required, scale_max, note, position )`
     )
     .eq("id", id)
     .maybeSingle();
@@ -93,7 +93,10 @@ export async function deleteForm(id) {
 
 // ── Fields ─────────────────────────────────────────────────────────
 
-export async function createField(formId, { type, label, options, required, position }) {
+export async function createField(
+  formId,
+  { type, label, options, required, position, scaleMax, note }
+) {
   ensure();
   const id = crypto.randomUUID();
   const { error } = await supabase.from("coaching_form_fields").insert({
@@ -103,6 +106,8 @@ export async function createField(formId, { type, label, options, required, posi
     label: label ?? "",
     options: options ?? [],
     required: !!required,
+    scale_max: scaleMax ?? null,
+    note: note?.trim() || null,
     position,
   });
   if (error) throw error;
@@ -112,16 +117,23 @@ export async function createField(formId, { type, label, options, required, posi
     label: label ?? "",
     options: options ?? [],
     required: !!required,
+    scale_max: scaleMax ?? null,
+    note: note?.trim() || null,
   };
 }
 
-export async function updateField(id, { type, label, options, required }) {
+export async function updateField(
+  id,
+  { type, label, options, required, scale_max, note }
+) {
   ensure();
   const patch = {};
   if (type !== undefined) patch.type = type;
   if (label !== undefined) patch.label = label;
   if (options !== undefined) patch.options = options;
   if (required !== undefined) patch.required = !!required;
+  if (scale_max !== undefined) patch.scale_max = scale_max;
+  if (note !== undefined) patch.note = note?.trim() || null;
   const { error } = await supabase
     .from("coaching_form_fields")
     .update(patch)
@@ -255,6 +267,7 @@ export async function getMyRefleksiEntries(lessons) {
           label: f.label || "Pertanyaan",
           type: f.type,
           value: r.answers?.[f.id],
+          scaleMax: f.scale_max || 5,
         })),
     };
   });

@@ -41,6 +41,12 @@ alter table public.coaching_form_fields
   add constraint coaching_form_fields_type_check
     check (type in ('short', 'long', 'single', 'multi', 'check', 'name', 'email', 'date', 'rating'));
 
+-- Field rating: jumlah bintang bisa diatur (null = default 5), plus
+-- catatan opsional yang tampil di bawah label (mis. keterangan skala).
+alter table public.coaching_form_fields
+  add column if not exists scale_max int,
+  add column if not exists note text;
+
 -- Respons murid. Boleh lebih dari 1x per form.
 create table if not exists public.coaching_form_responses (
   id         uuid primary key default gen_random_uuid(),

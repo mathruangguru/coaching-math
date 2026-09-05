@@ -66,6 +66,7 @@ export default function FormSummary({ form, responses, paged = false }) {
       const n = vals.length;
 
       if (f.type === "rating") {
+        const max = f.scale_max || 5;
         const nums = vals.map(Number).filter((x) => x > 0);
         const dist = {};
         for (const x of nums) dist[x] = (dist[x] ?? 0) + 1;
@@ -75,6 +76,7 @@ export default function FormSummary({ form, responses, paged = false }) {
           kind: "rating",
           n: nums.length,
           avg: nums.length ? sum / nums.length : 0,
+          max,
           dist,
         };
       }
@@ -162,6 +164,7 @@ export default function FormSummary({ form, responses, paged = false }) {
                 {r.kind === "option" && r.multi ? " · boleh pilih >1" : ""}
               </span>
             </p>
+            {f.note && <p className="mt-0.5 text-[11px] text-zinc-400">{f.note}</p>}
 
             {r.kind === "rating" &&
               (r.n === 0 ? (
@@ -172,10 +175,10 @@ export default function FormSummary({ form, responses, paged = false }) {
                     <span className="text-2xl font-bold text-zinc-900">
                       {r.avg.toFixed(1)}
                     </span>
-                    <span className="text-xs text-zinc-400">/ 5</span>
+                    <span className="text-xs text-zinc-400">/ {r.max}</span>
                   </div>
                   <div className="mt-1.5 flex flex-col gap-1">
-                    {[5, 4, 3, 2, 1].map((star) => {
+                    {Array.from({ length: r.max }, (_, i) => r.max - i).map((star) => {
                       const c = r.dist[star] ?? 0;
                       const p = pctOf(c, r.n);
                       return (

@@ -104,6 +104,8 @@ export default function AdminFormFormPage() {
         label: f.label.trim() || "Pertanyaan",
         options: f.options ?? [],
         required: f.required,
+        scale_max: f.type === "rating" ? (f.scale_max ?? 5) : null,
+        note: f.note ?? null,
       })
     );
 
@@ -282,6 +284,7 @@ export default function AdminFormFormPage() {
                         ? f.options
                         : Array(minOptions(type)).fill("")
                       : [],
+                    scale_max: type === "rating" ? (f.scale_max ?? 5) : null,
                   };
                   if (autoLabel[type] && !f.label.trim())
                     next.label = autoLabel[type];
@@ -330,9 +333,34 @@ export default function AdminFormFormPage() {
               </p>
             )}
             {f.type === "rating" && (
-              <p className="mt-1.5 pl-7 text-xs text-zinc-400">
-                Murid pilih 1–5 bintang.
-              </p>
+              <div className="mt-1.5 flex flex-col gap-1.5 pl-7">
+                <div className="flex items-center gap-1.5 text-xs text-zinc-500">
+                  <span>Murid pilih 1–</span>
+                  <input
+                    type="number"
+                    min={2}
+                    max={10}
+                    value={f.scale_max ?? 5}
+                    onChange={(e) => {
+                      const n = Number(e.target.value);
+                      const scale_max = Number.isFinite(n)
+                        ? Math.min(10, Math.max(2, Math.round(n)))
+                        : 5;
+                      patchField(f.id, { scale_max });
+                    }}
+                    onBlur={() => saveField(f)}
+                    className="w-14 rounded-md border border-zinc-200 bg-white px-1.5 py-1 text-center text-xs text-zinc-800 outline-none focus:border-brand-500"
+                  />
+                  <span>bintang.</span>
+                </div>
+                <input
+                  value={f.note ?? ""}
+                  onChange={(e) => patchField(f.id, { note: e.target.value })}
+                  onBlur={() => saveField(f)}
+                  placeholder='Catatan tambahan (opsional) — mis. "1 = kurang, 5 = sangat baik"'
+                  className={`${input} py-1.5 text-xs`}
+                />
+              </div>
             )}
 
             {hasOptions(f.type) && (

@@ -43,12 +43,13 @@ const fmtSent = (iso) => {
   return `${tgl} pukul ${jam}`;
 };
 
-function StarRating({ value, onChange }) {
+function StarRating({ value, onChange, max = 5 }) {
   const [hover, setHover] = useState(0);
   const active = hover || value || 0;
+  const stars = Array.from({ length: max }, (_, i) => i + 1);
   return (
     <div className="mt-2 flex items-center gap-1">
-      {[1, 2, 3, 4, 5].map((n) => (
+      {stars.map((n) => (
         <button
           key={n}
           type="button"
@@ -353,6 +354,7 @@ export default function FormPage() {
             {f.label || "(tanpa label)"}
             {f.required && <span className="text-rose-500"> *</span>}
           </p>
+          {f.note && <p className="mt-1 text-xs text-zinc-500">{f.note}</p>}
 
           {f.type === "short" && (
             <input
@@ -389,6 +391,7 @@ export default function FormPage() {
             <StarRating
               value={valueFor(f)}
               onChange={(n) => setVal(f.id, n)}
+              max={f.scale_max || 5}
             />
           )}
           {f.type === "single" && (
