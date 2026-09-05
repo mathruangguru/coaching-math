@@ -26,8 +26,9 @@ const fmtAnswer = (a) => {
   const v = a.value;
   if (v == null || v === "" || (Array.isArray(v) && v.length === 0)) return "—";
   if (a.type === "rating") {
-    const n = Math.max(0, Math.min(5, Math.round(Number(v) || 0)));
-    return "★".repeat(n) + "☆".repeat(5 - n);
+    const max = a.scaleMax || 5;
+    const n = Math.max(0, Math.min(max, Math.round(Number(v) || 0)));
+    return "★".repeat(n) + "☆".repeat(max - n);
   }
   return Array.isArray(v) ? v.join(", ") : String(v);
 };
