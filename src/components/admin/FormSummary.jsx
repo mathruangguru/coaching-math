@@ -5,6 +5,10 @@ import { Star, ChevronLeft, ChevronRight } from "lucide-react";
 const SKIP = new Set(["name", "email", "date"]);
 const OPTION_TYPES = new Set(["single", "multi", "check"]);
 
+// Jawaban isian di bawah ini dianggap nggak substansial (mis. "-", "—",
+// string kosong) -- nggak usah ikut ditampilkan di daftar Ringkasan.
+const MIN_TEXT_LEN = 5;
+
 const isBlank = (v) =>
   v == null ||
   v === 0 ||
@@ -96,11 +100,14 @@ export default function FormSummary({ form, responses, paged = false }) {
         };
       }
 
+      const texts = vals
+        .map((v) => String(v).trim())
+        .filter((t) => t.length >= MIN_TEXT_LEN);
       return {
         f,
         kind: "text",
-        n,
-        texts: vals.map((v) => String(v).trim()).filter(Boolean),
+        n: texts.length,
+        texts,
       };
     });
   }, [form, responses]);
