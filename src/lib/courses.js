@@ -33,7 +33,7 @@ export async function getCourse(id) {
       `id, title, description, icon, announcement,
        sections:coaching_course_sections (
          id, title, position, meet_at,
-         items:coaching_lessons ( id, type, title, duration, url, question_set_id, form_id, prompt, content, publish_status, access_open, position )
+         items:coaching_lessons ( id, type, title, duration, url, question_set_id, form_id, prompt, content, publish_status, access_open, access_opens_at, access_closes_at, position )
        )`
     )
     .eq("id", id)

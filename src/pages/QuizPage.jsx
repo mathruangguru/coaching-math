@@ -10,6 +10,7 @@ import {
   getQuizProgress,
   saveQuizDraft,
   getQuestionStats,
+  quizAccessNow,
 } from "../lib/quiz";
 import Skeleton from "../components/ui/Skeleton";
 
@@ -23,6 +24,14 @@ const fmtDur = (sec) => {
   const m = Math.floor(s / 60);
   return m > 0 ? `${m} mnt ${s % 60} dtk` : `${s} dtk`;
 };
+
+const fmtDateTime = (ms) =>
+  new Date(ms).toLocaleString("id-ID", {
+    day: "numeric",
+    month: "long",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 
 // mm:ss atau h:mm:ss
 const fmtClock = (ms) => {
@@ -511,7 +520,7 @@ export default function QuizPage({ review = false }) {
   // ── Lobby (instruksi + tombol Mulai) ────────────────────────────
   if (!started) {
     const limitMin = set.time_limit_min ?? null;
-    const closed = lesson.access_open === false;
+    const access = quizAccessNow(lesson, now);
     return (
       <div className="mx-auto flex max-w-2xl flex-col gap-5">
         {backLink}
@@ -540,12 +549,29 @@ export default function QuizPage({ review = false }) {
             </div>
           )}
 
-          {closed ? (
+          {!access.open ? (
             <div className="mt-5 flex items-center gap-2.5 rounded-lg border border-dashed border-zinc-300 bg-zinc-50 px-4 py-3">
               <Lock size={15} className="shrink-0 text-zinc-400" />
               <p className="text-xs font-medium text-zinc-500">
-                Akses latihan ini ditutup karena sesi pengerjaan belum
-                dimulai atau sudah berakhir.
+                {access.reason === "before" ? (
+                  <>
+                    Akses latihan ini baru dibuka mulai{" "}
+                    <span className="font-semibold text-zinc-700">
+                      {fmtDateTime(access.at)}
+                    </span>
+                    .
+                  </>
+                ) : access.reason === "after" ? (
+                  <>
+                    Akses latihan ini sudah ditutup sejak{" "}
+                    <span className="font-semibold text-zinc-700">
+                      {fmtDateTime(access.at)}
+                    </span>
+                    .
+                  </>
+                ) : (
+                  "Akses latihan ini ditutup karena sesi pengerjaan belum dimulai atau sudah berakhir."
+                )}
               </p>
             </div>
           ) : (
