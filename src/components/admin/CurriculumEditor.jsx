@@ -14,6 +14,7 @@ import {
   Upload,
   Lock,
   Clock,
+  UserCheck,
 } from "lucide-react";
 import {
   getCourse,
@@ -28,12 +29,17 @@ import {
 } from "../../lib/courses";
 import { getQuestionSets, quizAccessNow } from "../../lib/quiz";
 import { getForms } from "../../lib/forms";
+import { getCourseEnrollments } from "../../lib/enroll";
+import { getUsers } from "../../lib/users";
 import { uploadLessonPdf, deleteLessonPdf, PDF_MAX_MB } from "../../lib/pdf";
 import { lessonTypeLabels } from "../../lib/lessonTypes";
 import LessonIcon from "../ui/LessonIcon";
 import MateriEditor from "./MateriEditor";
 
 const LESSON_TYPES = Object.keys(lessonTypeLabels);
+
+const fullName = (u) =>
+  [u?.first_name, u?.last_name].filter(Boolean).join(" ") || u?.email || "";
 const URL_TYPES = ["meet", "recording", "slide", "form"];
 
 function PdfField({ lesson, onChange }) {
@@ -219,6 +225,7 @@ export default function CurriculumEditor({ courseId }) {
   const [editingId, setEditingId] = useState(null);
   const [questionSets, setQuestionSets] = useState([]);
   const [forms, setForms] = useState([]);
+  const [students, setStudents] = useState([]); // murid enrolled -- target feedback
   const [contentLesson, setContentLesson] = useState(null); // lesson materi yg lagi diedit isinya
   const [now] = useState(() => Date.now()); // buat badge "Akses ditutup" (jadwal)
 
@@ -232,10 +239,22 @@ export default function CurriculumEditor({ courseId }) {
     getForms()
       .then((d) => alive && setForms(d))
       .catch((err) => console.error("[admin] gagal memuat form:", err));
+    Promise.all([getCourseEnrollments(courseId), getUsers()])
+      .then(([enrollments, users]) => {
+        if (!alive) return;
+        const byId = new Map(users.map((u) => [u.id, u]));
+        setStudents(
+          enrollments
+            .map((e) => byId.get(e.user_id))
+            .filter(Boolean)
+            .sort((a, b) => fullName(a).localeCompare(fullName(b), "id"))
+        );
+      })
+      .catch((err) => console.error("[admin] gagal memuat murid:", err));
     return () => {
       alive = false;
     };
-  }, []);
+  }, [courseId]);
 
   const load = () => {
     setStatus("loading");
@@ -366,6 +385,8 @@ export default function CurriculumEditor({ courseId }) {
         access_open: lesson.access_open ?? true,
         access_opens_at: lesson.access_opens_at ?? null,
         access_closes_at: lesson.access_closes_at ?? null,
+        target_user_id: lesson.target_user_id ?? null,
+        target_name: lesson.target_name ?? null,
       }),
     );
 
@@ -858,6 +879,79 @@ export default function CurriculumEditor({ courseId }) {
                             ))}
                           </select>
                         </div>
+                      )}
+
+                      {lesson.type === "feedback" && (
+                        <>
+                          <div className="mt-1.5 flex items-center gap-1.5 pl-9">
+                            <ListChecks
+                              size={12}
+                              className="shrink-0 text-zinc-400"
+                            />
+                            <select
+                              value={lesson.form_id ?? ""}
+                              onChange={(e) => {
+                                const v = e.target.value || null;
+                                patchLessonLocal(editing.id, lesson.id, {
+                                  form_id: v,
+                                });
+                                saveLesson({ ...lesson, form_id: v });
+                              }}
+                              className={`${cell} flex-1 text-xs`}
+                            >
+                              <option value="">
+                                — pilih form pertanyaan —
+                              </option>
+                              {forms.map((fm) => (
+                                <option key={fm.id} value={fm.id}>
+                                  {fm.title}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="mt-1.5 flex items-center gap-1.5 pl-9">
+                            <UserCheck
+                              size={12}
+                              className="shrink-0 text-zinc-400"
+                            />
+                            <select
+                              value={lesson.target_user_id ?? ""}
+                              onChange={(e) => {
+                                const uid = e.target.value || null;
+                                const target = students.find(
+                                  (s) => s.id === uid,
+                                );
+                                const patch = {
+                                  target_user_id: uid,
+                                  target_name: target
+                                    ? fullName(target)
+                                    : null,
+                                };
+                                patchLessonLocal(
+                                  editing.id,
+                                  lesson.id,
+                                  patch,
+                                );
+                                saveLesson({ ...lesson, ...patch });
+                              }}
+                              className={`${cell} flex-1 text-xs`}
+                            >
+                              <option value="">
+                                — buat siapa (target) —
+                              </option>
+                              {students.map((s) => (
+                                <option key={s.id} value={s.id}>
+                                  {fullName(s)}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <p className="mt-1.5 pl-9 text-[11px] text-zinc-400">
+                            Murid lain ngisi form ini buat kasih feedback
+                            soal target. Ganti target = bikin lesson baru,
+                            bukan ubah yang ini.
+                          </p>
+                        </>
                       )}
 
                       {lesson.type === "presensi" && (

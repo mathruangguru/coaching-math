@@ -9,6 +9,7 @@ import {
   ClipboardList,
   UserCheck,
   NotebookPen,
+  MessageSquareHeart,
   Circle,
 } from "lucide-react";
 
@@ -22,6 +23,7 @@ const icons = {
   form: ClipboardList,
   presensi: UserCheck,
   refleksi: NotebookPen,
+  feedback: MessageSquareHeart,
 };
 
 // Merender ikon sesuai tipe item materi.

@@ -23,7 +23,13 @@ export default function CourseMateriPage() {
     if (status !== "ready" || !course) return;
     const items = (course.sections ?? []).flatMap((s) => s.items ?? []);
     const formIds = items
-      .filter((it) => (it.type === "form" || it.type === "refleksi") && it.form_id)
+      .filter(
+        (it) =>
+          (it.type === "form" ||
+            it.type === "refleksi" ||
+            it.type === "feedback") &&
+          it.form_id
+      )
       .map((it) => it.id);
     const presensiIds = items
       .filter((it) => it.type === "presensi")

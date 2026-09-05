@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { ChevronDown, Check } from "lucide-react";
+import { useAuth } from "../../context/auth-context";
 import LessonIcon from "../ui/LessonIcon";
 
 const typeTint = {
@@ -13,6 +14,7 @@ const typeTint = {
   form: "bg-violet-50 text-violet-600",
   presensi: "bg-emerald-50 text-emerald-600",
   refleksi: "bg-rose-50 text-rose-600",
+  feedback: "bg-indigo-50 text-indigo-600",
 };
 
 const pill = "rounded px-1.5 py-0.5 text-[10px] font-semibold";
@@ -49,11 +51,12 @@ function DoneBadge({ children }) {
   );
 }
 
-function CardInner({ item, done, att, score, quizStarted }) {
+function CardInner({ item, done, att, score, quizStarted, isFeedbackTarget }) {
   const soon =
     (item.type === "soal" && !item.question_set_id) ||
     (item.type === "form" && !item.form_id && !item.url) ||
     (item.type === "refleksi" && !item.form_id) ||
+    (item.type === "feedback" && (!item.form_id || !item.target_user_id)) ||
     (item.type === "slide" && !item.url) ||
     (item.type === "pdf" && !item.url);
   const meta = [item.duration || null, soon ? "segera" : null]
@@ -63,11 +66,14 @@ function CardInner({ item, done, att, score, quizStarted }) {
 
   const isForm =
     (item.type === "form" || item.type === "refleksi") && !!item.form_id;
+  const isFeedback =
+    item.type === "feedback" && !!item.form_id && !!item.target_user_id;
   const isQuiz = item.type === "soal" && !!item.question_set_id;
   const isPresensi = !!att && att.rounds > 0;
   const hadirPenuh = isPresensi && att.mine >= att.rounds;
 
-  const hasMetaRow = meta || isForm || isQuiz || isPresensi || notPublish;
+  const hasMetaRow =
+    meta || isForm || isFeedback || isQuiz || isPresensi || notPublish;
 
   return (
     <>
@@ -92,6 +98,15 @@ function CardInner({ item, done, att, score, quizStarted }) {
                 <DoneBadge>Sudah diisi</DoneBadge>
               ) : (
                 <span className={pillMuted}>Belum diisi</span>
+              ))}
+
+            {isFeedback &&
+              (isFeedbackTarget ? (
+                <span className={pillTeal}>Lihat feedback buat kamu</span>
+              ) : done ? (
+                <DoneBadge>Sudah kasih feedback</DoneBadge>
+              ) : (
+                <span className={pillMuted}>Belum kasih feedback</span>
               ))}
 
             {isQuiz &&
@@ -139,6 +154,7 @@ export default function CourseSection({
   progress = EMPTY_PROGRESS,
 }) {
   const [open, setOpen] = useState(true);
+  const { profile } = useAuth();
 
   return (
     <section>
@@ -176,7 +192,12 @@ export default function CourseSection({
             const article = item.type === "materi" && item.content;
             const quiz = item.type === "soal" && item.question_set_id;
             const presensi = item.type === "presensi";
-            const done = inAppForm && !!progress.done?.has(item.id);
+            const feedback =
+              item.type === "feedback" && item.form_id && item.target_user_id;
+            const isFeedbackTarget =
+              feedback && profile?.id === item.target_user_id;
+            const done =
+              (inAppForm || feedback) && !!progress.done?.has(item.id);
             const att = presensi ? progress.att?.[item.id] : null;
             const score = quiz ? progress.score?.[item.id] : null;
             const quizStarted =
@@ -204,6 +225,7 @@ export default function CourseSection({
               article ||
               quiz ||
               inAppForm ||
+              feedback ||
               presensi
             ) {
               const to = recording
@@ -216,7 +238,7 @@ export default function CourseSection({
                       ? `/course/${courseId}/materi/${item.id}`
                       : presensi
                         ? `/course/${courseId}/presensi/${item.id}`
-                        : inAppForm
+                        : inAppForm || feedback
                           ? `/course/${courseId}/${item.type}/${item.id}`
                           : `/course/${courseId}/soal/${item.id}`;
               return (
@@ -227,6 +249,7 @@ export default function CourseSection({
                     att={att}
                     score={score}
                     quizStarted={quizStarted}
+                    isFeedbackTarget={isFeedbackTarget}
                   />
                 </Link>
               );

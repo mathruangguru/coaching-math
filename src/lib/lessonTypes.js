@@ -10,6 +10,7 @@ export const lessonTypeLabels = {
   form: "Form",
   presensi: "Presensi",
   refleksi: "Refleksi",
+  feedback: "Feedback",
 };
 
 // Status publikasi per materi (kolom coaching_lessons.publish_status).
