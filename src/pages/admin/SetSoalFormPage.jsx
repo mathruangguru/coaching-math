@@ -10,6 +10,7 @@ import {
   Pencil,
   X,
   FileJson,
+  Download,
 } from "lucide-react";
 import {
   getQuestionSetAdmin,
@@ -19,6 +20,7 @@ import {
   deleteQuestion,
   reorderQuestions,
   parseQuestionsJson,
+  questionsToJson,
   bulkCreateQuestions,
 } from "../../lib/quiz";
 import Skeleton from "../../components/ui/Skeleton";
@@ -190,6 +192,18 @@ export default function SetSoalFormPage() {
       setImportOpen(false);
     });
 
+  const exportJson = () => {
+    const json = JSON.stringify(questionsToJson(set.questions), null, 2);
+    const url = URL.createObjectURL(
+      new Blob([json], { type: "application/json;charset=utf-8" })
+    );
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${(set.title || "set-soal").replace(/[^\w.-]+/g, "_")}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const removeQuestion = (q, idx) => {
     if (!window.confirm(`Hapus soal ${idx + 1} (${q.code})?`)) return;
     run(async () => {
@@ -350,22 +364,33 @@ export default function SetSoalFormPage() {
             );
           })}
 
-          <div className="mt-1 flex gap-1.5">
+          <div className="mt-1 flex flex-col gap-1.5">
             <button
               type="button"
               onClick={addQuestion}
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border-2 border-dashed border-zinc-200 py-2 text-xs font-semibold text-zinc-500 transition-colors hover:border-brand-300 hover:bg-brand-50/30 hover:text-brand-600"
+              className="flex items-center justify-center gap-1.5 rounded-lg border-2 border-dashed border-zinc-200 py-2 text-xs font-semibold text-zinc-500 transition-colors hover:border-brand-300 hover:bg-brand-50/30 hover:text-brand-600"
             >
               <Plus size={13} /> Tambah soal
             </button>
-            <button
-              type="button"
-              onClick={() => setImportOpen(true)}
-              title="Import banyak soal dari JSON"
-              className="flex items-center justify-center gap-1.5 rounded-lg border-2 border-dashed border-zinc-200 px-3 py-2 text-xs font-semibold text-zinc-500 transition-colors hover:border-brand-300 hover:bg-brand-50/30 hover:text-brand-600"
-            >
-              <FileJson size={13} /> Import
-            </button>
+            <div className="flex gap-1.5">
+              <button
+                type="button"
+                onClick={() => setImportOpen(true)}
+                title="Import banyak soal dari JSON"
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border-2 border-dashed border-zinc-200 px-3 py-2 text-xs font-semibold text-zinc-500 transition-colors hover:border-brand-300 hover:bg-brand-50/30 hover:text-brand-600"
+              >
+                <FileJson size={13} /> Import
+              </button>
+              <button
+                type="button"
+                onClick={exportJson}
+                disabled={set.questions.length === 0}
+                title="Export semua soal ke JSON"
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border-2 border-dashed border-zinc-200 px-3 py-2 text-xs font-semibold text-zinc-500 transition-colors hover:border-brand-300 hover:bg-brand-50/30 hover:text-brand-600 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-zinc-200 disabled:hover:bg-transparent disabled:hover:text-zinc-500"
+              >
+                <Download size={13} /> Export
+              </button>
+            </div>
           </div>
         </div>
 

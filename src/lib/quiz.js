@@ -231,6 +231,26 @@ export function parseQuestionsJson(text) {
 }
 
 /**
+ * Kebalikan dari parseQuestionsJson -- serialize soal (dari
+ * getQuestionSetAdmin, yang udah bawa `.answers`) balik ke bentuk JSON
+ * yang bisa di-import lagi apa adanya. `single` -> answer index tunggal,
+ * `multi` -> answer array index.
+ */
+export function questionsToJson(questions) {
+  return {
+    questions: questions.map((q) => ({
+      prompt: q.prompt,
+      options: q.options,
+      type: q.type === "multi" ? "multi" : "single",
+      answer:
+        q.type === "multi"
+          ? (q.answers ?? [])
+          : (q.answers?.[0] ?? q.answer ?? 0),
+    })),
+  };
+}
+
+/**
  * Tambah banyak soal sekaligus (2 insert batch: questions + keys).
  */
 export async function bulkCreateQuestions(setId, items, startPosition = 0) {
