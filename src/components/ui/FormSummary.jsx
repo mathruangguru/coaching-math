@@ -164,7 +164,11 @@ export default function FormSummary({ form, responses, paged = false }) {
                 {r.kind === "option" && r.multi ? " · boleh pilih >1" : ""}
               </span>
             </p>
-            {f.note && <p className="mt-0.5 text-[11px] text-zinc-400">{f.note}</p>}
+            {f.note && (
+              <p className="mt-0.5 whitespace-pre-wrap text-[11px] text-zinc-400">
+                {f.note}
+              </p>
+            )}
 
             {r.kind === "rating" &&
               (r.n === 0 ? (

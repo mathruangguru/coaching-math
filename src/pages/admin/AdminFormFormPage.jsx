@@ -353,12 +353,15 @@ export default function AdminFormFormPage() {
                   />
                   <span>bintang.</span>
                 </div>
-                <input
+                <textarea
+                  rows={2}
                   value={f.note ?? ""}
                   onChange={(e) => patchField(f.id, { note: e.target.value })}
                   onBlur={() => saveField(f)}
-                  placeholder='Catatan tambahan (opsional) — mis. "1 = kurang, 5 = sangat baik"'
-                  className={`${input} py-1.5 text-xs`}
+                  placeholder={
+                    'Catatan tambahan (opsional) — boleh multi-baris, mis.\n1: Terdapat miskonsepsi\n2: Kurang konsisten\n…'
+                  }
+                  className={`${input} resize-y py-1.5 text-xs`}
                 />
               </div>
             )}

@@ -354,7 +354,11 @@ export default function FormPage() {
             {f.label || "(tanpa label)"}
             {f.required && <span className="text-rose-500"> *</span>}
           </p>
-          {f.note && <p className="mt-1 text-xs text-zinc-500">{f.note}</p>}
+          {f.note && (
+            <p className="mt-1 whitespace-pre-wrap text-xs text-zinc-500">
+              {f.note}
+            </p>
+          )}
 
           {f.type === "short" && (
             <input
