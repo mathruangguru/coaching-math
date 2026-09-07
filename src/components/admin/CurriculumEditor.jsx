@@ -46,6 +46,9 @@ const LESSON_TYPES = Object.keys(lessonTypeLabels);
 const fullName = (u) =>
   [u?.first_name, u?.last_name].filter(Boolean).join(" ") || u?.email || "";
 const URL_TYPES = ["meet", "recording", "slide", "form"];
+// Item yang isian-nya form in-app (dirender FormPage) — semua kena toggle
+// buka/tutup akses per-lesson, sama kayak soal tapi tanpa jadwal.
+const FORM_LIKE = new Set(["form", "refleksi", "feedback"]);
 
 function PdfField({ lesson, onChange }) {
   const [busy, setBusy] = useState(false);
@@ -598,7 +601,7 @@ export default function CurriculumEditor({ courseId }) {
                       )}
                       {((lesson.type === "soal" &&
                         !quizAccessNow(lesson, now).open) ||
-                        (lesson.type === "form" &&
+                        (FORM_LIKE.has(lesson.type) &&
                           lesson.access_open === false)) && (
                         <span className="shrink-0 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-600">
                           Akses ditutup
@@ -851,7 +854,8 @@ export default function CurriculumEditor({ courseId }) {
                         </div>
                       )}
 
-                      {(lesson.type === "soal" || lesson.type === "form") && (
+                      {(lesson.type === "soal" ||
+                        FORM_LIKE.has(lesson.type)) && (
                         <div className="mt-1.5 flex items-center gap-2 pl-9">
                           <Lock size={12} className="shrink-0 text-zinc-400" />
                           {(() => {
@@ -864,7 +868,7 @@ export default function CurriculumEditor({ courseId }) {
                               saveLesson({ ...lesson, access_open: next });
                             };
                             const hint =
-                              lesson.type === "form"
+                              lesson.type !== "soal"
                                 ? open
                                   ? "murid bisa buka & isi"
                                   : "murid nggak bisa buka"
