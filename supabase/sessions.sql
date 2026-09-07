@@ -4,11 +4,14 @@
 -- ── Tipe lesson baru ──────────────────────────────────────────────
 -- 'slide' = preview Google Slides, 'pdf' = PDF yang di-upload
 -- (dua-duanya simpan link di kolom `url`, sama kayak recording/meet).
+-- List LENGKAP semua tipe -- sama persis di feedback.sql & image.sql biar
+-- urutan run / re-run file nggak ngefek (kalau salah satu pakai list
+-- lebih pendek, dia gagal di row tipe yang belum masuk list-nya).
 alter table public.coaching_lessons drop constraint if exists coaching_lessons_type_check;
 alter table public.coaching_lessons
   add constraint coaching_lessons_type_check
     check (type in ('materi', 'soal', 'meet', 'recording', 'slide', 'pdf',
-                    'form', 'presensi', 'refleksi'));
+                    'form', 'presensi', 'refleksi', 'feedback', 'image'));
 
 -- Pertanyaan refleksi (dipakai lesson tipe 'refleksi').
 alter table public.coaching_lessons add column if not exists prompt text;

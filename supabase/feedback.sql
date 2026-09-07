@@ -16,11 +16,14 @@
 --     pernah nyampe ke browser target lewat jalur mana pun.
 
 -- ── Tipe lesson baru ──────────────────────────────────────────────
+-- List LENGKAP semua tipe -- sama persis di sessions.sql & image.sql biar
+-- urutan run / re-run file nggak ngefek (kalau salah satu pakai list
+-- lebih pendek, dia gagal di row tipe yang belum masuk list-nya).
 alter table public.coaching_lessons drop constraint if exists coaching_lessons_type_check;
 alter table public.coaching_lessons
   add constraint coaching_lessons_type_check
     check (type in ('materi', 'soal', 'meet', 'recording', 'slide', 'pdf',
-                    'form', 'presensi', 'refleksi', 'feedback'));
+                    'form', 'presensi', 'refleksi', 'feedback', 'image'));
 
 -- target_user_id = "orang X" ronde ini. target_name didenormalisasi
 -- (nama tersimpan pas admin milih) -- murid biasa nggak bisa baca

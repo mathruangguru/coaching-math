@@ -4,6 +4,8 @@
 -- Aman dijalankan ulang.
 
 -- ── Tipe lesson baru 'image' ──────────────────────────────────────────
+-- List LENGKAP semua tipe -- sama persis di sessions.sql & feedback.sql
+-- biar urutan run / re-run file nggak ngefek.
 alter table public.coaching_lessons drop constraint if exists coaching_lessons_type_check;
 alter table public.coaching_lessons
   add constraint coaching_lessons_type_check
