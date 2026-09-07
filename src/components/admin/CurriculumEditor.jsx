@@ -596,12 +596,14 @@ export default function CurriculumEditor({ courseId }) {
                           Not publish
                         </span>
                       )}
-                      {lesson.type === "soal" &&
-                        !quizAccessNow(lesson, now).open && (
-                          <span className="shrink-0 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-600">
-                            Akses ditutup
-                          </span>
-                        )}
+                      {((lesson.type === "soal" &&
+                        !quizAccessNow(lesson, now).open) ||
+                        (lesson.type === "form" &&
+                          lesson.access_open === false)) && (
+                        <span className="shrink-0 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-600">
+                          Akses ditutup
+                        </span>
+                      )}
                       <span className="shrink-0 text-xs text-zinc-400">
                         {lessonTypeLabels[lesson.type]}
                         {lesson.duration ? ` · ${lesson.duration}` : ""}
@@ -849,7 +851,7 @@ export default function CurriculumEditor({ courseId }) {
                         </div>
                       )}
 
-                      {lesson.type === "soal" && (
+                      {(lesson.type === "soal" || lesson.type === "form") && (
                         <div className="mt-1.5 flex items-center gap-2 pl-9">
                           <Lock size={12} className="shrink-0 text-zinc-400" />
                           {(() => {
@@ -861,6 +863,14 @@ export default function CurriculumEditor({ courseId }) {
                               });
                               saveLesson({ ...lesson, access_open: next });
                             };
+                            const hint =
+                              lesson.type === "form"
+                                ? open
+                                  ? "murid bisa buka & isi"
+                                  : "murid nggak bisa buka"
+                                : open
+                                  ? "murid bisa mulai ngerjain"
+                                  : "yang belum mulai ketahan di lobby";
                             return (
                               <>
                                 <button
@@ -882,9 +892,7 @@ export default function CurriculumEditor({ courseId }) {
                                   {open ? "Akses dibuka" : "Akses ditutup"}
                                 </span>
                                 <span className="text-[11px] text-zinc-400">
-                                  {open
-                                    ? "murid bisa mulai ngerjain"
-                                    : "yang belum mulai ketahan di lobby"}
+                                  {hint}
                                 </span>
                               </>
                             );

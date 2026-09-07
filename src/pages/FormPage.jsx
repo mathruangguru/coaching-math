@@ -260,6 +260,18 @@ export default function FormPage() {
       </div>
     );
 
+  // Admin nutup akses item ini (per-lesson, kayak buka/tutup soal).
+  if (lesson.access_open === false)
+    return (
+      <div className="mx-auto flex max-w-2xl flex-col gap-5">
+        {backLink}
+        {header}
+        <p className="rounded-2xl border border-dashed border-zinc-300 bg-white px-6 py-10 text-center text-sm text-zinc-400">
+          Akses ke {noun} ini sedang ditutup pengajar.
+        </p>
+      </div>
+    );
+
   if (form.open === false)
     return (
       <div className="mx-auto flex max-w-2xl flex-col gap-5">

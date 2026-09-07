@@ -32,9 +32,10 @@ alter table public.coaching_lessons
 
 -- ── RLS: nggak boleh ngasih feedback ke diri sendiri ────────────────
 -- Redefine "coaching_form_responses insert own" -- salin persis klausa
--- yang udah ada di forms.sql (form harus open, sekali per form+lesson),
--- tambah satu klausa baru: kalau lesson-nya tipe feedback, user_id yang
--- insert nggak boleh sama dengan target_user_id lesson itu.
+-- yang udah ada di forms.sql (form harus open, sekali per form+lesson,
+-- lesson nggak lagi ditutup aksesnya), tambah satu klausa baru: kalau
+-- lesson-nya tipe feedback, user_id yang insert nggak boleh sama dengan
+-- target_user_id lesson itu.
 drop policy if exists "coaching_form_responses insert own" on public.coaching_form_responses;
 create policy "coaching_form_responses insert own"
   on public.coaching_form_responses for insert
@@ -53,6 +54,13 @@ create policy "coaching_form_responses insert own"
       where r.form_id = coaching_form_responses.form_id
         and r.lesson_id is not distinct from coaching_form_responses.lesson_id
         and r.user_id = auth.uid()
+    )
+    -- Lesson-nya lagi ditutup aksesnya (coaching_lessons.access_open =
+    -- false). Sama kayak klausa di forms.sql.
+    and not exists (
+      select 1 from public.coaching_lessons l
+      where l.id = coaching_form_responses.lesson_id
+        and coalesce(l.access_open, true) = false
     )
     -- Feedback: nggak boleh ngasih feedback buat diri sendiri.
     and not exists (
