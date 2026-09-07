@@ -51,6 +51,11 @@ const fmt = (iso) => {
 
 const QUICK = ["Presensi 1", "Presensi 2", "Presensi 3"];
 
+const csvCell = (v) => {
+  const s = v == null ? "" : String(v);
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+};
+
 // Inisial dari nama: huruf pertama kata pertama + kata terakhir.
 const initialsOf = (name) => {
   const parts = (name || "").trim().split(/\s+/).filter(Boolean);
@@ -406,6 +411,48 @@ function PresensiRow({ lesson, usersById, courseItems = [] }) {
     }
   };
 
+  // Matriks kehadiran ke CSV: baris = orang yang pernah hadir, kolom =
+  // tiap ronde (Hadir / -), plus jumlah hadir.
+  const downloadCsv = () => {
+    if (!rounds?.length) return;
+    const present = new Set();
+    for (const r of rounds)
+      for (const p of r.people) present.add(`${p.user_id}|${r.id}`);
+    const uids = [
+      ...new Set(rounds.flatMap((r) => r.people.map((p) => p.user_id))),
+    ];
+    const body = uids
+      .map((uid) => {
+        const u = usersById.get(uid);
+        const cells = rounds.map((r) =>
+          present.has(`${uid}|${r.id}`) ? "Hadir" : "-"
+        );
+        const hadir = cells.filter((c) => c === "Hadir").length;
+        return { name: u ? fullName(u) : uid, email: u?.email ?? "", cells, hadir };
+      })
+      .sort((a, b) => b.hadir - a.hadir || a.name.localeCompare(b.name));
+
+    const lines = [
+      ["Nama", "Email", ...rounds.map((r) => r.label), "Hadir", "Total sesi"],
+      ...body.map((r) => [
+        r.name,
+        r.email,
+        ...r.cells,
+        r.hadir,
+        rounds.length,
+      ]),
+    ];
+    const csv = lines.map((row) => row.map(csvCell).join(",")).join("\n");
+    const url = URL.createObjectURL(
+      new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" })
+    );
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${lesson.title.replace(/[^\w.-]+/g, "_")}-presensi.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const startRename = (r) => {
     escRef.current = false;
     setDraft(r.label);
@@ -496,24 +543,33 @@ function PresensiRow({ lesson, usersById, courseItems = [] }) {
               )}
 
               {rounds.length > 0 && (
-                <div className="inline-flex w-fit rounded-lg border border-zinc-200 bg-white p-0.5 text-xs font-semibold">
-                  {[
-                    ["sesi", "Per sesi"],
-                    ["rekap", "Rekap kehadiran"],
-                  ].map(([k, lbl]) => (
-                    <button
-                      key={k}
-                      type="button"
-                      onClick={() => setView(k)}
-                      className={`rounded-md px-2.5 py-1 transition-colors ${
-                        view === k
-                          ? "bg-brand-500 text-white"
-                          : "text-zinc-500 hover:text-zinc-800"
-                      }`}
-                    >
-                      {lbl}
-                    </button>
-                  ))}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="inline-flex w-fit rounded-lg border border-zinc-200 bg-white p-0.5 text-xs font-semibold">
+                    {[
+                      ["sesi", "Per sesi"],
+                      ["rekap", "Rekap kehadiran"],
+                    ].map(([k, lbl]) => (
+                      <button
+                        key={k}
+                        type="button"
+                        onClick={() => setView(k)}
+                        className={`rounded-md px-2.5 py-1 transition-colors ${
+                          view === k
+                            ? "bg-brand-500 text-white"
+                            : "text-zinc-500 hover:text-zinc-800"
+                        }`}
+                      >
+                        {lbl}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={downloadCsv}
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-zinc-200 bg-white px-2 py-1 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-50"
+                  >
+                    <Download size={12} /> CSV
+                  </button>
                 </div>
               )}
 
