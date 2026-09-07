@@ -162,7 +162,7 @@ export default function CourseSection({
   courseId,
   progress = EMPTY_PROGRESS,
 }) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(section.default_open !== false);
   const { profile } = useAuth();
 
   return (
