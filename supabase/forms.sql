@@ -125,6 +125,14 @@ create policy "coaching_form_responses insert own"
         and r.lesson_id is not distinct from coaching_form_responses.lesson_id
         and r.user_id = auth.uid()
     )
+    -- Lesson-nya lagi ditutup aksesnya (coaching_lessons.access_open =
+    -- false, di-set admin per item -- kayak buka/tutup soal). NULL
+    -- lesson_id (form lepasan tanpa lesson) lolos.
+    and not exists (
+      select 1 from public.coaching_lessons l
+      where l.id = coaching_form_responses.lesson_id
+        and coalesce(l.access_open, true) = false
+    )
   );
 
 drop policy if exists "coaching_form_responses select own" on public.coaching_form_responses;
