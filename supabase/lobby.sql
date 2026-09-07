@@ -8,3 +8,9 @@ alter table public.coaching_courses
 -- Waktu pertemuan per section — buat "pertemuan berikutnya" di lobby.
 alter table public.coaching_course_sections
   add column if not exists meet_at timestamptz;
+
+-- Kondisi awal akordion pertemuan pas murid buka daftar materi. true =
+-- kebuka, false = ketutup (murid tetap bisa toggle sendiri). Admin set
+-- ini biar murid fokus ke pertemuan yang lagi relevan.
+alter table public.coaching_course_sections
+  add column if not exists default_open boolean not null default true;

@@ -558,6 +558,11 @@ export default function CurriculumEditor({ courseId }) {
                 <p className="flex-1 truncate px-1 text-sm font-bold text-zinc-900">
                   {section.title}
                 </p>
+                {section.default_open === false && (
+                  <span className="shrink-0 rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-500">
+                    Tutup default
+                  </span>
+                )}
                 <span className="shrink-0 text-[11px] text-zinc-400">
                   {section.items.length} materi
                 </span>
@@ -668,6 +673,44 @@ export default function CurriculumEditor({ courseId }) {
                 className={`${cell} mt-1.5 w-full text-sm sm:w-64`}
               />
             </label>
+
+            <div className="flex items-center gap-2">
+              {(() => {
+                const open = editing.default_open !== false;
+                const toggle = () => {
+                  const next = !open;
+                  patchSectionLocal(editing.id, { default_open: next });
+                  run(() => updateSection(editing.id, { default_open: next }));
+                };
+                return (
+                  <>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={open}
+                      onClick={toggle}
+                      className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
+                        open ? "bg-emerald-500" : "bg-zinc-300"
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                          open ? "translate-x-4" : "translate-x-0.5"
+                        }`}
+                      />
+                    </button>
+                    <span className="text-xs text-zinc-600">
+                      {open
+                        ? "Akordion kebuka default"
+                        : "Akordion ketutup default"}
+                    </span>
+                    <span className="text-[11px] text-zinc-400">
+                      pas murid buka daftar materi
+                    </span>
+                  </>
+                );
+              })()}
+            </div>
 
             <div>
               <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-zinc-400">
