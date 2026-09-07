@@ -229,6 +229,15 @@ alter table public.coaching_lessons
   add column if not exists access_opens_at timestamptz,
   add column if not exists access_closes_at timestamptz;
 
+-- Tag "by-pass": kalau akses soal lagi DITUTUP (manual / di luar jadwal),
+-- murid tetep boleh lihat DAFTAR SOAL read-only (tanpa ngerjain). Kalau
+-- akses masih DIBUKA, tag ini nggak ngefek -- flow normal (lobby ->
+-- Mulai). Cuma soal read-access, nggak nambah exposure -- coaching_questions
+-- emang udah `select using (true)`, dan gate submit (open_quiz_progress)
+-- nggak berubah. Jadi ini murni UI, nggak ada policy baru.
+alter table public.coaching_lessons
+  add column if not exists soal_bypass boolean not null default false;
+
 -- Mulai / lanjut sesi kuis. Ganti upsert client-side lama (rawan race +
 -- nggak bisa nge-gate access_open karena coaching_quiz_progress cuma
 -- punya set_id, bukan lesson_id). security definer: satu query atomik
