@@ -521,6 +521,8 @@ export default function QuizPage({ review = false }) {
   if (!started) {
     const limitMin = set.time_limit_min ?? null;
     const access = quizAccessNow(lesson, now);
+    // By-pass: akses ketutup TAPI admin izinin lihat daftar soal (read-only).
+    const bypassView = !access.open && lesson.soal_bypass === true;
     return (
       <div className="mx-auto flex max-w-2xl flex-col gap-5">
         {backLink}
@@ -559,7 +561,8 @@ export default function QuizPage({ review = false }) {
                     <span className="font-semibold text-zinc-700">
                       {fmtDateTime(access.at)}
                     </span>
-                    .
+                    .{" "}
+                    {bypassView && "Kamu belum bisa mengerjakannya."}
                   </>
                 ) : access.reason === "after" ? (
                   <>
@@ -567,11 +570,17 @@ export default function QuizPage({ review = false }) {
                     <span className="font-semibold text-zinc-700">
                       {fmtDateTime(access.at)}
                     </span>
-                    .
+                    .{" "}
+                    {bypassView && "Kamu sudah nggak bisa mengerjakannya."}
                   </>
                 ) : (
-                  "Akses latihan ini ditutup karena sesi pengerjaan belum dimulai atau sudah berakhir."
+                  <>
+                    Akses latihan ini ditutup karena sesi pengerjaan belum
+                    dimulai atau sudah berakhir.{" "}
+                    {bypassView && "Kamu nggak bisa mengerjakannya."}
+                  </>
                 )}
+                {bypassView && " Di bawah cuma daftar soalnya buat dilihat."}
               </p>
             </div>
           ) : (
@@ -585,6 +594,50 @@ export default function QuizPage({ review = false }) {
             </button>
           )}
         </div>
+
+        {bypassView && (
+          <Suspense
+            fallback={<Skeleton className="h-40 w-full rounded-2xl" />}
+          >
+            <div className="flex flex-col gap-3">
+              {questions.map((qq, i) => (
+                <div
+                  key={qq.id}
+                  className="rounded-2xl border border-zinc-200/80 bg-white p-5"
+                >
+                  <p className="text-xs text-zinc-400">
+                    Soal {i + 1} dari {total}
+                  </p>
+                  <div className="mt-1.5 text-sm font-medium text-zinc-900">
+                    <Markdown>{qq.prompt}</Markdown>
+                  </div>
+                  {qq.type === "multi" && (
+                    <p className="mt-1 text-xs font-medium text-brand-600">
+                      Bisa pilih lebih dari satu.
+                    </p>
+                  )}
+                  <div className="mt-3 flex flex-col gap-2">
+                    {qq.options.map((opt, oi) => (
+                      <div
+                        key={oi}
+                        className="flex items-center gap-2.5 rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-600"
+                      >
+                        <span
+                          className={`grid h-6 w-6 shrink-0 place-items-center border border-zinc-300 text-xs font-bold text-zinc-400 ${
+                            qq.type === "multi" ? "rounded-md" : "rounded-full"
+                          }`}
+                        >
+                          {String.fromCharCode(65 + oi)}
+                        </span>
+                        <Markdown inline>{opt}</Markdown>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Suspense>
+        )}
       </div>
     );
   }

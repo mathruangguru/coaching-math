@@ -472,6 +472,7 @@ export default function CurriculumEditor({ courseId }) {
         access_open: lesson.access_open ?? true,
         access_opens_at: lesson.access_opens_at ?? null,
         access_closes_at: lesson.access_closes_at ?? null,
+        soal_bypass: lesson.soal_bypass ?? false,
         target_user_id: lesson.target_user_id ?? null,
         target_name: lesson.target_name ?? null,
         allow_download: lesson.allow_download ?? true,
@@ -961,6 +962,26 @@ export default function CurriculumEditor({ courseId }) {
                             jadwal opsional, kosongin = ikut toggle di atas
                           </span>
                         </div>
+                      )}
+
+                      {lesson.type === "soal" && (
+                        <label
+                          className="mt-1.5 flex cursor-pointer items-center gap-1.5 pl-9 text-xs text-zinc-500"
+                          title="Kalau akses ditutup, murid tetap bisa lihat daftar soal (read-only, nggak bisa dikerjakan). Nggak ngefek kalau akses masih dibuka."
+                        >
+                          <input
+                            type="checkbox"
+                            checked={lesson.soal_bypass === true}
+                            onChange={(e) => {
+                              const soal_bypass = e.target.checked;
+                              patchLessonLocal(editing.id, lesson.id, {
+                                soal_bypass,
+                              });
+                              saveLesson({ ...lesson, soal_bypass });
+                            }}
+                          />
+                          By-pass: boleh lihat soal kalau akses ditutup
+                        </label>
                       )}
 
                       {(lesson.type === "form" ||
