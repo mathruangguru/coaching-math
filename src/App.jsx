@@ -14,6 +14,7 @@ import MyFeedbackPage from "./pages/MyFeedbackPage";
 import RecordingPage from "./pages/RecordingPage";
 import SlidePage from "./pages/SlidePage";
 import PdfPage from "./pages/PdfPage";
+import ImagePage from "./pages/ImagePage";
 import QuizPage from "./pages/QuizPage";
 import FormPage from "./pages/FormPage";
 import PresensiPage from "./pages/PresensiPage";
@@ -67,6 +68,10 @@ export default function App() {
           <Route
             path="course/:courseId/pdf/:lessonId"
             element={<PdfPage />}
+          />
+          <Route
+            path="course/:courseId/image/:lessonId"
+            element={<ImagePage />}
           />
           <Route
             path="course/:courseId/soal/:lessonId"
