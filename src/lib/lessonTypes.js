@@ -7,6 +7,7 @@ export const lessonTypeLabels = {
   recording: "Recording",
   slide: "Google Slide",
   pdf: "PDF",
+  image: "Gambar",
   form: "Form",
   presensi: "Presensi",
   refleksi: "Refleksi",

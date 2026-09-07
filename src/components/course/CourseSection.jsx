@@ -11,6 +11,7 @@ const typeTint = {
   recording: "bg-teal-50 text-teal-600",
   slide: "bg-orange-50 text-orange-600",
   pdf: "bg-red-50 text-red-600",
+  image: "bg-cyan-50 text-cyan-600",
   form: "bg-violet-50 text-violet-600",
   presensi: "bg-emerald-50 text-emerald-600",
   refleksi: "bg-rose-50 text-rose-600",
@@ -58,7 +59,8 @@ function CardInner({ item, done, att, score, quizStarted, isFeedbackTarget }) {
     (item.type === "refleksi" && !item.form_id) ||
     (item.type === "feedback" && (!item.form_id || !item.target_user_id)) ||
     (item.type === "slide" && !item.url) ||
-    (item.type === "pdf" && !item.url);
+    (item.type === "pdf" && !item.url) ||
+    (item.type === "image" && !item.url);
   const notPublish = item.publish_status && item.publish_status !== "all";
 
   const isForm =
@@ -196,6 +198,7 @@ export default function CourseSection({
             const recording = item.type === "recording" && item.url;
             const slide = item.type === "slide" && item.url;
             const pdf = item.type === "pdf" && item.url;
+            const image = item.type === "image" && item.url;
             const article = item.type === "materi" && item.content;
             const quiz = item.type === "soal" && item.question_set_id;
             const presensi = item.type === "presensi";
@@ -229,6 +232,7 @@ export default function CourseSection({
               recording ||
               slide ||
               pdf ||
+              image ||
               article ||
               quiz ||
               inAppForm ||
@@ -241,13 +245,15 @@ export default function CourseSection({
                   ? `/course/${courseId}/slide/${item.id}`
                   : pdf
                     ? `/course/${courseId}/pdf/${item.id}`
-                    : article
-                      ? `/course/${courseId}/materi/${item.id}`
-                      : presensi
-                        ? `/course/${courseId}/presensi/${item.id}`
-                        : inAppForm || feedback
-                          ? `/course/${courseId}/${item.type}/${item.id}`
-                          : `/course/${courseId}/soal/${item.id}`;
+                    : image
+                      ? `/course/${courseId}/image/${item.id}`
+                      : article
+                        ? `/course/${courseId}/materi/${item.id}`
+                        : presensi
+                          ? `/course/${courseId}/presensi/${item.id}`
+                          : inAppForm || feedback
+                            ? `/course/${courseId}/${item.type}/${item.id}`
+                            : `/course/${courseId}/soal/${item.id}`;
               return (
                 <Link key={item.id} to={to} className={cardCls + clickableCls}>
                   <CardInner

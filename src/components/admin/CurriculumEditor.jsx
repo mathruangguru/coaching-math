@@ -32,6 +32,11 @@ import { getForms } from "../../lib/forms";
 import { getCourseEnrollments } from "../../lib/enroll";
 import { getUsers } from "../../lib/users";
 import { uploadLessonPdf, deleteLessonPdf, PDF_MAX_MB } from "../../lib/pdf";
+import {
+  uploadLessonImage,
+  deleteLessonImage,
+  IMAGE_MAX_MB,
+} from "../../lib/images";
 import { lessonTypeLabels } from "../../lib/lessonTypes";
 import LessonIcon from "../ui/LessonIcon";
 import MateriEditor from "./MateriEditor";
@@ -118,11 +123,90 @@ function PdfField({ lesson, onChange }) {
   );
 }
 
+// Upload gambar + preview. Mirip PdfField.
+function ImageField({ lesson, onChange }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const inputRef = useRef(null);
+
+  const pick = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setBusy(true);
+    setErr("");
+    try {
+      const old = lesson.url;
+      const url = await uploadLessonImage(lesson.id, file);
+      onChange(url);
+      if (old) deleteLessonImage(old);
+    } catch (e2) {
+      setErr(e2?.message ?? "Gagal upload.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = () => {
+    if (!window.confirm("Hapus gambar?")) return;
+    const old = lesson.url;
+    onChange(null);
+    deleteLessonImage(old);
+  };
+
+  return (
+    <div className="mt-1.5 flex flex-col gap-2 pl-9">
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/png,image/jpeg,image/webp,image/gif"
+          className="hidden"
+          onChange={pick}
+        />
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => inputRef.current?.click()}
+          className="inline-flex items-center gap-1.5 rounded-md border border-zinc-200 bg-white px-2 py-1 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-50 disabled:opacity-50"
+        >
+          <Upload size={12} className="text-zinc-400" />
+          {busy ? "Mengupload…" : lesson.url ? "Ganti gambar" : "Upload gambar"}
+        </button>
+        {lesson.url && !busy && (
+          <button
+            type="button"
+            onClick={remove}
+            className="text-xs font-medium text-zinc-400 transition-colors hover:text-rose-500"
+          >
+            Hapus
+          </button>
+        )}
+        {err ? (
+          <span className="text-xs text-rose-500">{err}</span>
+        ) : (
+          <span className="text-[11px] text-zinc-400">
+            PNG / JPG / WEBP / GIF · maks {IMAGE_MAX_MB} MB
+          </span>
+        )}
+      </div>
+      {lesson.url && !busy && (
+        <img
+          src={lesson.url}
+          alt=""
+          className="max-h-40 w-auto max-w-full rounded-lg border border-zinc-200"
+        />
+      )}
+    </div>
+  );
+}
+
 const typeTint = {
   materi: "bg-zinc-100 text-zinc-500",
   soal: "bg-amber-50 text-amber-600",
   meet: "bg-sky-50 text-sky-600",
   recording: "bg-teal-50 text-teal-600",
+  image: "bg-cyan-50 text-cyan-600",
   slide: "bg-orange-50 text-orange-600",
   form: "bg-violet-50 text-violet-600",
   presensi: "bg-emerald-50 text-emerald-600",
@@ -387,6 +471,7 @@ export default function CurriculumEditor({ courseId }) {
         access_closes_at: lesson.access_closes_at ?? null,
         target_user_id: lesson.target_user_id ?? null,
         target_name: lesson.target_name ?? null,
+        allow_download: lesson.allow_download ?? true,
       }),
     );
 
@@ -981,6 +1066,32 @@ export default function CurriculumEditor({ courseId }) {
                             saveLesson({ ...lesson, url });
                           }}
                         />
+                      )}
+
+                      {lesson.type === "image" && (
+                        <>
+                          <ImageField
+                            lesson={lesson}
+                            onChange={(url) => {
+                              patchLessonLocal(editing.id, lesson.id, { url });
+                              saveLesson({ ...lesson, url });
+                            }}
+                          />
+                          <label className="mt-1.5 flex items-center gap-1.5 pl-9 text-xs text-zinc-500">
+                            <input
+                              type="checkbox"
+                              checked={lesson.allow_download !== false}
+                              onChange={(e) => {
+                                const allow_download = e.target.checked;
+                                patchLessonLocal(editing.id, lesson.id, {
+                                  allow_download,
+                                });
+                                saveLesson({ ...lesson, allow_download });
+                              }}
+                            />
+                            Murid boleh download gambarnya
+                          </label>
+                        </>
                       )}
                     </div>
                   );
