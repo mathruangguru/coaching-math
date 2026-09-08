@@ -1071,13 +1071,13 @@ export default function CurriculumEditor({ courseId }) {
               {mobileStep === "detail" && detailPaneEl}
             </div>
 
-            {/* Laptop+: 3 kolom, geser kalau nggak muat */}
-            <div className="hidden gap-4 overflow-x-auto md:flex">
-              <div className="w-[210px] shrink-0">{secListEl}</div>
-              <div className="w-[360px] shrink-0 border-l border-zinc-100 pl-4">
+            {/* Laptop+: 3 kolom, nyesuain lebar layar (nggak geser) */}
+            <div className="hidden gap-3 md:flex lg:gap-4">
+              <div className="w-[180px] shrink-0 lg:w-[210px]">{secListEl}</div>
+              <div className="min-w-0 flex-[1.1] border-l border-zinc-100 pl-3 lg:pl-4">
                 {midPaneEl}
               </div>
-              <div className="min-w-[320px] flex-1 border-l border-zinc-100 pl-4">
+              <div className="min-w-0 flex-1 border-l border-zinc-100 pl-3 lg:pl-4">
                 {detailPaneEl}
               </div>
             </div>
