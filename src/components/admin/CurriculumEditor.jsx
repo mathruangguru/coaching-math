@@ -454,6 +454,7 @@ export default function CurriculumEditor({ courseId }) {
         ),
       );
       setSelLesId((id) => (id === lesson.id ? null : id));
+      setMobileStep((step) => (step === "detail" ? "items" : step));
     });
   };
 
@@ -590,113 +591,56 @@ export default function CurriculumEditor({ courseId }) {
           return (
             <div
               key={lesson.id}
-              onClick={() => setSelLesId(lesson.id)}
-              className={`cursor-pointer rounded-lg border transition-colors ${
+              onClick={() => {
+                setSelLesId(lesson.id);
+                setMobileStep("detail");
+              }}
+              className={`flex cursor-pointer items-center gap-2 rounded-lg border px-2 py-2 transition-colors ${
                 on
                   ? "border-brand-300 bg-brand-50"
                   : "border-zinc-200 bg-white hover:bg-zinc-50"
               }`}
             >
-              <div className="flex items-center gap-2 px-2 py-1.5">
-                <span onClick={(e) => e.stopPropagation()}>
-                  <ReorderBtns
-                    label="materi"
-                    first={li === 0}
-                    last={li === activeSec.items.length - 1}
-                    onUp={() => moveLesson(activeSec, li, -1)}
-                    onDown={() => moveLesson(activeSec, li, 1)}
-                  />
-                </span>
-                <span
-                  className={`grid h-7 w-7 shrink-0 place-items-center rounded-md ${
-                    typeTint[lesson.type] ?? "bg-zinc-100 text-zinc-500"
-                  }`}
-                >
-                  <LessonIcon type={lesson.type} size={14} />
-                </span>
-                <input
-                  value={lesson.title}
-                  onClick={(e) => e.stopPropagation()}
-                  onChange={(e) =>
-                    patchLessonLocal(activeSec.id, lesson.id, {
-                      title: e.target.value,
-                    })
-                  }
-                  onBlur={() => saveLesson(lesson)}
-                  onKeyDown={(e) =>
-                    e.key === "Enter" && e.currentTarget.blur()
-                  }
-                  placeholder="Judul materi"
-                  className={`${cell} min-w-0 flex-1 font-medium`}
+              <span onClick={(e) => e.stopPropagation()}>
+                <ReorderBtns
+                  label="materi"
+                  first={li === 0}
+                  last={li === activeSec.items.length - 1}
+                  onUp={() => moveLesson(activeSec, li, -1)}
+                  onDown={() => moveLesson(activeSec, li, 1)}
                 />
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    removeLesson(activeSec, lesson);
-                  }}
-                  aria-label="Hapus materi"
-                  className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-zinc-300 transition-colors hover:bg-rose-50 hover:text-rose-500"
-                >
-                  <Trash2 size={13} />
-                </button>
-              </div>
-              <div className="flex flex-wrap items-center gap-1.5 px-2 pb-1.5 pl-[3.25rem]">
-                <select
-                  value={lesson.type}
-                  onClick={(e) => e.stopPropagation()}
-                  onChange={(e) => {
-                    const next = { ...lesson, type: e.target.value };
-                    patchLessonLocal(activeSec.id, lesson.id, {
-                      type: e.target.value,
-                    });
-                    saveLesson(next);
-                  }}
-                  className="shrink-0 rounded-md border border-zinc-200 bg-white px-1.5 py-1 text-xs text-zinc-600 outline-none focus:border-brand-500"
-                >
-                  {LESSON_TYPES.map((t) => (
-                    <option key={t} value={t}>
-                      {lessonTypeLabels[t]}
-                    </option>
-                  ))}
-                </select>
-                <input
-                  value={lesson.duration ?? ""}
-                  onClick={(e) => e.stopPropagation()}
-                  onChange={(e) =>
-                    patchLessonLocal(activeSec.id, lesson.id, {
-                      duration: e.target.value,
-                    })
-                  }
-                  onBlur={() => saveLesson(lesson)}
-                  onKeyDown={(e) =>
-                    e.key === "Enter" && e.currentTarget.blur()
-                  }
-                  placeholder="durasi"
-                  className={`${cell} w-[72px] shrink-0 text-xs text-zinc-500`}
-                />
-                {lesson.publish_status !== "all" && (
-                  <span className="shrink-0 rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-500">
-                    Not publish
+              </span>
+              <span
+                className={`grid h-7 w-7 shrink-0 place-items-center rounded-md ${
+                  typeTint[lesson.type] ?? "bg-zinc-100 text-zinc-500"
+                }`}
+              >
+                <LessonIcon type={lesson.type} size={14} />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-medium text-zinc-800">
+                  {lesson.title || "Tanpa judul"}
+                </span>
+                <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-zinc-400">
+                  <span>
+                    {lessonTypeLabels[lesson.type]}
+                    {lesson.duration ? ` · ${lesson.duration}` : ""}
                   </span>
-                )}
-                {closed && (
-                  <span className="shrink-0 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-600">
-                    Akses ditutup
-                  </span>
-                )}
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSelLesId(lesson.id);
-                    setMobileStep("detail");
-                  }}
-                  className="ml-auto shrink-0 text-[11px] font-semibold text-brand-600 hover:text-brand-700"
-                >
-                  Atur ▸
-                </button>
-              </div>
+                  {lesson.publish_status !== "all" && (
+                    <span className="rounded bg-zinc-100 px-1 py-px font-semibold text-zinc-500">
+                      Not publish
+                    </span>
+                  )}
+                  {closed && (
+                    <span className="rounded bg-amber-50 px-1 py-px font-semibold text-amber-600">
+                      Akses ditutup
+                    </span>
+                  )}
+                </span>
+              </span>
+              <span className="shrink-0 text-[11px] font-semibold text-brand-600">
+                Atur ▸
+              </span>
             </div>
           );
         })}
@@ -731,11 +675,52 @@ export default function CurriculumEditor({ courseId }) {
     const accOpen = lesson.access_open !== false;
     detailPaneEl = (
       <div className="flex flex-col gap-3">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-zinc-400">
-          {lessonTypeLabels[lesson.type]} — {lesson.title || "tanpa judul"}
-        </p>
+        <input
+          value={lesson.title}
+          onChange={(e) =>
+            patchLessonLocal(sid, lesson.id, { title: e.target.value })
+          }
+          onBlur={() => saveLesson(lesson)}
+          onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+          placeholder="Judul materi"
+          className={`${cell} text-sm font-bold`}
+        />
+        <div className="flex flex-wrap items-center gap-1.5">
+          <select
+            value={lesson.type}
+            onChange={(e) => {
+              const next = { ...lesson, type: e.target.value };
+              patchLessonLocal(sid, lesson.id, { type: e.target.value });
+              saveLesson(next);
+            }}
+            className="shrink-0 rounded-md border border-zinc-200 bg-white px-1.5 py-1 text-xs text-zinc-600 outline-none focus:border-brand-500"
+          >
+            {LESSON_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {lessonTypeLabels[t]}
+              </option>
+            ))}
+          </select>
+          <input
+            value={lesson.duration ?? ""}
+            onChange={(e) =>
+              patchLessonLocal(sid, lesson.id, { duration: e.target.value })
+            }
+            onBlur={() => saveLesson(lesson)}
+            onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+            placeholder="durasi"
+            className={`${cell} w-[90px] shrink-0 text-xs text-zinc-500`}
+          />
+          <button
+            type="button"
+            onClick={() => removeLesson(activeSec, lesson)}
+            className="ml-auto inline-flex items-center gap-1 rounded-md border border-rose-200 px-2 py-1 text-xs font-medium text-rose-600 transition-colors hover:bg-rose-50"
+          >
+            <Trash2 size={11} /> Hapus
+          </button>
+        </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 border-t border-zinc-100 pt-3">
           <Eye size={12} className="shrink-0 text-zinc-400" />
           <button
             type="button"
