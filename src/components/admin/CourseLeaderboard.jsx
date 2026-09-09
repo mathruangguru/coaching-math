@@ -48,6 +48,42 @@ const RANK_TINT = {
   3: "bg-orange-100 text-orange-700 ring-orange-200",
 };
 
+function Entry({ r }) {
+  return (
+    <li className="flex items-center gap-3 rounded-xl border border-zinc-100 px-3 py-2">
+      <span
+        className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-bold ring-1 ring-inset ${
+          RANK_TINT[r.rank] ?? "bg-white text-zinc-400 ring-zinc-200"
+        }`}
+      >
+        {r.rank}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium text-zinc-800">
+          {fullName(r.user) || r.uid}
+          {!r.enrolled && (
+            <span className="ml-1.5 rounded bg-amber-50 px-1 py-px text-[10px] font-medium text-amber-600">
+              tidak enroll
+            </span>
+          )}
+        </p>
+        <p className="truncate text-[11px] text-zinc-400">
+          {fmtDur(r.duration_sec)} · {fmtDate(r.created_at)}
+        </p>
+      </div>
+      <div className="shrink-0 text-right">
+        <p className="text-sm font-bold text-zinc-800">
+          {r.score}
+          <span className="font-normal text-zinc-400">/{r.total}</span>
+        </p>
+        <p className={`text-[11px] font-semibold ${toneText(r.pct)}`}>
+          {r.pct}%
+        </p>
+      </div>
+    </li>
+  );
+}
+
 /**
  * Papan peringkat per latihan soal dalam satu course. Pilih soal di atas,
  * daftar di bawah diurut skor (attempt TERAKHIR tiap murid) — seri dipecah
@@ -272,51 +308,36 @@ export default function CourseLeaderboard({ courseId }) {
                   </div>
                 )}
 
-                <ol className="flex flex-col gap-1.5">
-                  {shown.map((r) => (
-                    <li
-                      key={r.uid}
-                      className="flex items-center gap-3 rounded-xl border border-zinc-100 px-3 py-2"
-                    >
-                      <span
-                        className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-bold ring-1 ring-inset ${
-                          RANK_TINT[r.rank] ?? "bg-white text-zinc-400 ring-zinc-200"
-                        }`}
-                      >
-                        {r.rank}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-zinc-800">
-                          {fullName(r.user) || r.uid}
-                          {!r.enrolled && (
-                            <span className="ml-1.5 rounded bg-amber-50 px-1 py-px text-[10px] font-medium text-amber-600">
-                              tidak enroll
-                            </span>
-                          )}
-                        </p>
-                        <p className="truncate text-[11px] text-zinc-400">
-                          {fmtDur(r.duration_sec)} · {fmtDate(r.created_at)}
-                        </p>
-                      </div>
-                      <div className="shrink-0 text-right">
-                        <p className="text-sm font-bold text-zinc-800">
-                          {r.score}
-                          <span className="font-normal text-zinc-400">
-                            /{r.total}
-                          </span>
-                        </p>
-                        <p className={`text-[11px] font-semibold ${toneText(r.pct)}`}>
-                          {r.pct}%
-                        </p>
-                      </div>
-                    </li>
-                  ))}
-                  {shown.length === 0 && (
-                    <li className="px-3 py-4 text-center text-xs text-zinc-400">
-                      Nggak ada yang cocok.
-                    </li>
-                  )}
-                </ol>
+                {limited ? (
+                  // Top 10: dua kolom — kiri 1-5, kanan 6-10.
+                  <div className="grid gap-x-4 gap-y-1.5 sm:grid-cols-2">
+                    <ol className="flex flex-col gap-1.5">
+                      {shown
+                        .slice(0, Math.ceil(shown.length / 2))
+                        .map((r) => (
+                          <Entry key={r.uid} r={r} />
+                        ))}
+                    </ol>
+                    <ol className="flex flex-col gap-1.5">
+                      {shown
+                        .slice(Math.ceil(shown.length / 2))
+                        .map((r) => (
+                          <Entry key={r.uid} r={r} />
+                        ))}
+                    </ol>
+                  </div>
+                ) : (
+                  <ol className="flex flex-col gap-1.5">
+                    {shown.map((r) => (
+                      <Entry key={r.uid} r={r} />
+                    ))}
+                    {shown.length === 0 && (
+                      <li className="px-3 py-4 text-center text-xs text-zinc-400">
+                        Nggak ada yang cocok.
+                      </li>
+                    )}
+                  </ol>
+                )}
 
                 <p className="text-[11px] text-zinc-400">
                   {limited && `Nampilin 10 teratas dari ${ranked.length}. `}
