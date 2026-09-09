@@ -59,6 +59,7 @@ export default function CourseLeaderboard({ courseId }) {
   const [selId, setSelId] = useState("");
   const [attemptsByLesson, setAttemptsByLesson] = useState(new Map()); // lessonId -> [rows]
   const [q, setQ] = useState("");
+  const [topOnly, setTopOnly] = useState(true); // true = cuma tampilkan top 10
 
   useEffect(() => {
     let alive = true;
@@ -142,13 +143,17 @@ export default function CourseLeaderboard({ courseId }) {
   }, [attemptsByLesson, selId]);
 
   const needle = q.trim().toLowerCase();
+  const canLimit = ranked.length > 10;
+  const limited = topOnly && canLimit && !needle;
   const shown = needle
     ? ranked.filter(
         (r) =>
           fullName(r.user).toLowerCase().includes(needle) ||
           (r.user?.email ?? "").toLowerCase().includes(needle),
       )
-    : ranked;
+    : limited
+      ? ranked.filter((r) => r.rank <= 10)
+      : ranked;
 
   const classAvg = ranked.length
     ? Math.round(ranked.reduce((s, r) => s + r.pct, 0) / ranked.length)
@@ -227,19 +232,44 @@ export default function CourseLeaderboard({ courseId }) {
               </p>
             ) : (
               <>
-                {ranked.length > 8 && (
-                  <label className="relative sm:max-w-xs">
-                    <Search
-                      size={14}
-                      className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400"
-                    />
-                    <input
-                      value={q}
-                      onChange={(e) => setQ(e.target.value)}
-                      placeholder="Cari nama / email…"
-                      className="w-full rounded-lg border border-zinc-300 py-2 pl-8 pr-3 text-sm text-zinc-900 outline-none transition-colors focus:border-brand-500"
-                    />
-                  </label>
+                {(ranked.length > 8 || canLimit) && (
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    {ranked.length > 8 && (
+                      <label className="relative min-w-[180px] flex-1 sm:max-w-xs">
+                        <Search
+                          size={14}
+                          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400"
+                        />
+                        <input
+                          value={q}
+                          onChange={(e) => setQ(e.target.value)}
+                          placeholder="Cari nama / email…"
+                          className="w-full rounded-lg border border-zinc-300 py-2 pl-8 pr-3 text-sm text-zinc-900 outline-none transition-colors focus:border-brand-500"
+                        />
+                      </label>
+                    )}
+                    {canLimit && (
+                      <div className="inline-flex shrink-0 rounded-lg border border-zinc-200 p-0.5 text-xs font-semibold">
+                        {[
+                          [true, "Top 10"],
+                          [false, `Semua ${ranked.length}`],
+                        ].map(([val, label]) => (
+                          <button
+                            key={label}
+                            type="button"
+                            onClick={() => setTopOnly(val)}
+                            className={`rounded-md px-2.5 py-1 transition-colors ${
+                              topOnly === val
+                                ? "bg-brand-500 text-white"
+                                : "text-zinc-500 hover:text-zinc-800"
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 )}
 
                 <ol className="flex flex-col gap-1.5">
@@ -289,6 +319,7 @@ export default function CourseLeaderboard({ courseId }) {
                 </ol>
 
                 <p className="text-[11px] text-zinc-400">
+                  {limited && `Nampilin 10 teratas dari ${ranked.length}. `}
                   Dari attempt terakhir tiap murid. Seri dipecah pakai durasi,
                   lalu waktu submit.
                 </p>
