@@ -9,6 +9,8 @@ import {
   Plus,
   Trash2,
   Download,
+  Copy,
+  Check,
 } from "lucide-react";
 import { getCourse } from "../../lib/courses";
 import { getUsers } from "../../lib/users";
@@ -55,6 +57,29 @@ const csvCell = (v) => {
   const s = v == null ? "" : String(v);
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 };
+
+// Buat paste ke spreadsheet: tab/enter di dalam sel diganti spasi.
+const tsvCell = (v) => String(v ?? "").replace(/[\t\r\n]+/g, " ");
+
+// Salin teks ke clipboard, fallback execCommand kalau API-nya nggak ada.
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+      document.execCommand("copy");
+    } catch {
+      /* nggak bisa nyalin — biarin */
+    }
+    document.body.removeChild(ta);
+  }
+}
 
 // Inisial dari nama: huruf pertama kata pertama + kata terakhir.
 const initialsOf = (name) => {
@@ -298,6 +323,7 @@ function PresensiRow({ lesson, usersById, courseItems = [] }) {
   const [label, setLabel] = useState("");
   const [busy, setBusy] = useState(false);
   const [view, setView] = useState("sesi"); // sesi | rekap
+  const [copied, setCopied] = useState(false);
   const [editId, setEditId] = useState(null); // ronde yang lagi diganti namanya
   const [draft, setDraft] = useState("");
   const escRef = useRef(false);
@@ -411,10 +437,9 @@ function PresensiRow({ lesson, usersById, courseItems = [] }) {
     }
   };
 
-  // Matriks kehadiran ke CSV: baris = orang yang pernah hadir, kolom =
-  // tiap ronde (Hadir / -), plus jumlah hadir.
-  const downloadCsv = () => {
-    if (!rounds?.length) return;
+  // Matriks kehadiran: baris = orang yang pernah hadir, kolom = tiap ronde
+  // (Hadir / -), plus jumlah hadir. Dipakai export CSV & salin TSV.
+  const attendanceMatrix = () => {
     const present = new Set();
     for (const r of rounds)
       for (const p of r.people) present.add(`${p.user_id}|${r.id}`);
@@ -432,17 +457,17 @@ function PresensiRow({ lesson, usersById, courseItems = [] }) {
       })
       .sort((a, b) => b.hadir - a.hadir || a.name.localeCompare(b.name));
 
-    const lines = [
+    return [
       ["Nama", "Email", ...rounds.map((r) => r.label), "Hadir", "Total sesi"],
-      ...body.map((r) => [
-        r.name,
-        r.email,
-        ...r.cells,
-        r.hadir,
-        rounds.length,
-      ]),
+      ...body.map((r) => [r.name, r.email, ...r.cells, r.hadir, rounds.length]),
     ];
-    const csv = lines.map((row) => row.map(csvCell).join(",")).join("\n");
+  };
+
+  const downloadCsv = () => {
+    if (!rounds?.length) return;
+    const csv = attendanceMatrix()
+      .map((row) => row.map(csvCell).join(","))
+      .join("\n");
     const url = URL.createObjectURL(
       new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" })
     );
@@ -451,6 +476,16 @@ function PresensiRow({ lesson, usersById, courseItems = [] }) {
     a.download = `${lesson.title.replace(/[^\w.-]+/g, "_")}-presensi.csv`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const copyTable = async () => {
+    if (!rounds?.length) return;
+    const tsv = attendanceMatrix()
+      .map((row) => row.map(tsvCell).join("\t"))
+      .join("\n");
+    await copyText(tsv);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1800);
   };
 
   const startRename = (r) => {
@@ -543,7 +578,7 @@ function PresensiRow({ lesson, usersById, courseItems = [] }) {
               )}
 
               {rounds.length > 0 && (
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="inline-flex w-fit rounded-lg border border-zinc-200 bg-white p-0.5 text-xs font-semibold">
                     {[
                       ["sesi", "Per sesi"],
@@ -563,13 +598,28 @@ function PresensiRow({ lesson, usersById, courseItems = [] }) {
                       </button>
                     ))}
                   </div>
-                  <button
-                    type="button"
-                    onClick={downloadCsv}
-                    className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-zinc-200 bg-white px-2 py-1 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-50"
-                  >
-                    <Download size={12} /> CSV
-                  </button>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={copyTable}
+                      title="Salin tabel — tinggal paste ke Google Sheets / Excel"
+                      className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-medium transition-colors ${
+                        copied
+                          ? "border-teal-200 bg-teal-50 text-teal-700"
+                          : "border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50"
+                      }`}
+                    >
+                      {copied ? <Check size={12} /> : <Copy size={12} />}
+                      {copied ? "Tersalin" : "Salin tabel"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={downloadCsv}
+                      className="inline-flex items-center gap-1.5 rounded-md border border-zinc-200 bg-white px-2 py-1 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-50"
+                    >
+                      <Download size={12} /> CSV
+                    </button>
+                  </div>
                 </div>
               )}
 
