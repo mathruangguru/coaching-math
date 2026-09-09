@@ -36,13 +36,20 @@ update public.coaching_questions
   where code is null;
 
 -- Tipe soal: 'single' (pilihan ganda) / 'multi' (checklist, >1 jawaban
--- benar) / 'number' (isian angka — murid ngetik angka, dicek pas ± toleransi).
+-- benar) / 'number' (isian angka — murid ngetik angka, dicek pas ± toleransi) /
+-- 'table' (tabel pilihan ganda: baris = pernyataan, kolom = opsi, murid pilih
+-- 1 kolom per baris; benar kalau SEMUA baris benar).
 alter table public.coaching_questions
   add column if not exists type text not null default 'single';
 alter table public.coaching_questions drop constraint if exists coaching_questions_type_check;
 alter table public.coaching_questions
   add constraint coaching_questions_type_check
-    check (type in ('single', 'multi', 'number'));
+    check (type in ('single', 'multi', 'number', 'table'));
+
+-- Tipe 'table': `options` dipakai buat label KOLOM, `table_rows` buat teks
+-- tiap BARIS (pernyataan). Kunci per baris ada di coaching_question_keys.row_keys.
+alter table public.coaching_questions
+  add column if not exists table_rows jsonb not null default '[]'::jsonb;
 
 -- Kunci jawaban dipisah: murid nggak boleh bisa baca ini lewat API.
 create table if not exists public.coaching_question_keys (
@@ -63,6 +70,11 @@ update public.coaching_question_keys
 alter table public.coaching_question_keys
   add column if not exists answer_num numeric,
   add column if not exists answer_tol numeric not null default 0;
+
+-- Kunci buat tipe 'table': row_keys[i] = index kolom yang benar buat baris
+-- ke-i. Panjang = jumlah baris. answers[]/answer nggak dipakai buat tipe ini.
+alter table public.coaching_question_keys
+  add column if not exists row_keys jsonb not null default '[]'::jsonb;
 
 -- Attempt murid: skor + snapshot jawaban. 1x per (user, set).
 create table if not exists public.coaching_quiz_attempts (

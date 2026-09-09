@@ -45,7 +45,7 @@ export async function getQuestionSet(id) {
     .from("coaching_question_sets")
     .select(
       `id, title, description, time_limit_min, intro,
-       questions:coaching_questions ( id, code, type, prompt, options, position )`
+       questions:coaching_questions ( id, code, type, prompt, options, table_rows, position )`
     )
     .eq("id", id)
     .maybeSingle();
@@ -55,6 +55,7 @@ export async function getQuestionSet(id) {
   for (const q of data.questions) {
     delete q.position;
     q.type = q.type ?? "single";
+    q.table_rows = Array.isArray(q.table_rows) ? q.table_rows : [];
   }
   return data;
 }
@@ -71,7 +72,7 @@ export async function getQuestionSetAdmin(id) {
   if (ids.length) {
     const { data: keys, error } = await supabase
       .from("coaching_question_keys")
-      .select("question_id, answer, answers, answer_num, answer_tol")
+      .select("question_id, answer, answers, answer_num, answer_tol, row_keys")
       .in("question_id", ids);
     if (error) throw error;
     const m = new Map(keys.map((k) => [k.question_id, k]));
@@ -83,6 +84,7 @@ export async function getQuestionSetAdmin(id) {
       q.answer = q.answers[0] ?? 0; // legacy
       q.answer_num = k?.answer_num ?? null;
       q.answer_tol = k?.answer_tol ?? 0;
+      q.row_keys = Array.isArray(k?.row_keys) ? k.row_keys : [];
     }
   }
   return set;
@@ -150,9 +152,24 @@ export function toNum(v) {
   return Number.isFinite(n) ? n : null;
 }
 
+// Normalisasi kunci per baris (tipe 'table') -> array int non-negatif.
+function normRowKeys(v) {
+  return Array.isArray(v) ? v.map((n) => Math.max(0, Math.trunc(Number(n)) || 0)) : [];
+}
+
 export async function createQuestion(
   setId,
-  { prompt, options, type = "single", answers, answerNum, answerTol, position }
+  {
+    prompt,
+    options,
+    type = "single",
+    answers,
+    answerNum,
+    answerTol,
+    tableRows,
+    rowKeys,
+    position,
+  }
 ) {
   ensure();
   const id = crypto.randomUUID();
@@ -162,13 +179,15 @@ export async function createQuestion(
     type === "number"
       ? { answer_num: toNum(answerNum), answer_tol: Math.abs(toNum(answerTol) ?? 0) }
       : { answer_num: null, answer_tol: 0 };
+  const rows = type === "table" && Array.isArray(tableRows) ? tableRows : [];
+  const rKeys = type === "table" ? normRowKeys(rowKeys) : [];
   const { error } = await supabase
     .from("coaching_questions")
-    .insert({ id, set_id: setId, code, type, prompt, options, position });
+    .insert({ id, set_id: setId, code, type, prompt, options, table_rows: rows, position });
   if (error) throw error;
   const { error: keyErr } = await supabase
     .from("coaching_question_keys")
-    .insert({ question_id: id, answers: ans, answer: ans[0], ...numKey });
+    .insert({ question_id: id, answers: ans, answer: ans[0], ...numKey, row_keys: rKeys });
   if (keyErr) throw keyErr;
   return {
     id,
@@ -176,10 +195,12 @@ export async function createQuestion(
     type,
     prompt,
     options,
+    table_rows: rows,
     answers: ans,
     answer: ans[0],
     answer_num: numKey.answer_num,
     answer_tol: numKey.answer_tol,
+    row_keys: rKeys,
   };
 }
 
@@ -202,6 +223,9 @@ function toOptionIndex(v, options) {
  *   type    : "single" (default) / "multi" — auto "multi" kalau answer > 1.
  *   -- isian angka:
  *   type: "number", answer: <angka>, tolerance?: <angka> (default 0)
+ *   -- tabel pilihan ganda:
+ *   type: "table", columns: string[] (>= 2), rows: string[] (>= 1),
+ *   answers: (index/huruf/label kolom)[] sepanjang rows
  * Balikin { items: normalized[], errors: string[] }.
  */
 export function parseQuestionsJson(text) {
@@ -230,6 +254,48 @@ export function parseQuestionsJson(text) {
       const answerTol = Math.abs(toNum(q?.tolerance) ?? 0);
       if (prompt && answerNum != null) {
         items.push({ prompt, type: "number", answerNum, answerTol });
+      }
+      return;
+    }
+
+    if (q?.type === "table") {
+      const cols = (
+        Array.isArray(q?.columns) ? q.columns : q?.options
+      );
+      const columns = Array.isArray(cols) ? cols.map((c) => String(c)) : [];
+      const rowsIn = Array.isArray(q?.rows) ? q.rows : [];
+      const rowTexts = rowsIn.map((r) =>
+        r && typeof r === "object" ? String(r.text ?? "") : String(r)
+      );
+      const ansIn = Array.isArray(q?.answers) ? q.answers : [];
+      const rawRowAns = rowsIn.map((r, ri) =>
+        r && typeof r === "object" && "answer" in r ? r.answer : ansIn[ri]
+      );
+      const rowKeys = rawRowAns.map((v) => toOptionIndex(v, columns));
+      if (columns.length < 2)
+        errors.push(`Soal ${n}: "columns" minimal 2 buat type "table".`);
+      if (rowTexts.length < 1)
+        errors.push(`Soal ${n}: "rows" minimal 1 buat type "table".`);
+      const badKey =
+        rowKeys.length !== rowTexts.length ||
+        rowKeys.some((k) => !Number.isInteger(k) || k < 0 || k >= columns.length);
+      if (badKey)
+        errors.push(
+          `Soal ${n}: tiap baris "table" butuh jawaban kolom yang valid.`
+        );
+      if (
+        prompt &&
+        columns.length >= 2 &&
+        rowTexts.length >= 1 &&
+        !badKey
+      ) {
+        items.push({
+          prompt,
+          type: "table",
+          options: columns,
+          tableRows: rowTexts,
+          rowKeys,
+        });
       }
       return;
     }
@@ -279,6 +345,16 @@ export function questionsToJson(questions) {
         if (q.answer_tol) out.tolerance = q.answer_tol;
         return out;
       }
+      if (q.type === "table") {
+        const cols = q.options ?? [];
+        return {
+          prompt: q.prompt,
+          type: "table",
+          columns: cols,
+          rows: q.table_rows ?? [],
+          answers: (q.row_keys ?? []).map((i) => cols[i] ?? i),
+        };
+      }
       return {
         prompt: q.prompt,
         options: q.options,
@@ -299,6 +375,7 @@ export async function bulkCreateQuestions(setId, items, startPosition = 0) {
   ensure();
   const meta = items.map((it, i) => {
     const isNum = it.type === "number";
+    const isTable = it.type === "table";
     const answers = toAnswerArray(it.answers ?? it.answer).length
       ? toAnswerArray(it.answers ?? it.answer)
       : [0];
@@ -306,9 +383,11 @@ export async function bulkCreateQuestions(setId, items, startPosition = 0) {
       id: crypto.randomUUID(),
       code: randomCode(),
       type: it.type ?? (answers.length > 1 ? "multi" : "single"),
-      answers: isNum ? [0] : answers,
+      answers: isNum || isTable ? [0] : answers,
       answer_num: isNum ? toNum(it.answerNum ?? it.answer) : null,
       answer_tol: isNum ? Math.abs(toNum(it.answerTol ?? it.tolerance) ?? 0) : 0,
+      table_rows: isTable && Array.isArray(it.tableRows) ? it.tableRows : [],
+      row_keys: isTable ? normRowKeys(it.rowKeys) : [],
       prompt: it.prompt,
       options: isNum ? [] : it.options,
       position: startPosition + i,
@@ -323,6 +402,7 @@ export async function bulkCreateQuestions(setId, items, startPosition = 0) {
       type: m.type,
       prompt: m.prompt,
       options: m.options,
+      table_rows: m.table_rows,
       position: m.position,
     }))
   );
@@ -335,6 +415,7 @@ export async function bulkCreateQuestions(setId, items, startPosition = 0) {
       answer: m.answers[0],
       answer_num: m.answer_num,
       answer_tol: m.answer_tol,
+      row_keys: m.row_keys,
     }))
   );
   if (keyErr) throw keyErr;
@@ -345,16 +426,18 @@ export async function bulkCreateQuestions(setId, items, startPosition = 0) {
     type: m.type,
     prompt: m.prompt,
     options: m.options,
+    table_rows: m.table_rows,
     answers: m.answers,
     answer: m.answers[0],
     answer_num: m.answer_num,
     answer_tol: m.answer_tol,
+    row_keys: m.row_keys,
   }));
 }
 
 export async function updateQuestion(
   id,
-  { prompt, options, type, answers, answerNum, answerTol }
+  { prompt, options, type, answers, answerNum, answerTol, tableRows, rowKeys }
 ) {
   ensure();
   const t = type ?? "single";
@@ -363,14 +446,16 @@ export async function updateQuestion(
     t === "number"
       ? { answer_num: toNum(answerNum), answer_tol: Math.abs(toNum(answerTol) ?? 0) }
       : { answer_num: null, answer_tol: 0 };
+  const rows = t === "table" && Array.isArray(tableRows) ? tableRows : [];
+  const rKeys = t === "table" ? normRowKeys(rowKeys) : [];
   const { error } = await supabase
     .from("coaching_questions")
-    .update({ prompt, options, type: t })
+    .update({ prompt, options, type: t, table_rows: rows })
     .eq("id", id);
   if (error) throw error;
   const { error: keyErr } = await supabase
     .from("coaching_question_keys")
-    .upsert({ question_id: id, answers: ans, answer: ans[0], ...numKey });
+    .upsert({ question_id: id, answers: ans, answer: ans[0], ...numKey, row_keys: rKeys });
   if (keyErr) throw keyErr;
 }
 

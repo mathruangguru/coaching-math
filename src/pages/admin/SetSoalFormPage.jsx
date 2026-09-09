@@ -165,6 +165,8 @@ export default function SetSoalFormPage() {
         answers: q.answers ?? [q.answer ?? 0],
         answerNum: q.answer_num,
         answerTol: q.answer_tol,
+        tableRows: q.table_rows,
+        rowKeys: q.row_keys,
       })
     );
 
@@ -412,7 +414,9 @@ export default function SetSoalFormPage() {
                       ? "Checklist"
                       : selected.type === "number"
                         ? "Isian angka"
-                        : "Pilihan ganda"}
+                        : selected.type === "table"
+                          ? "Tabel"
+                          : "Pilihan ganda"}
                   </span>
                 </p>
                 <button
@@ -440,6 +444,54 @@ export default function SetSoalFormPage() {
                     {Number(selected.answer_tol) > 0 &&
                       ` (± ${selected.answer_tol})`}
                   </p>
+                ) : selected.type === "table" ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse text-sm">
+                      <thead>
+                        <tr>
+                          <th className="border-b border-zinc-200 px-2 py-1.5" />
+                          {(selected.options ?? []).map((col, ci) => (
+                            <th
+                              key={ci}
+                              className="border-b border-zinc-200 px-2 py-1.5 text-center text-xs font-semibold text-zinc-500"
+                            >
+                              {col || String.fromCharCode(65 + ci)}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(selected.table_rows ?? []).map((row, ri) => (
+                          <tr key={ri}>
+                            <td className="border-b border-zinc-100 px-2 py-1.5 text-zinc-700">
+                              <Markdown inline>
+                                {row || `(pernyataan ${ri + 1})`}
+                              </Markdown>
+                            </td>
+                            {(selected.options ?? []).map((_, ci) => {
+                              const key = (selected.row_keys ?? [])[ri] === ci;
+                              return (
+                                <td
+                                  key={ci}
+                                  className={`border-b border-zinc-100 px-2 py-1.5 text-center ${
+                                    key ? "bg-teal-50" : ""
+                                  }`}
+                                >
+                                  {key && (
+                                    <Check
+                                      size={13}
+                                      strokeWidth={3}
+                                      className="mx-auto text-teal-600"
+                                    />
+                                  )}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 ) : (
                 <ul className="flex flex-col gap-1.5">
                   {selected.options.map((opt, oi) => {
@@ -485,6 +537,9 @@ export default function SetSoalFormPage() {
           const eKeys = editing.answers ?? [editing.answer ?? 0];
           const eMulti = editing.type === "multi";
           const eNum = editing.type === "number";
+          const eTable = editing.type === "table";
+          const eRows = editing.table_rows ?? [];
+          const eRowKeys = editing.row_keys ?? [];
           const commit = (patch) => {
             patchQ(editing.id, patch);
             saveQ({ ...editing, ...patch });
@@ -495,6 +550,41 @@ export default function SetSoalFormPage() {
               ? eKeys.filter((x) => x !== oi)
               : [...eKeys, oi].sort((a, b) => a - b);
             commit({ answers: next.length ? next : eKeys });
+          };
+          // ── Editor tabel ──────────────────────────────────────────
+          const setRowKey = (ri, ci) => {
+            const rk = eRows.map((_, i) => (i === ri ? ci : eRowKeys[i] ?? 0));
+            commit({ row_keys: rk });
+          };
+          const addCol = () =>
+            commit({ options: [...editing.options, ""] });
+          const editCol = (ci, val) => {
+            const options = editing.options.slice();
+            options[ci] = val;
+            patchQ(editing.id, { options });
+          };
+          const removeCol = (ci) => {
+            if (editing.options.length <= 2) return;
+            const options = editing.options.filter((_, i) => i !== ci);
+            const row_keys = eRows.map((_, i) => {
+              const k = eRowKeys[i] ?? 0;
+              return k === ci ? 0 : k > ci ? k - 1 : k;
+            });
+            commit({ options, row_keys });
+          };
+          const addRow = () =>
+            commit({ table_rows: [...eRows, ""], row_keys: [...eRowKeys, 0] });
+          const editRow = (ri, val) => {
+            const table_rows = eRows.slice();
+            table_rows[ri] = val;
+            patchQ(editing.id, { table_rows });
+          };
+          const removeRow = (ri) => {
+            if (eRows.length <= 1) return;
+            commit({
+              table_rows: eRows.filter((_, i) => i !== ri),
+              row_keys: eRowKeys.filter((_, i) => i !== ri),
+            });
           };
           return (
         <Modal title={`Soal · ${editing.code}`} onClose={closeModal}>
@@ -523,12 +613,27 @@ export default function SetSoalFormPage() {
                   ["single", "Pilihan ganda"],
                   ["multi", "Checklist"],
                   ["number", "Isian angka"],
+                  ["table", "Tabel"],
                 ].map(([val, label]) => (
                   <button
                     key={val}
                     type="button"
                     onClick={() => {
                       if ((editing.type ?? "single") === val) return;
+                      if (val === "table") {
+                        const cols =
+                          editing.options?.length >= 2
+                            ? editing.options
+                            : ["Benar", "Salah"];
+                        const rows = eRows.length ? eRows : ["", ""];
+                        commit({
+                          type: "table",
+                          options: cols,
+                          table_rows: rows,
+                          row_keys: rows.map((_, i) => eRowKeys[i] ?? 0),
+                        });
+                        return;
+                      }
                       commit({
                         type: val,
                         answers: val === "single" ? [eKeys[0] ?? 0] : eKeys,
@@ -584,7 +689,107 @@ export default function SetSoalFormPage() {
               </div>
             )}
 
-            {!eNum && (
+            {eTable && (
+              <div className="flex flex-col gap-4">
+                {/* Kolom */}
+                <div className="flex flex-col gap-1.5">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-zinc-400">
+                    Kolom · opsi yang bisa dipilih tiap baris (min 2)
+                  </p>
+                  {editing.options.map((col, ci) => (
+                    <div key={ci} className="flex items-center gap-2">
+                      <span className="w-5 shrink-0 text-center text-xs font-bold text-zinc-400">
+                        {String.fromCharCode(65 + ci)}
+                      </span>
+                      <input
+                        value={col}
+                        onChange={(e) => editCol(ci, e.target.value)}
+                        onBlur={() => saveQ(editing)}
+                        placeholder={`Kolom ${String.fromCharCode(65 + ci)}`}
+                        className={`${input} py-1.5`}
+                      />
+                      <button
+                        type="button"
+                        disabled={editing.options.length <= 2}
+                        onClick={() => removeCol(ci)}
+                        aria-label="Hapus kolom"
+                        className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-zinc-300 transition-colors hover:bg-rose-50 hover:text-rose-500 disabled:opacity-25"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={addCol}
+                    className="mt-0.5 inline-flex w-fit items-center gap-1 text-xs font-semibold text-brand-600 hover:text-brand-700"
+                  >
+                    <Plus size={12} /> Tambah kolom
+                  </button>
+                </div>
+
+                {/* Baris + kunci per baris */}
+                <div className="flex flex-col gap-1.5">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-zinc-400">
+                    Baris · pernyataan + pilih kolom yang benar
+                  </p>
+                  {eRows.map((row, ri) => (
+                    <div
+                      key={ri}
+                      className="flex flex-col gap-1.5 rounded-lg border border-zinc-200 p-2 sm:flex-row sm:items-center"
+                    >
+                      <input
+                        value={row}
+                        onChange={(e) => editRow(ri, e.target.value)}
+                        onBlur={() => saveQ(editing)}
+                        placeholder={`Pernyataan ${ri + 1}`}
+                        className={`${input} py-1.5 sm:flex-1`}
+                      />
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {editing.options.map((col, ci) => {
+                          const on = (eRowKeys[ri] ?? 0) === ci;
+                          return (
+                            <button
+                              key={ci}
+                              type="button"
+                              onClick={() => setRowKey(ri, ci)}
+                              className={`rounded-md border px-2 py-1 text-xs font-semibold transition-colors ${
+                                on
+                                  ? "border-teal-500 bg-teal-500 text-white"
+                                  : "border-zinc-200 text-zinc-500 hover:border-teal-400"
+                              }`}
+                            >
+                              {col || String.fromCharCode(65 + ci)}
+                            </button>
+                          );
+                        })}
+                        <button
+                          type="button"
+                          disabled={eRows.length <= 1}
+                          onClick={() => removeRow(ri)}
+                          aria-label="Hapus baris"
+                          className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-zinc-300 transition-colors hover:bg-rose-50 hover:text-rose-500 disabled:opacity-25"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={addRow}
+                    className="mt-0.5 inline-flex w-fit items-center gap-1 text-xs font-semibold text-brand-600 hover:text-brand-700"
+                  >
+                    <Plus size={12} /> Tambah baris
+                  </button>
+                  <p className="text-[11px] text-zinc-400">
+                    Soal dihitung benar cuma kalau semua baris benar.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {!eNum && !eTable && (
             <div className="flex flex-col gap-1.5">
               <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-zinc-400">
                 Opsi · klik kotak buat tandai kunci
@@ -672,6 +877,51 @@ export default function SetSoalFormPage() {
                     {Number(editing.answer_tol) > 0 &&
                       ` (± ${editing.answer_tol})`}
                   </p>
+                ) : eTable ? (
+                  <div className="mt-2 overflow-x-auto">
+                    <table className="w-full border-collapse text-sm">
+                      <thead>
+                        <tr>
+                          <th className="border-b border-zinc-200 px-2 py-1" />
+                          {editing.options.map((col, ci) => (
+                            <th
+                              key={ci}
+                              className="border-b border-zinc-200 px-2 py-1 text-center text-xs font-semibold text-zinc-500"
+                            >
+                              {col || String.fromCharCode(65 + ci)}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {eRows.map((row, ri) => (
+                          <tr key={ri}>
+                            <td className="border-b border-zinc-100 px-2 py-1 text-zinc-700">
+                              {row || `(pernyataan ${ri + 1})`}
+                            </td>
+                            {editing.options.map((_, ci) => (
+                              <td
+                                key={ci}
+                                className="border-b border-zinc-100 px-2 py-1 text-center"
+                              >
+                                <span
+                                  className={`inline-grid h-4 w-4 place-items-center rounded-full border ${
+                                    (eRowKeys[ri] ?? 0) === ci
+                                      ? "border-teal-500 bg-teal-500 text-white"
+                                      : "border-zinc-300"
+                                  }`}
+                                >
+                                  {(eRowKeys[ri] ?? 0) === ci && (
+                                    <Check size={9} strokeWidth={4} />
+                                  )}
+                                </span>
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 ) : (
                   <ul className="mt-2 flex flex-col gap-1 text-sm text-zinc-600">
                     {editing.options.map((opt, oi) => (
@@ -722,6 +972,13 @@ const IMPORT_EXAMPLE = `[
     "type": "number",
     "answer": 3.14,
     "tolerance": 0.01
+  },
+  {
+    "prompt": "Tentukan benar/salah tiap pernyataan:",
+    "type": "table",
+    "columns": ["Benar", "Salah"],
+    "rows": ["2 bilangan prima", "9 bilangan prima"],
+    "answers": ["Benar", "Salah"]
   }
 ]`;
 
@@ -741,7 +998,10 @@ function ImportModal({ onClose, onImport }) {
           atau teks opsi persis — boleh <code>array</code> untuk checklist).
           Opsional <code>type</code>: <code>&quot;multi&quot;</code>. Untuk isian
           angka: <code>type: &quot;number&quot;</code>, <code>answer</code> angka,
-          opsional <code>tolerance</code>. Soal ditambahkan di akhir.
+          opsional <code>tolerance</code>. Untuk tabel:{" "}
+          <code>type: &quot;table&quot;</code>, <code>columns</code> (min 2),{" "}
+          <code>rows</code>, <code>answers</code> (kolom benar per baris). Soal
+          ditambahkan di akhir.
         </p>
         <details className="text-xs text-zinc-400">
           <summary className="cursor-pointer select-none">Contoh</summary>

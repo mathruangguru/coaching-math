@@ -125,7 +125,7 @@ Deno.serve(async (req) => {
   const typeMap = new Map(questions.map((q) => [q.id, q.type ?? "single"]));
   const { data: keys, error: kErr } = await admin
     .from("coaching_question_keys")
-    .select("question_id, answer, answers, answer_num, answer_tol")
+    .select("question_id, answer, answers, answer_num, answer_tol, row_keys")
     .in("question_id", ids);
   if (kErr) return json({ error: kErr.message }, 400);
 
@@ -160,11 +160,19 @@ Deno.serve(async (req) => {
       },
     ])
   );
+  // Tipe 'table': row_keys[i] = index kolom benar buat baris i.
+  const rowKeys = new Map(
+    (keys ?? []).map((k) => [
+      k.question_id,
+      Array.isArray(k.row_keys) ? k.row_keys.map(Number) : [],
+    ])
+  );
   const results: Record<string, boolean> = {};
   let score = 0;
   for (const qid of ids) {
     let ok: boolean;
-    if (typeMap.get(qid) === "number") {
+    const t = typeMap.get(qid);
+    if (t === "number") {
       const key = numKeys.get(qid);
       const v = parseNum(answers[qid]);
       ok =
@@ -172,6 +180,11 @@ Deno.serve(async (req) => {
         Number.isFinite(key.num) &&
         Number.isFinite(v) &&
         Math.abs(v - key.num) <= key.tol;
+    } else if (t === "table") {
+      const rk = rowKeys.get(qid) ?? [];
+      const picked = Array.isArray(answers[qid]) ? answers[qid] : [];
+      // Benar cuma kalau SEMUA baris cocok (all-or-nothing).
+      ok = rk.length > 0 && rk.every((k, i) => Number(picked[i]) === k);
     } else {
       ok = same(norm(answers[qid]), idxKeys.get(qid) ?? []);
     }
