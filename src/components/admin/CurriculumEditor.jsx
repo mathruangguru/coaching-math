@@ -25,6 +25,10 @@ import {
   updateLesson,
   deleteLesson,
   reorderLessons,
+  createSubsection,
+  updateSubsection,
+  deleteSubsection,
+  reorderSubsections,
 } from "../../lib/courses";
 import { getQuestionSets, quizAccessNow } from "../../lib/quiz";
 import { getForms } from "../../lib/forms";
@@ -225,6 +229,35 @@ function move(arr, from, to) {
   return next;
 }
 
+// Materi section dipecah: grup "loose" (tanpa subbagian) dulu, lalu tiap
+// subbagian (urut position) beserta materinya. Urutan materi global (position)
+// selalu ngikutin urutan tampilan ini.
+function groupsOf(section) {
+  const subs = [...(section.subsections ?? [])].sort(
+    (a, b) => (a.position ?? 0) - (b.position ?? 0),
+  );
+  const subIds = new Set(subs.map((s) => s.id));
+  const items = [...(section.items ?? [])].sort(
+    (a, b) => (a.position ?? 0) - (b.position ?? 0),
+  );
+  return [
+    {
+      key: null,
+      sub: null,
+      items: items.filter(
+        (it) => !it.subsection_id || !subIds.has(it.subsection_id),
+      ),
+    },
+    ...subs.map((s) => ({
+      key: s.id,
+      sub: s,
+      items: items.filter((it) => it.subsection_id === s.id),
+    })),
+  ];
+}
+
+const flattenGroups = (groups) => groups.flatMap((g) => g.items);
+
 // ISO <-> value <input type="datetime-local"> (YYYY-MM-DDTHH:mm, waktu lokal).
 const toLocalInput = (iso) => {
   if (!iso) return "";
@@ -360,6 +393,20 @@ export default function CurriculumEditor({ courseId }) {
       ),
     );
 
+  const patchSubLocal = (sid, subId, patch) =>
+    setSections((p) =>
+      p.map((s) =>
+        s.id !== sid
+          ? s
+          : {
+              ...s,
+              subsections: (s.subsections ?? []).map((x) =>
+                x.id === subId ? { ...x, ...patch } : x,
+              ),
+            },
+      ),
+    );
+
   // ── Section ops ──────────────────────────────────────────────────
   const addSection = () =>
     run(async () => {
@@ -439,6 +486,7 @@ export default function CurriculumEditor({ courseId }) {
         target_user_id: lesson.target_user_id ?? null,
         target_name: lesson.target_name ?? null,
         allow_download: lesson.allow_download ?? true,
+        subsection_id: lesson.subsection_id ?? null,
       }),
     );
 
@@ -458,14 +506,106 @@ export default function CurriculumEditor({ courseId }) {
     });
   };
 
-  const moveLesson = (section, index, dir) => {
+  // Naik/turun materi — cuma di dalam grup-nya sendiri (loose / subbagian).
+  const moveLesson = (section, groupKey, index, dir) => {
+    const groups = groupsOf(section);
+    const g = groups.find((x) => x.key === groupKey);
     const to = index + dir;
-    if (to < 0 || to >= section.items.length) return;
-    const nextItems = move(section.items, index, to);
+    if (!g || to < 0 || to >= g.items.length) return;
+    g.items = move(g.items, index, to);
+    const nextItems = flattenGroups(groups);
     setSections((p) =>
       p.map((s) => (s.id === section.id ? { ...s, items: nextItems } : s)),
     );
     run(() => reorderLessons(nextItems.map((it) => it.id)));
+  };
+
+  // ── Subbagian ops ────────────────────────────────────────────────
+  const addSubsection = (section) =>
+    run(async () => {
+      const pos = (section.subsections ?? []).length;
+      const row = await createSubsection(section.id, {
+        title: "Subbagian baru",
+        position: pos,
+      });
+      setSections((p) =>
+        p.map((s) =>
+          s.id !== section.id
+            ? s
+            : { ...s, subsections: [...(s.subsections ?? []), row] },
+        ),
+      );
+    });
+
+  const saveSubTitle = (section, sub) => {
+    const title = (sub.title ?? "").trim() || "Tanpa judul";
+    if (title !== sub.title) patchSubLocal(section.id, sub.id, { title });
+    run(() => updateSubsection(sub.id, { title }));
+  };
+
+  const removeSubsection = (section, sub) => {
+    if (
+      !window.confirm(
+        `Hapus subbagian "${sub.title || "Tanpa judul"}"? Materinya nggak ikut kehapus, cuma lepas dari subbagian.`,
+      )
+    )
+      return;
+    const patched = {
+      ...section,
+      subsections: (section.subsections ?? []).filter((x) => x.id !== sub.id),
+      items: section.items.map((it) =>
+        it.subsection_id === sub.id ? { ...it, subsection_id: null } : it,
+      ),
+    };
+    const nextItems = flattenGroups(groupsOf(patched));
+    setSections((p) =>
+      p.map((s) => (s.id === section.id ? { ...patched, items: nextItems } : s)),
+    );
+    run(async () => {
+      await deleteSubsection(sub.id);
+      await reorderLessons(nextItems.map((it) => it.id));
+    });
+  };
+
+  const moveSubsection = (section, index, dir) => {
+    const subs = [...(section.subsections ?? [])].sort(
+      (a, b) => (a.position ?? 0) - (b.position ?? 0),
+    );
+    const to = index + dir;
+    if (to < 0 || to >= subs.length) return;
+    const nextSubs = move(subs, index, to).map((s, i) => ({ ...s, position: i }));
+    const patched = { ...section, subsections: nextSubs };
+    const nextItems = flattenGroups(groupsOf(patched));
+    setSections((p) =>
+      p.map((s) =>
+        s.id === section.id
+          ? { ...s, subsections: nextSubs, items: nextItems }
+          : s,
+      ),
+    );
+    run(async () => {
+      await reorderSubsections(nextSubs.map((s) => s.id));
+      await reorderLessons(nextItems.map((it) => it.id));
+    });
+  };
+
+  // Pindah materi ke subbagian lain (dropdown kolom kanan). Posisi materi
+  // di-resync biar tiap grup tetep nyambung.
+  const assignSubsection = (section, lesson, subId) => {
+    const patched = {
+      ...section,
+      items: section.items.map((it) =>
+        it.id === lesson.id ? { ...it, subsection_id: subId } : it,
+      ),
+    };
+    const nextItems = flattenGroups(groupsOf(patched));
+    setSections((p) =>
+      p.map((s) => (s.id === section.id ? { ...s, items: nextItems } : s)),
+    );
+    run(async () => {
+      await updateLesson(lesson.id, { subsection_id: subId });
+      await reorderLessons(nextItems.map((it) => it.id));
+    });
   };
 
   const totalLessons = sections.reduce((n, s) => n + s.items.length, 0);
@@ -579,78 +719,140 @@ export default function CurriculumEditor({ courseId }) {
         </div>
       </div>
 
-      <div className="flex flex-col gap-1.5">
-        {activeSec.items.length === 0 && (
-          <p className="px-1 py-3 text-xs text-zinc-400">Belum ada materi.</p>
-        )}
-        {activeSec.items.map((lesson, li) => {
-          const on = activeLes?.id === lesson.id;
-          const closed =
-            (lesson.type === "soal" && !quizAccessNow(lesson, now).open) ||
-            (FORM_LIKE.has(lesson.type) && lesson.access_open === false);
+      <div className="flex flex-col gap-3">
+        {activeSec.items.length === 0 &&
+          (activeSec.subsections?.length ?? 0) === 0 && (
+            <p className="px-1 py-3 text-xs text-zinc-400">Belum ada materi.</p>
+          )}
+
+        {groupsOf(activeSec).map((g, gi) => {
+          const subCount = activeSec.subsections?.length ?? 0;
+          const subIdx = gi - 1; // -1 = grup loose
           return (
-            <div
-              key={lesson.id}
-              onClick={() => {
-                setSelLesId(lesson.id);
-                setMobileStep("detail");
-              }}
-              className={`flex cursor-pointer items-center gap-2 rounded-lg border px-2 py-2 transition-colors ${
-                on
-                  ? "border-brand-300 bg-brand-50"
-                  : "border-zinc-200 bg-white hover:bg-zinc-50"
-              }`}
-            >
-              <span onClick={(e) => e.stopPropagation()}>
-                <ReorderBtns
-                  label="materi"
-                  first={li === 0}
-                  last={li === activeSec.items.length - 1}
-                  onUp={() => moveLesson(activeSec, li, -1)}
-                  onDown={() => moveLesson(activeSec, li, 1)}
-                />
-              </span>
-              <span
-                className={`grid h-7 w-7 shrink-0 place-items-center rounded-md ${
-                  typeTint[lesson.type] ?? "bg-zinc-100 text-zinc-500"
-                }`}
-              >
-                <LessonIcon type={lesson.type} size={14} />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-medium text-zinc-800">
-                  {lesson.title || "Tanpa judul"}
-                </span>
-                <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-zinc-400">
-                  <span>
-                    {lessonTypeLabels[lesson.type]}
-                    {lesson.duration ? ` · ${lesson.duration}` : ""}
-                  </span>
-                  {lesson.publish_status !== "all" && (
-                    <span className="rounded bg-zinc-100 px-1 py-px font-semibold text-zinc-500">
-                      Not publish
+            <div key={g.key ?? "__loose__"} className="flex flex-col gap-1.5">
+              {g.sub && (
+                <div className="flex items-center gap-1.5">
+                  <ReorderBtns
+                    label="subbagian"
+                    first={subIdx === 0}
+                    last={subIdx === subCount - 1}
+                    onUp={() => moveSubsection(activeSec, subIdx, -1)}
+                    onDown={() => moveSubsection(activeSec, subIdx, 1)}
+                  />
+                  <input
+                    value={g.sub.title ?? ""}
+                    onChange={(e) =>
+                      patchSubLocal(activeSec.id, g.sub.id, {
+                        title: e.target.value,
+                      })
+                    }
+                    onBlur={() => saveSubTitle(activeSec, g.sub)}
+                    onKeyDown={(e) =>
+                      e.key === "Enter" && e.currentTarget.blur()
+                    }
+                    placeholder="Nama subbagian"
+                    className={`${cell} flex-1 text-xs font-bold uppercase tracking-wide`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeSubsection(activeSec, g.sub)}
+                    aria-label="Hapus subbagian"
+                    className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-zinc-300 transition-colors hover:bg-rose-50 hover:text-rose-500"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              )}
+
+              {g.items.length === 0 && g.sub && (
+                <p className="px-1 text-[11px] text-zinc-300">
+                  Belum ada materi di subbagian ini.
+                </p>
+              )}
+
+              {g.items.map((lesson, li) => {
+                const on = activeLes?.id === lesson.id;
+                const closed =
+                  (lesson.type === "soal" &&
+                    !quizAccessNow(lesson, now).open) ||
+                  (FORM_LIKE.has(lesson.type) &&
+                    lesson.access_open === false);
+                return (
+                  <div
+                    key={lesson.id}
+                    onClick={() => {
+                      setSelLesId(lesson.id);
+                      setMobileStep("detail");
+                    }}
+                    className={`flex cursor-pointer items-center gap-2 rounded-lg border px-2 py-2 transition-colors ${
+                      on
+                        ? "border-brand-300 bg-brand-50"
+                        : "border-zinc-200 bg-white hover:bg-zinc-50"
+                    }`}
+                  >
+                    <span onClick={(e) => e.stopPropagation()}>
+                      <ReorderBtns
+                        label="materi"
+                        first={li === 0}
+                        last={li === g.items.length - 1}
+                        onUp={() => moveLesson(activeSec, g.key, li, -1)}
+                        onDown={() => moveLesson(activeSec, g.key, li, 1)}
+                      />
                     </span>
-                  )}
-                  {closed && (
-                    <span className="rounded bg-amber-50 px-1 py-px font-semibold text-amber-600">
-                      Akses ditutup
+                    <span
+                      className={`grid h-7 w-7 shrink-0 place-items-center rounded-md ${
+                        typeTint[lesson.type] ?? "bg-zinc-100 text-zinc-500"
+                      }`}
+                    >
+                      <LessonIcon type={lesson.type} size={14} />
                     </span>
-                  )}
-                </span>
-              </span>
-              <span className="shrink-0 text-[11px] font-semibold text-brand-600">
-                Atur ▸
-              </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium text-zinc-800">
+                        {lesson.title || "Tanpa judul"}
+                      </span>
+                      <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-zinc-400">
+                        <span>
+                          {lessonTypeLabels[lesson.type]}
+                          {lesson.duration ? ` · ${lesson.duration}` : ""}
+                        </span>
+                        {lesson.publish_status !== "all" && (
+                          <span className="rounded bg-zinc-100 px-1 py-px font-semibold text-zinc-500">
+                            Not publish
+                          </span>
+                        )}
+                        {closed && (
+                          <span className="rounded bg-amber-50 px-1 py-px font-semibold text-amber-600">
+                            Akses ditutup
+                          </span>
+                        )}
+                      </span>
+                    </span>
+                    <span className="shrink-0 text-[11px] font-semibold text-brand-600">
+                      Atur ▸
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           );
         })}
-        <button
-          type="button"
-          onClick={() => addLesson(activeSec)}
-          className="mt-1 flex items-center justify-center gap-1.5 rounded-lg border-2 border-dashed border-zinc-200 py-2 text-xs font-semibold text-brand-600 transition-colors hover:border-brand-300 hover:bg-brand-50/30"
-        >
-          <Plus size={13} /> Tambah materi
-        </button>
+
+        <div className="mt-1 flex flex-col gap-1.5">
+          <button
+            type="button"
+            onClick={() => addLesson(activeSec)}
+            className="flex items-center justify-center gap-1.5 rounded-lg border-2 border-dashed border-zinc-200 py-2 text-xs font-semibold text-brand-600 transition-colors hover:border-brand-300 hover:bg-brand-50/30"
+          >
+            <Plus size={13} /> Tambah materi
+          </button>
+          <button
+            type="button"
+            onClick={() => addSubsection(activeSec)}
+            className="flex items-center justify-center gap-1.5 rounded-lg border-2 border-dashed border-zinc-200 py-2 text-xs font-semibold text-zinc-500 transition-colors hover:border-brand-300 hover:bg-brand-50/30 hover:text-brand-600"
+          >
+            <Layers size={13} /> Tambah subbagian
+          </button>
+        </div>
       </div>
     </div>
   ) : (
@@ -719,6 +921,28 @@ export default function CurriculumEditor({ courseId }) {
             <Trash2 size={11} /> Hapus
           </button>
         </div>
+
+        {(activeSec.subsections?.length ?? 0) > 0 && (
+          <div className="flex items-center gap-1.5">
+            <Layers size={12} className="shrink-0 text-zinc-400" />
+            <select
+              value={lesson.subsection_id ?? ""}
+              onChange={(e) =>
+                assignSubsection(activeSec, lesson, e.target.value || null)
+              }
+              className={`${cell} flex-1 text-xs`}
+            >
+              <option value="">— langsung di pertemuan —</option>
+              {[...(activeSec.subsections ?? [])]
+                .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+                .map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.title || "Subbagian"}
+                  </option>
+                ))}
+            </select>
+          </div>
+        )}
 
         <div className="flex items-center gap-2 border-t border-zinc-100 pt-3">
           <Eye size={12} className="shrink-0 text-zinc-400" />
