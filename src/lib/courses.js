@@ -33,7 +33,8 @@ export async function getCourse(id) {
       `id, title, description, icon, announcement,
        sections:coaching_course_sections (
          id, title, position, meet_at, default_open,
-         items:coaching_lessons ( id, type, title, duration, url, question_set_id, form_id, prompt, content, publish_status, access_open, access_opens_at, access_closes_at, soal_bypass, target_user_id, target_name, allow_download, position )
+         subsections:coaching_course_subsections ( id, title, position ),
+         items:coaching_lessons ( id, type, title, duration, url, question_set_id, form_id, prompt, content, publish_status, access_open, access_opens_at, access_closes_at, soal_bypass, target_user_id, target_name, allow_download, subsection_id, position )
        )`
     )
     .eq("id", id)
@@ -46,6 +47,7 @@ export async function getCourse(id) {
   data.sections.sort((a, b) => a.position - b.position);
   for (const section of data.sections) {
     section.items.sort((a, b) => a.position - b.position);
+    (section.subsections ?? []).sort((a, b) => a.position - b.position);
     delete section.position;
     for (const item of section.items) delete item.position;
   }
@@ -235,11 +237,60 @@ export async function updateLesson(id, patch) {
   if ("form_id" in clean) clean.form_id = clean.form_id || null;
   if ("prompt" in clean) clean.prompt = clean.prompt?.trim() || null;
   if ("content" in clean) clean.content = clean.content?.trim() || null;
+  if ("subsection_id" in clean) clean.subsection_id = clean.subsection_id || null;
   const { error } = await supabase
     .from("coaching_lessons")
     .update(clean)
     .eq("id", id);
   if (error) throw error;
+}
+
+// ── Subbagian (grup materi dalam section) ─────────────────────────────
+
+export async function createSubsection(sectionId, { title, position }) {
+  ensureSupabase();
+  const { data, error } = await supabase
+    .from("coaching_course_subsections")
+    .insert({
+      id: crypto.randomUUID(),
+      section_id: sectionId,
+      title: title ?? "",
+      position: position ?? 0,
+    })
+    .select("id, title, position")
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updateSubsection(id, patch) {
+  ensureSupabase();
+  const { error } = await supabase
+    .from("coaching_course_subsections")
+    .update(patch)
+    .eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteSubsection(id) {
+  ensureSupabase();
+  const { error } = await supabase
+    .from("coaching_course_subsections")
+    .delete()
+    .eq("id", id);
+  if (error) throw error;
+}
+
+export async function reorderSubsections(orderedIds) {
+  ensureSupabase();
+  await runAll(
+    orderedIds.map((id, i) =>
+      supabase
+        .from("coaching_course_subsections")
+        .update({ position: i })
+        .eq("id", id)
+    )
+  );
 }
 
 export async function deleteLesson(id) {

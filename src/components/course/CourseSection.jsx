@@ -157,6 +157,87 @@ const EMPTY_PROGRESS = {
   quizStarted: new Set(),
 };
 
+function LessonCard({ item, courseId, progress, profile }) {
+  const inAppForm =
+    (item.type === "form" || item.type === "refleksi") && item.form_id;
+  const external =
+    (item.type === "meet" || item.type === "form") && item.url && !inAppForm;
+  const recording = item.type === "recording" && item.url;
+  const slide = item.type === "slide" && item.url;
+  const pdf = item.type === "pdf" && item.url;
+  const image = item.type === "image" && item.url;
+  const article = item.type === "materi" && item.content;
+  const quiz = item.type === "soal" && item.question_set_id;
+  const presensi = item.type === "presensi";
+  const feedback =
+    item.type === "feedback" && item.form_id && item.target_user_id;
+  const isFeedbackTarget = feedback && profile?.id === item.target_user_id;
+  const done = (inAppForm || feedback) && !!progress.done?.has(item.id);
+  const att = presensi ? progress.att?.[item.id] : null;
+  const score = quiz ? progress.score?.[item.id] : null;
+  const quizStarted =
+    quiz && !score && !!progress.quizStarted?.has(item.question_set_id);
+
+  if (external) {
+    return (
+      <a
+        href={item.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={cardCls + clickableCls}
+      >
+        <CardInner item={item} />
+      </a>
+    );
+  }
+  if (
+    recording ||
+    slide ||
+    pdf ||
+    image ||
+    article ||
+    quiz ||
+    inAppForm ||
+    feedback ||
+    presensi
+  ) {
+    const to = recording
+      ? `/course/${courseId}/recording/${item.id}`
+      : slide
+        ? `/course/${courseId}/slide/${item.id}`
+        : pdf
+          ? `/course/${courseId}/pdf/${item.id}`
+          : image
+            ? `/course/${courseId}/image/${item.id}`
+            : article
+              ? `/course/${courseId}/materi/${item.id}`
+              : presensi
+                ? `/course/${courseId}/presensi/${item.id}`
+                : inAppForm || feedback
+                  ? `/course/${courseId}/${item.type}/${item.id}`
+                  : `/course/${courseId}/soal/${item.id}`;
+    return (
+      <Link to={to} className={cardCls + clickableCls}>
+        <CardInner
+          item={item}
+          done={done}
+          att={att}
+          score={score}
+          quizStarted={quizStarted}
+          isFeedbackTarget={isFeedbackTarget}
+        />
+      </Link>
+    );
+  }
+  return (
+    <div className={cardCls}>
+      <CardInner item={item} />
+    </div>
+  );
+}
+
+const GRID = "grid items-start gap-3 sm:grid-cols-2 lg:grid-cols-3";
+
 export default function CourseSection({
   section,
   courseId,
@@ -164,6 +245,36 @@ export default function CourseSection({
 }) {
   const [open, setOpen] = useState(section.default_open !== false);
   const { profile } = useAuth();
+
+  // Grup materi: yang tanpa subbagian dulu, lalu tiap subbagian (urut
+  // position) beserta materinya. Subbagian kosong disembunyiin.
+  const subs = [...(section.subsections ?? [])].sort(
+    (a, b) => (a.position ?? 0) - (b.position ?? 0),
+  );
+  const subIds = new Set(subs.map((s) => s.id));
+  const loose = section.items.filter(
+    (it) => !it.subsection_id || !subIds.has(it.subsection_id),
+  );
+  const groups = [
+    { key: "__loose__", title: null, items: loose },
+    ...subs
+      .map((s) => ({
+        key: s.id,
+        title: s.title,
+        items: section.items.filter((it) => it.subsection_id === s.id),
+      }))
+      .filter((g) => g.items.length > 0),
+  ].filter((g) => g.items.length > 0);
+
+  const cardOf = (item) => (
+    <LessonCard
+      key={item.id}
+      item={item}
+      courseId={courseId}
+      progress={progress}
+      profile={profile}
+    />
+  );
 
   return (
     <section>
@@ -186,93 +297,21 @@ export default function CourseSection({
       </button>
 
       {open && (
-        <div className="mt-2 grid items-start gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {section.items.map((item) => {
-            const inAppForm =
-              (item.type === "form" || item.type === "refleksi") &&
-              item.form_id;
-            const external =
-              (item.type === "meet" || item.type === "form") &&
-              item.url &&
-              !inAppForm;
-            const recording = item.type === "recording" && item.url;
-            const slide = item.type === "slide" && item.url;
-            const pdf = item.type === "pdf" && item.url;
-            const image = item.type === "image" && item.url;
-            const article = item.type === "materi" && item.content;
-            const quiz = item.type === "soal" && item.question_set_id;
-            const presensi = item.type === "presensi";
-            const feedback =
-              item.type === "feedback" && item.form_id && item.target_user_id;
-            const isFeedbackTarget =
-              feedback && profile?.id === item.target_user_id;
-            const done =
-              (inAppForm || feedback) && !!progress.done?.has(item.id);
-            const att = presensi ? progress.att?.[item.id] : null;
-            const score = quiz ? progress.score?.[item.id] : null;
-            const quizStarted =
-              quiz &&
-              !score &&
-              !!progress.quizStarted?.has(item.question_set_id);
-
-            if (external) {
-              return (
-                <a
-                  key={item.id}
-                  href={item.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={cardCls + clickableCls}
-                >
-                  <CardInner item={item} />
-                </a>
-              );
-            }
-            if (
-              recording ||
-              slide ||
-              pdf ||
-              image ||
-              article ||
-              quiz ||
-              inAppForm ||
-              feedback ||
-              presensi
-            ) {
-              const to = recording
-                ? `/course/${courseId}/recording/${item.id}`
-                : slide
-                  ? `/course/${courseId}/slide/${item.id}`
-                  : pdf
-                    ? `/course/${courseId}/pdf/${item.id}`
-                    : image
-                      ? `/course/${courseId}/image/${item.id}`
-                      : article
-                        ? `/course/${courseId}/materi/${item.id}`
-                        : presensi
-                          ? `/course/${courseId}/presensi/${item.id}`
-                          : inAppForm || feedback
-                            ? `/course/${courseId}/${item.type}/${item.id}`
-                            : `/course/${courseId}/soal/${item.id}`;
-              return (
-                <Link key={item.id} to={to} className={cardCls + clickableCls}>
-                  <CardInner
-                    item={item}
-                    done={done}
-                    att={att}
-                    score={score}
-                    quizStarted={quizStarted}
-                    isFeedbackTarget={isFeedbackTarget}
-                  />
-                </Link>
-              );
-            }
-            return (
-              <div key={item.id} className={cardCls}>
-                <CardInner item={item} />
+        <div className="mt-2 flex flex-col gap-4">
+          {groups.map((g) =>
+            g.title == null ? (
+              <div key={g.key} className={GRID}>
+                {g.items.map(cardOf)}
               </div>
-            );
-          })}
+            ) : (
+              <div key={g.key}>
+                <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.08em] text-zinc-400">
+                  {g.title || "Subbagian"}
+                </p>
+                <div className={GRID}>{g.items.map(cardOf)}</div>
+              </div>
+            ),
+          )}
         </div>
       )}
     </section>
