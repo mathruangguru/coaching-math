@@ -71,18 +71,18 @@ export async function getQuestionSetAdmin(id) {
   if (ids.length) {
     const { data: keys, error } = await supabase
       .from("coaching_question_keys")
-      .select("question_id, answer, answers")
+      .select("question_id, answer, answers, answer_num, answer_tol")
       .in("question_id", ids);
     if (error) throw error;
-    const m = new Map(
-      keys.map((k) => [
-        k.question_id,
-        k.answers?.length ? k.answers : [k.answer ?? 0],
-      ])
-    );
+    const m = new Map(keys.map((k) => [k.question_id, k]));
     for (const q of set.questions) {
-      q.answers = toAnswerArray(m.get(q.id) ?? [0]);
+      const k = m.get(q.id);
+      q.answers = toAnswerArray(
+        k?.answers?.length ? k.answers : [k?.answer ?? 0]
+      );
       q.answer = q.answers[0] ?? 0; // legacy
+      q.answer_num = k?.answer_num ?? null;
+      q.answer_tol = k?.answer_tol ?? 0;
     }
   }
   return set;
@@ -143,23 +143,44 @@ function randomCode() {
   return s;
 }
 
+/** number | null (buat kunci isian angka). "3,5" -> 3.5. */
+export function toNum(v) {
+  if (v == null || v === "") return null;
+  const n = typeof v === "number" ? v : Number(String(v).trim().replace(",", "."));
+  return Number.isFinite(n) ? n : null;
+}
+
 export async function createQuestion(
   setId,
-  { prompt, options, type = "single", answers, position }
+  { prompt, options, type = "single", answers, answerNum, answerTol, position }
 ) {
   ensure();
   const id = crypto.randomUUID();
   const code = randomCode();
   const ans = toAnswerArray(answers).length ? toAnswerArray(answers) : [0];
+  const numKey =
+    type === "number"
+      ? { answer_num: toNum(answerNum), answer_tol: Math.abs(toNum(answerTol) ?? 0) }
+      : { answer_num: null, answer_tol: 0 };
   const { error } = await supabase
     .from("coaching_questions")
     .insert({ id, set_id: setId, code, type, prompt, options, position });
   if (error) throw error;
   const { error: keyErr } = await supabase
     .from("coaching_question_keys")
-    .insert({ question_id: id, answers: ans, answer: ans[0] });
+    .insert({ question_id: id, answers: ans, answer: ans[0], ...numKey });
   if (keyErr) throw keyErr;
-  return { id, code, type, prompt, options, answers: ans, answer: ans[0] };
+  return {
+    id,
+    code,
+    type,
+    prompt,
+    options,
+    answers: ans,
+    answer: ans[0],
+    answer_num: numKey.answer_num,
+    answer_tol: numKey.answer_tol,
+  };
 }
 
 // "B" / 2 / "opsi persis" -> index; -1 kalau nggak ketemu.
@@ -175,10 +196,12 @@ function toOptionIndex(v, options) {
  * Parse + validasi array JSON soal. Terima array langsung atau
  * { questions: [...] }. Tiap item butuh:
  *   prompt  : string
+ *   -- pilihan ganda / checklist:
  *   options : string[] (>= 2)
  *   answer  : index / huruf "A".. / teks opsi. Boleh ARRAY buat checklist.
- *   type    : "single" (default) / "multi" — atau otomatis "multi" kalau
- *             answer array isinya > 1.
+ *   type    : "single" (default) / "multi" — auto "multi" kalau answer > 1.
+ *   -- isian angka:
+ *   type: "number", answer: <angka>, tolerance?: <angka> (default 0)
  * Balikin { items: normalized[], errors: string[] }.
  */
 export function parseQuestionsJson(text) {
@@ -198,10 +221,22 @@ export function parseQuestionsJson(text) {
   arr.forEach((q, i) => {
     const n = i + 1;
     const prompt = typeof q?.prompt === "string" ? q.prompt.trim() : "";
+    if (!prompt) errors.push(`Soal ${n}: "prompt" wajib string.`);
+
+    if (q?.type === "number") {
+      const answerNum = toNum(q?.answer);
+      if (answerNum == null)
+        errors.push(`Soal ${n}: "answer" harus angka buat type "number".`);
+      const answerTol = Math.abs(toNum(q?.tolerance) ?? 0);
+      if (prompt && answerNum != null) {
+        items.push({ prompt, type: "number", answerNum, answerTol });
+      }
+      return;
+    }
+
     const options = Array.isArray(q?.options)
       ? q.options.map((o) => String(o))
       : [];
-    if (!prompt) errors.push(`Soal ${n}: "prompt" wajib string.`);
     if (options.length < 2) errors.push(`Soal ${n}: minimal 2 "options".`);
 
     const rawAns = Array.isArray(q?.answer) ? q.answer : [q?.answer];
@@ -238,15 +273,22 @@ export function parseQuestionsJson(text) {
  */
 export function questionsToJson(questions) {
   return {
-    questions: questions.map((q) => ({
-      prompt: q.prompt,
-      options: q.options,
-      type: q.type === "multi" ? "multi" : "single",
-      answer:
-        q.type === "multi"
-          ? (q.answers ?? [])
-          : (q.answers?.[0] ?? q.answer ?? 0),
-    })),
+    questions: questions.map((q) => {
+      if (q.type === "number") {
+        const out = { prompt: q.prompt, type: "number", answer: q.answer_num };
+        if (q.answer_tol) out.tolerance = q.answer_tol;
+        return out;
+      }
+      return {
+        prompt: q.prompt,
+        options: q.options,
+        type: q.type === "multi" ? "multi" : "single",
+        answer:
+          q.type === "multi"
+            ? (q.answers ?? [])
+            : (q.answers?.[0] ?? q.answer ?? 0),
+      };
+    }),
   };
 }
 
@@ -256,6 +298,7 @@ export function questionsToJson(questions) {
 export async function bulkCreateQuestions(setId, items, startPosition = 0) {
   ensure();
   const meta = items.map((it, i) => {
+    const isNum = it.type === "number";
     const answers = toAnswerArray(it.answers ?? it.answer).length
       ? toAnswerArray(it.answers ?? it.answer)
       : [0];
@@ -263,9 +306,11 @@ export async function bulkCreateQuestions(setId, items, startPosition = 0) {
       id: crypto.randomUUID(),
       code: randomCode(),
       type: it.type ?? (answers.length > 1 ? "multi" : "single"),
-      answers,
+      answers: isNum ? [0] : answers,
+      answer_num: isNum ? toNum(it.answerNum ?? it.answer) : null,
+      answer_tol: isNum ? Math.abs(toNum(it.answerTol ?? it.tolerance) ?? 0) : 0,
       prompt: it.prompt,
-      options: it.options,
+      options: isNum ? [] : it.options,
       position: startPosition + i,
     };
   });
@@ -288,6 +333,8 @@ export async function bulkCreateQuestions(setId, items, startPosition = 0) {
       question_id: m.id,
       answers: m.answers,
       answer: m.answers[0],
+      answer_num: m.answer_num,
+      answer_tol: m.answer_tol,
     }))
   );
   if (keyErr) throw keyErr;
@@ -300,20 +347,30 @@ export async function bulkCreateQuestions(setId, items, startPosition = 0) {
     options: m.options,
     answers: m.answers,
     answer: m.answers[0],
+    answer_num: m.answer_num,
+    answer_tol: m.answer_tol,
   }));
 }
 
-export async function updateQuestion(id, { prompt, options, type, answers }) {
+export async function updateQuestion(
+  id,
+  { prompt, options, type, answers, answerNum, answerTol }
+) {
   ensure();
+  const t = type ?? "single";
   const ans = toAnswerArray(answers).length ? toAnswerArray(answers) : [0];
+  const numKey =
+    t === "number"
+      ? { answer_num: toNum(answerNum), answer_tol: Math.abs(toNum(answerTol) ?? 0) }
+      : { answer_num: null, answer_tol: 0 };
   const { error } = await supabase
     .from("coaching_questions")
-    .update({ prompt, options, type: type ?? "single" })
+    .update({ prompt, options, type: t })
     .eq("id", id);
   if (error) throw error;
   const { error: keyErr } = await supabase
     .from("coaching_question_keys")
-    .upsert({ question_id: id, answers: ans, answer: ans[0] });
+    .upsert({ question_id: id, answers: ans, answer: ans[0], ...numKey });
   if (keyErr) throw keyErr;
 }
 

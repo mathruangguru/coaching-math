@@ -163,6 +163,8 @@ export default function SetSoalFormPage() {
         options: q.options,
         type: q.type ?? "single",
         answers: q.answers ?? [q.answer ?? 0],
+        answerNum: q.answer_num,
+        answerTol: q.answer_tol,
       })
     );
 
@@ -406,7 +408,11 @@ export default function SetSoalFormPage() {
                 <p className="font-mono text-xs text-zinc-400">
                   {selected.code}
                   <span className="ml-2 rounded bg-zinc-100 px-1.5 py-0.5 font-sans font-semibold text-zinc-500">
-                    {selected.type === "multi" ? "Checklist" : "Pilihan ganda"}
+                    {selected.type === "multi"
+                      ? "Checklist"
+                      : selected.type === "number"
+                        ? "Isian angka"
+                        : "Pilihan ganda"}
                   </span>
                 </p>
                 <button
@@ -425,6 +431,16 @@ export default function SetSoalFormPage() {
                   {selected.prompt || "(soal masih kosong)"}
                 </Markdown>
 
+                {selected.type === "number" ? (
+                  <p className="rounded-lg border border-teal-300 bg-teal-50 px-3 py-2 text-sm text-teal-800">
+                    Jawaban:{" "}
+                    <span className="font-semibold">
+                      {selected.answer_num ?? "(belum diisi)"}
+                    </span>
+                    {Number(selected.answer_tol) > 0 &&
+                      ` (± ${selected.answer_tol})`}
+                  </p>
+                ) : (
                 <ul className="flex flex-col gap-1.5">
                   {selected.options.map((opt, oi) => {
                     const key = (
@@ -452,6 +468,7 @@ export default function SetSoalFormPage() {
                     );
                   })}
                 </ul>
+                )}
               </Suspense>
             </div>
           )}
@@ -467,6 +484,7 @@ export default function SetSoalFormPage() {
         (() => {
           const eKeys = editing.answers ?? [editing.answer ?? 0];
           const eMulti = editing.type === "multi";
+          const eNum = editing.type === "number";
           const commit = (patch) => {
             patchQ(editing.id, patch);
             saveQ({ ...editing, ...patch });
@@ -504,6 +522,7 @@ export default function SetSoalFormPage() {
                 {[
                   ["single", "Pilihan ganda"],
                   ["multi", "Checklist"],
+                  ["number", "Isian angka"],
                 ].map(([val, label]) => (
                   <button
                     key={val}
@@ -527,6 +546,45 @@ export default function SetSoalFormPage() {
               </div>
             </div>
 
+            {eNum && (
+              <div className="flex flex-wrap items-end gap-3">
+                <label className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-zinc-400">
+                  Jawaban (angka)
+                  <input
+                    value={editing.answer_num ?? ""}
+                    onChange={(e) =>
+                      patchQ(editing.id, { answer_num: e.target.value })
+                    }
+                    onBlur={() =>
+                      commit({ answer_num: editing.answer_num ?? "" })
+                    }
+                    inputMode="decimal"
+                    placeholder="mis. 3.14"
+                    className={`mt-1.5 ${input} w-40 font-mono normal-case tracking-normal`}
+                  />
+                </label>
+                <label className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-zinc-400">
+                  Toleransi ±
+                  <span className="ml-1.5 font-normal normal-case tracking-normal text-zinc-400">
+                    0 = harus persis
+                  </span>
+                  <input
+                    value={editing.answer_tol ?? 0}
+                    onChange={(e) =>
+                      patchQ(editing.id, { answer_tol: e.target.value })
+                    }
+                    onBlur={() =>
+                      commit({ answer_tol: editing.answer_tol ?? 0 })
+                    }
+                    inputMode="decimal"
+                    placeholder="0"
+                    className={`mt-1.5 ${input} w-32 font-mono normal-case tracking-normal`}
+                  />
+                </label>
+              </div>
+            )}
+
+            {!eNum && (
             <div className="flex flex-col gap-1.5">
               <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-zinc-400">
                 Opsi · klik kotak buat tandai kunci
@@ -590,6 +648,7 @@ export default function SetSoalFormPage() {
                 <Plus size={12} /> Tambah opsi
               </button>
             </div>
+            )}
 
             {/* Live preview */}
             <div className="rounded-lg border border-zinc-200 bg-zinc-50/60 p-3">
@@ -602,25 +661,40 @@ export default function SetSoalFormPage() {
                 <Markdown className="mt-1.5 block text-sm text-zinc-900">
                   {editing.prompt || "(soal masih kosong)"}
                 </Markdown>
-                <ul className="mt-2 flex flex-col gap-1 text-sm text-zinc-600">
-                  {editing.options.map((opt, oi) => (
-                    <li key={oi} className="flex gap-2">
-                      <span
-                        className={`font-semibold ${
-                          eKeys.includes(oi) ? "text-teal-600" : "text-zinc-400"
-                        }`}
-                      >
-                        {String.fromCharCode(65 + oi)}.
-                      </span>
-                      <Markdown inline>{opt || "(kosong)"}</Markdown>
-                      {eKeys.includes(oi) && (
-                        <span className="ml-auto text-[11px] font-semibold text-teal-700">
-                          kunci
+                {eNum ? (
+                  <p className="mt-2 text-sm text-teal-700">
+                    Jawaban:{" "}
+                    <span className="font-semibold">
+                      {editing.answer_num === "" || editing.answer_num == null
+                        ? "(belum diisi)"
+                        : editing.answer_num}
+                    </span>
+                    {Number(editing.answer_tol) > 0 &&
+                      ` (± ${editing.answer_tol})`}
+                  </p>
+                ) : (
+                  <ul className="mt-2 flex flex-col gap-1 text-sm text-zinc-600">
+                    {editing.options.map((opt, oi) => (
+                      <li key={oi} className="flex gap-2">
+                        <span
+                          className={`font-semibold ${
+                            eKeys.includes(oi)
+                              ? "text-teal-600"
+                              : "text-zinc-400"
+                          }`}
+                        >
+                          {String.fromCharCode(65 + oi)}.
                         </span>
-                      )}
-                    </li>
-                  ))}
-                </ul>
+                        <Markdown inline>{opt || "(kosong)"}</Markdown>
+                        {eKeys.includes(oi) && (
+                          <span className="ml-auto text-[11px] font-semibold text-teal-700">
+                            kunci
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </Suspense>
             </div>
           </div>
@@ -642,6 +716,12 @@ const IMPORT_EXAMPLE = `[
     "options": ["2", "4", "7", "9"],
     "type": "multi",
     "answer": ["A", "C"]
+  },
+  {
+    "prompt": "Nilai $\\\\pi$ sampai 2 desimal:",
+    "type": "number",
+    "answer": 3.14,
+    "tolerance": 0.01
   }
 ]`;
 
@@ -659,8 +739,9 @@ function ImportModal({ onClose, onImport }) {
           <code> $…$ </code>), <code>options</code> (array, min 2),{" "}
           <code>answer</code> (index 0-based, huruf <code>&quot;A&quot;</code>…,
           atau teks opsi persis — boleh <code>array</code> untuk checklist).
-          Opsional <code>type</code>: <code>&quot;multi&quot;</code>. Soal
-          ditambahkan di akhir.
+          Opsional <code>type</code>: <code>&quot;multi&quot;</code>. Untuk isian
+          angka: <code>type: &quot;number&quot;</code>, <code>answer</code> angka,
+          opsional <code>tolerance</code>. Soal ditambahkan di akhir.
         </p>
         <details className="text-xs text-zinc-400">
           <summary className="cursor-pointer select-none">Contoh</summary>

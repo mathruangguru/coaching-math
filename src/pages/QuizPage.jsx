@@ -118,6 +118,7 @@ export default function QuizPage({ review = false }) {
       if (!silent) {
         const blanks = qs.filter((qq) => {
           const v = answers[qq.id];
+          if (typeof v === "string") return v.trim() === "";
           return Array.isArray(v) ? v.length === 0 : v == null;
         }).length;
         // Ada yang kosong -> minta konfirmasi lewat modal, jangan submit dulu.
@@ -288,6 +289,7 @@ export default function QuizPage({ review = false }) {
 
   const isAnswered = (qq) => {
     const v = answers[qq.id];
+    if (typeof v === "string") return v.trim() !== "";
     return Array.isArray(v) ? v.length > 0 : v != null;
   };
 
@@ -425,6 +427,16 @@ export default function QuizPage({ review = false }) {
             <div className="mt-1.5 text-sm font-medium text-zinc-900">
               <Markdown>{q.prompt}</Markdown>
             </div>
+            {q.type === "number" ? (
+              <div className="mt-3 rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-700">
+                Jawaban kamu:{" "}
+                <span className="font-semibold text-brand-800">
+                  {typeof chosen === "string" && chosen.trim() !== ""
+                    ? chosen
+                    : "—"}
+                </span>
+              </div>
+            ) : (
             <div className="mt-3 flex flex-col gap-2">
               {q.options.map((opt, oi) => (
                 <div
@@ -455,6 +467,7 @@ export default function QuizPage({ review = false }) {
                 </div>
               ))}
             </div>
+            )}
           </div>
         </Suspense>
 
@@ -616,23 +629,29 @@ export default function QuizPage({ review = false }) {
                       Bisa pilih lebih dari satu.
                     </p>
                   )}
-                  <div className="mt-3 flex flex-col gap-2">
-                    {qq.options.map((opt, oi) => (
-                      <div
-                        key={oi}
-                        className="flex items-center gap-2.5 rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-600"
-                      >
-                        <span
-                          className={`grid h-6 w-6 shrink-0 place-items-center border border-zinc-300 text-xs font-bold text-zinc-400 ${
-                            qq.type === "multi" ? "rounded-md" : "rounded-full"
-                          }`}
+                  {qq.type === "number" ? (
+                    <div className="mt-3 rounded-lg border border-dashed border-zinc-300 px-3 py-2 text-sm text-zinc-400">
+                      Isian angka
+                    </div>
+                  ) : (
+                    <div className="mt-3 flex flex-col gap-2">
+                      {qq.options.map((opt, oi) => (
+                        <div
+                          key={oi}
+                          className="flex items-center gap-2.5 rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-600"
                         >
-                          {String.fromCharCode(65 + oi)}
-                        </span>
-                        <Markdown inline>{opt}</Markdown>
-                      </div>
-                    ))}
-                  </div>
+                          <span
+                            className={`grid h-6 w-6 shrink-0 place-items-center border border-zinc-300 text-xs font-bold text-zinc-400 ${
+                              qq.type === "multi" ? "rounded-md" : "rounded-full"
+                            }`}
+                          >
+                            {String.fromCharCode(65 + oi)}
+                          </span>
+                          <Markdown inline>{opt}</Markdown>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -770,6 +789,25 @@ export default function QuizPage({ review = false }) {
                 Bisa pilih lebih dari satu.
               </p>
             )}
+            {q.type === "number" ? (
+              <div className="mt-3">
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={
+                    typeof answers[q.id] === "string" ? answers[q.id] : ""
+                  }
+                  onChange={(e) =>
+                    setAnswers((a) => ({ ...a, [q.id]: e.target.value }))
+                  }
+                  placeholder="Ketik jawaban berupa angka…"
+                  className="w-full max-w-xs rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none transition-colors focus:border-brand-500"
+                />
+                <p className="mt-1 text-[11px] text-zinc-400">
+                  Contoh: 3.14 atau 3,14
+                </p>
+              </div>
+            ) : (
             <div className="mt-3 flex flex-col gap-2">
               {q.options.map((opt, oi) => {
                 const multi = q.type === "multi";
@@ -809,6 +847,7 @@ export default function QuizPage({ review = false }) {
                 );
               })}
             </div>
+            )}
           </Suspense>
         </div>
 
