@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Search, Download } from "lucide-react";
+import { Search, Download, Copy, Check } from "lucide-react";
 import { getCourse } from "../../lib/courses";
 import { getCourseEnrollments } from "../../lib/enroll";
 import { getUsers } from "../../lib/users";
@@ -42,6 +42,9 @@ const csvCell = (v) => {
   return /[",\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 };
 
+// Buat paste ke spreadsheet: tab/enter di dalam sel diganti spasi.
+const tsvCell = (v) => String(v ?? "").replace(/[\t\r\n]+/g, " ");
+
 // Nilai buat sorting sebuah baris di kolom `key` ('name' | 'avg' | <quizId>).
 const sortVal = (r, key) => {
   if (key === "name") return fullName(r.user).toLowerCase() || r.uid;
@@ -72,6 +75,7 @@ export default function CourseGradebook({ courseId }) {
   const [quizzes, setQuizzes] = useState([]); // [{ id, title }]
   const [rows, setRows] = useState([]);
   const [q, setQ] = useState("");
+  const [copied, setCopied] = useState(false);
   // { key: 'name' | 'avg' | <quizId>, dir: 'asc' | 'desc' } | null (urutan default)
   const [sort, setSort] = useState(null);
 
@@ -227,7 +231,8 @@ export default function CourseGradebook({ courseId }) {
     });
   }, [rows, needle, sort]);
 
-  const exportCsv = () => {
+  // Matriks nilai sebagai baris teks — dipakai export CSV & copy TSV.
+  const tableMatrix = () => {
     const head = [
       "Nama",
       "Email",
@@ -236,34 +241,58 @@ export default function CourseGradebook({ courseId }) {
       "Rata-rata (%)",
       "Selesai",
     ];
-    const lines = [head.map(csvCell).join(",")];
-    for (const r of rows) {
-      lines.push(
-        [
-          fullName(r.user) || r.uid,
-          r.user?.email ?? "",
-          r.enrolled ? "enrolled" : "tidak enroll",
-          ...quizzes.map((qz) => {
-            const c = r.cells[qz.id];
-            return c ? `${c.score}/${c.total} (${c.pct}%)` : "";
-          }),
-          r.avgPct ?? "",
-          `${r.doneCount}/${quizzes.length}`,
-        ]
-          .map(csvCell)
-          .join(","),
-      );
-    }
-    const url = URL.createObjectURL(
-      new Blob(["﻿" + lines.join("\n")], {
-        type: "text/csv;charset=utf-8",
+    const body = rows.map((r) => [
+      fullName(r.user) || r.uid,
+      r.user?.email ?? "",
+      r.enrolled ? "enrolled" : "tidak enroll",
+      ...quizzes.map((qz) => {
+        const c = r.cells[qz.id];
+        return c ? `${c.score}/${c.total} (${c.pct}%)` : "";
       }),
+      r.avgPct ?? "",
+      `${r.doneCount}/${quizzes.length}`,
+    ]);
+    return [head, ...body];
+  };
+
+  const exportCsv = () => {
+    const csv = tableMatrix()
+      .map((row) => row.map(csvCell).join(","))
+      .join("\n");
+    const url = URL.createObjectURL(
+      new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" }),
     );
     const a = document.createElement("a");
     a.href = url;
     a.download = `nilai-${courseId}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  // Salin sebagai TSV — langsung kebaca jadi sel-sel pas di-paste ke
+  // Google Sheets / Excel.
+  const copyTable = async () => {
+    const tsv = tableMatrix()
+      .map((row) => row.map(tsvCell).join("\t"))
+      .join("\n");
+    try {
+      await navigator.clipboard.writeText(tsv);
+    } catch {
+      const ta = document.createElement("textarea");
+      ta.value = tsv;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand("copy");
+      } catch {
+        /* nggak bisa nyalin — biarin */
+      }
+      document.body.removeChild(ta);
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1800);
   };
 
   const stickyHead =
@@ -278,10 +307,23 @@ export default function CourseGradebook({ courseId }) {
           Nilai
         </span>
         {status === "ready" && rows.length > 0 && (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
             <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold text-zinc-500">
               {overall != null ? `rata-rata ${overall}%` : "belum ada nilai"}
             </span>
+            <button
+              type="button"
+              onClick={copyTable}
+              className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-medium transition-colors ${
+                copied
+                  ? "border-teal-200 bg-teal-50 text-teal-700"
+                  : "border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50"
+              }`}
+              title="Salin tabel — tinggal paste ke Google Sheets / Excel"
+            >
+              {copied ? <Check size={12} /> : <Copy size={12} />}
+              {copied ? "Tersalin" : "Salin tabel"}
+            </button>
             <button
               type="button"
               onClick={exportCsv}
