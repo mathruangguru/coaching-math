@@ -29,6 +29,24 @@ const numKeyLabel = (q) =>
   q.answer_num == null
     ? "–"
     : `${q.answer_num}${Number(q.answer_tol) > 0 ? ` ±${q.answer_tol}` : ""}`;
+// Kunci soal tabel -> huruf kolom per baris, mis. "ABBA".
+const rowKeysOf = (q) => (Array.isArray(q.row_keys) ? q.row_keys.map(Number) : []);
+const tableKeyLabel = (q) => {
+  const rk = rowKeysOf(q);
+  return rk.length ? rk.map((i) => String.fromCharCode(65 + i)).join("") : "–";
+};
+// Jawaban tabel -> huruf kolom per baris ("·" = belum dijawab).
+const tablePickLabel = (chosen, n) =>
+  Array.from({ length: n }, (_, i) => {
+    const c = Array.isArray(chosen) ? chosen[i] : null;
+    return c == null ? "·" : String.fromCharCode(65 + Number(c));
+  }).join("");
+// Jumlah baris benar di jawaban tabel.
+const tableRowsRight = (q, chosen) => {
+  const rk = rowKeysOf(q);
+  const pick = Array.isArray(chosen) ? chosen : [];
+  return rk.reduce((n, k, i) => n + (Number(pick[i]) === k ? 1 : 0), 0);
+};
 // Jawaban murid buat soal ini benar?
 const qCorrect = (q, chosen) => {
   if (q.type === "number") {
@@ -39,6 +57,11 @@ const qCorrect = (q, chosen) => {
       Number.isFinite(key) &&
       Math.abs(v - key) <= Math.abs(Number(q.answer_tol) || 0)
     );
+  }
+  if (q.type === "table") {
+    const rk = rowKeysOf(q);
+    const pick = Array.isArray(chosen) ? chosen : [];
+    return rk.length > 0 && rk.every((k, i) => Number(pick[i]) === k);
   }
   return sameAnswerSet(chosen, keyOf(q));
 };
@@ -146,9 +169,13 @@ const td = "border border-zinc-100 px-2.5 py-1.5";
 
 function Cell({ q, chosen, active, onEnter }) {
   const isNum = q.type === "number";
+  const isTable = q.type === "table";
+  const nRows = q.table_rows?.length ?? rowKeysOf(q).length;
   const blank = isNum
     ? chosen == null || String(chosen).trim() === ""
-    : toAnswerArray(chosen).length === 0;
+    : isTable
+      ? !Array.isArray(chosen) || chosen.every((x) => x == null)
+      : toAnswerArray(chosen).length === 0;
   if (blank) {
     return (
       <td
@@ -165,11 +192,18 @@ function Cell({ q, chosen, active, onEnter }) {
   return (
     <td
       onMouseEnter={onEnter}
+      title={
+        isTable ? `${tableRowsRight(q, chosen)}/${nRows} baris benar` : undefined
+      }
       className={`${td} text-center text-xs font-bold ${
         ok ? "bg-teal-50 text-teal-700" : "bg-rose-50 text-rose-700"
       } ${active ? "ring-1 ring-inset ring-brand-300" : ""}`}
     >
-      {isNum ? String(chosen) : letters(chosen)}
+      {isNum
+        ? String(chosen)
+        : isTable
+          ? tablePickLabel(chosen, nRows)
+          : letters(chosen)}
     </td>
   );
 }
@@ -269,7 +303,11 @@ function ResultTable({
                     : "text-zinc-600"
                 }`}
               >
-                {q.type === "number" ? numKeyLabel(q) : letters(keyOf(q))}
+                {q.type === "number"
+                  ? numKeyLabel(q)
+                  : q.type === "table"
+                    ? tableKeyLabel(q)
+                    : letters(keyOf(q))}
               </td>
             ))}
             {onReset && <td className={td} />}
@@ -468,9 +506,12 @@ function QuestionAnalytics({ questions, attempts }) {
     return questions
       .map((q, idx) => {
         const isNum = q.type === "number";
+        const isTable = q.type === "table";
         const keyArr = keyOf(q);
         const opts = (q.options ?? []).map(() => 0);
         const numDist = new Map(); // jawaban -> count (soal isian angka)
+        const tRows = isTable ? (q.table_rows ?? []) : [];
+        const tRowRight = tRows.map(() => 0); // baris benar per baris (tabel)
         let correct = 0;
         let blank = 0;
         for (const a of attempts) {
@@ -485,6 +526,18 @@ function QuestionAnalytics({ questions, attempts }) {
             numDist.set(s, (numDist.get(s) ?? 0) + 1);
             continue;
           }
+          if (isTable) {
+            if (!Array.isArray(raw) || raw.every((x) => x == null)) {
+              blank += 1;
+              continue;
+            }
+            if (qCorrect(q, raw)) correct += 1;
+            const rk = rowKeysOf(q);
+            rk.forEach((k, ri) => {
+              if (Number(raw[ri]) === k) tRowRight[ri] += 1;
+            });
+            continue;
+          }
           const picked = toAnswerArray(raw);
           if (picked.length === 0) {
             blank += 1;
@@ -494,10 +547,12 @@ function QuestionAnalytics({ questions, attempts }) {
           for (const oi of picked)
             if (oi >= 0 && oi < opts.length) opts[oi] += 1;
         }
+        const tAnswered = n - blank;
         return {
           id: q.id,
           num: idx + 1,
           isNum,
+          isTable,
           prompt: (q.prompt ?? "").trim(),
           options: q.options ?? [],
           keyArr,
@@ -505,6 +560,14 @@ function QuestionAnalytics({ questions, attempts }) {
           numDist: [...numDist.entries()]
             .map(([val, c]) => [val, c, qCorrect(q, val)])
             .sort((a, b) => b[1] - a[1]),
+          tableRows: isTable
+            ? tRows.map((text, ri) => ({
+                text: String(text ?? "").trim(),
+                pct: tAnswered
+                  ? Math.round((tRowRight[ri] / tAnswered) * 100)
+                  : 0,
+              }))
+            : [],
           n,
           correct,
           blank,
@@ -558,7 +621,37 @@ function QuestionAnalytics({ questions, attempts }) {
                   {r.blank > 0 && ` · ${r.blank} kosong`}
                 </span>
               </div>
-              {r.isNum ? (
+              {r.isTable ? (
+                <div className="flex flex-col gap-1.5">
+                  <p className="text-[11px] text-zinc-400">
+                    % benar per baris (dari yang menjawab)
+                  </p>
+                  {r.tableRows.map((row, ri) => (
+                    <div key={ri}>
+                      <div className="flex items-baseline gap-1.5 text-[11px]">
+                        <span className="min-w-0 flex-1 truncate text-zinc-600">
+                          {row.text || `Baris ${ri + 1}`}
+                        </span>
+                        <span className="shrink-0 tabular-nums text-zinc-400">
+                          {row.pct}%
+                        </span>
+                      </div>
+                      <div className="mt-1 h-2 overflow-hidden rounded-full bg-zinc-100">
+                        <div
+                          className={`h-full rounded-full ${
+                            row.pct >= 70
+                              ? "bg-teal-500"
+                              : row.pct >= 40
+                                ? "bg-amber-400"
+                                : "bg-rose-400"
+                          }`}
+                          style={{ width: `${row.pct}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : r.isNum ? (
                 <div className="flex flex-col gap-2">
                   <p className="text-[11px] text-zinc-500">
                     Kunci:{" "}

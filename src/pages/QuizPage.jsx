@@ -118,6 +118,10 @@ export default function QuizPage({ review = false }) {
       if (!silent) {
         const blanks = qs.filter((qq) => {
           const v = answers[qq.id];
+          if (qq.type === "table") {
+            const rows = qq.table_rows ?? [];
+            return !(rows.length > 0 && rows.every((_, i) => v?.[i] != null));
+          }
           if (typeof v === "string") return v.trim() === "";
           return Array.isArray(v) ? v.length === 0 : v == null;
         }).length;
@@ -287,8 +291,15 @@ export default function QuizPage({ review = false }) {
   const questions = set?.questions ?? [];
   const total = questions.length;
 
+  // Tabel: dianggap terjawab kalau SEMUA baris udah dipilih.
+  const tableDone = (qq, v) => {
+    const rows = qq.table_rows ?? [];
+    return rows.length > 0 && rows.every((_, i) => v?.[i] != null);
+  };
+
   const isAnswered = (qq) => {
     const v = answers[qq.id];
+    if (qq.type === "table") return tableDone(qq, v);
     if (typeof v === "string") return v.trim() !== "";
     return Array.isArray(v) ? v.length > 0 : v != null;
   };
@@ -302,6 +313,14 @@ export default function QuizPage({ review = false }) {
         ? cur.filter((x) => x !== oi)
         : [...cur, oi].sort((m, n) => m - n);
       return { ...a, [qq.id]: next };
+    });
+
+  // Tabel: set kolom terpilih buat satu baris.
+  const pickRow = (qq, ri, ci) =>
+    setAnswers((a) => {
+      const cur = Array.isArray(a[qq.id]) ? [...a[qq.id]] : [];
+      cur[ri] = ci;
+      return { ...a, [qq.id]: cur };
     });
 
   const answeredCount = questions.filter(isAnswered).length;
@@ -435,6 +454,63 @@ export default function QuizPage({ review = false }) {
                     ? chosen
                     : "—"}
                 </span>
+              </div>
+            ) : q.type === "table" ? (
+              <div className="mt-3 overflow-x-auto">
+                <table className="w-full border-collapse text-sm">
+                  <thead>
+                    <tr>
+                      <th className="px-2 py-1.5" />
+                      {q.options.map((col, ci) => (
+                        <th
+                          key={ci}
+                          className="px-2 py-1.5 text-center text-xs font-semibold text-zinc-500"
+                        >
+                          {col}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(q.table_rows ?? []).map((row, ri) => (
+                      <tr key={ri} className="border-t border-zinc-100">
+                        <td className="px-2 py-2 align-middle text-zinc-700">
+                          <Markdown inline>{row}</Markdown>
+                        </td>
+                        {q.options.map((_, ci) => {
+                          const on =
+                            Array.isArray(chosen) && chosen[ri] === ci;
+                          return (
+                            <td
+                              key={ci}
+                              className={`px-2 py-2 text-center ${
+                                on ? "bg-brand-50" : ""
+                              }`}
+                            >
+                              <span
+                                className={`mx-auto grid h-5 w-5 place-items-center rounded-full border-2 ${
+                                  on ? "border-brand-500" : "border-zinc-200"
+                                }`}
+                              >
+                                <span
+                                  className={`h-2.5 w-2.5 rounded-full ${
+                                    on ? "bg-brand-500" : "bg-transparent"
+                                  }`}
+                                />
+                              </span>
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {(!Array.isArray(chosen) ||
+                  chosen.every((x) => x == null)) && (
+                  <p className="mt-1 text-[11px] text-zinc-400">
+                    Belum kamu jawab.
+                  </p>
+                )}
               </div>
             ) : (
             <div className="mt-3 flex flex-col gap-2">
@@ -633,6 +709,38 @@ export default function QuizPage({ review = false }) {
                     <div className="mt-3 rounded-lg border border-dashed border-zinc-300 px-3 py-2 text-sm text-zinc-400">
                       Isian angka
                     </div>
+                  ) : qq.type === "table" ? (
+                    <div className="mt-3 overflow-x-auto">
+                      <table className="w-full border-collapse text-sm">
+                        <thead>
+                          <tr>
+                            <th className="px-2 py-1.5" />
+                            {qq.options.map((col, ci) => (
+                              <th
+                                key={ci}
+                                className="px-2 py-1.5 text-center text-xs font-semibold text-zinc-500"
+                              >
+                                {col}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(qq.table_rows ?? []).map((row, ri) => (
+                            <tr key={ri} className="border-t border-zinc-100">
+                              <td className="px-2 py-2 text-zinc-600">
+                                <Markdown inline>{row}</Markdown>
+                              </td>
+                              {qq.options.map((_, ci) => (
+                                <td key={ci} className="px-2 py-2 text-center">
+                                  <span className="mx-auto block h-4 w-4 rounded-full border border-zinc-300" />
+                                </td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   ) : (
                     <div className="mt-3 flex flex-col gap-2">
                       {qq.options.map((opt, oi) => (
@@ -806,6 +914,66 @@ export default function QuizPage({ review = false }) {
                 <p className="mt-1 text-[11px] text-zinc-400">
                   Contoh: 3.14 atau 3,14
                 </p>
+              </div>
+            ) : q.type === "table" ? (
+              <div className="mt-3 overflow-x-auto">
+                <table className="w-full border-collapse text-sm">
+                  <thead>
+                    <tr>
+                      <th className="px-2 py-1.5" />
+                      {q.options.map((col, ci) => (
+                        <th
+                          key={ci}
+                          className="px-2 py-1.5 text-center text-xs font-semibold text-zinc-500"
+                        >
+                          {col}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(q.table_rows ?? []).map((row, ri) => {
+                      const chosen = answers[q.id];
+                      return (
+                        <tr key={ri} className="border-t border-zinc-100">
+                          <td className="px-2 py-2 align-middle text-zinc-800">
+                            <Markdown inline>{row}</Markdown>
+                          </td>
+                          {q.options.map((_, ci) => {
+                            const on =
+                              Array.isArray(chosen) && chosen[ri] === ci;
+                            return (
+                              <td key={ci} className="px-2 py-2 text-center">
+                                <label className="inline-flex cursor-pointer">
+                                  <input
+                                    type="radio"
+                                    name={`${q.id}:${ri}`}
+                                    checked={on}
+                                    onChange={() => pickRow(q, ri, ci)}
+                                    className="sr-only"
+                                  />
+                                  <span
+                                    className={`grid h-5 w-5 place-items-center rounded-full border-2 transition-colors ${
+                                      on
+                                        ? "border-brand-500"
+                                        : "border-zinc-300"
+                                    }`}
+                                  >
+                                    <span
+                                      className={`h-2.5 w-2.5 rounded-full ${
+                                        on ? "bg-brand-500" : "bg-transparent"
+                                      }`}
+                                    />
+                                  </span>
+                                </label>
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             ) : (
             <div className="mt-3 flex flex-col gap-2">
