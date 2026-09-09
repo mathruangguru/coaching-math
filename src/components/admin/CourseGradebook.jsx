@@ -232,12 +232,13 @@ export default function CourseGradebook({ courseId }) {
   }, [rows, needle, sort]);
 
   // Matriks nilai sebagai baris teks — dipakai export CSV & copy TSV.
+  // Tiap latihan soal jadi 2 kolom: skor ("13/30") + persen (angka "43").
   const tableMatrix = () => {
     const head = [
       "Nama",
       "Email",
       "Status",
-      ...quizzes.map((qz) => qz.title),
+      ...quizzes.flatMap((qz) => [qz.title, `${qz.title} (%)`]),
       "Rata-rata (%)",
       "Selesai",
     ];
@@ -245,9 +246,9 @@ export default function CourseGradebook({ courseId }) {
       fullName(r.user) || r.uid,
       r.user?.email ?? "",
       r.enrolled ? "enrolled" : "tidak enroll",
-      ...quizzes.map((qz) => {
+      ...quizzes.flatMap((qz) => {
         const c = r.cells[qz.id];
-        return c ? `${c.score}/${c.total} (${c.pct}%)` : "";
+        return c ? [`${c.score}/${c.total}`, c.pct] : ["", ""];
       }),
       r.avgPct ?? "",
       `${r.doneCount}/${quizzes.length}`,
