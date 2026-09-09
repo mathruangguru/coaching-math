@@ -42,6 +42,26 @@ const csvCell = (v) => {
   return /[",\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 };
 
+// Nilai buat sorting sebuah baris di kolom `key` ('name' | 'avg' | <quizId>).
+const sortVal = (r, key) => {
+  if (key === "name") return fullName(r.user).toLowerCase() || r.uid;
+  if (key === "avg") return r.avgPct;
+  return r.cells[key]?.pct; // kolom soal
+};
+
+// Penanda arah sort di header. state: 'asc' | 'desc' | null.
+function SortCaret({ state }) {
+  return (
+    <span
+      className={`ml-0.5 inline-block shrink-0 text-[8px] leading-none ${
+        state ? "text-brand-500" : "text-zinc-300"
+      }`}
+    >
+      {state === "asc" ? "▲" : state === "desc" ? "▼" : "↕"}
+    </span>
+  );
+}
+
 /**
  * Gradebook satu course: matriks nilai murid × latihan soal. Baris = murid
  * enrolled (plus siapa pun yang punya attempt walau nggak enroll), kolom =
@@ -52,6 +72,18 @@ export default function CourseGradebook({ courseId }) {
   const [quizzes, setQuizzes] = useState([]); // [{ id, title }]
   const [rows, setRows] = useState([]);
   const [q, setQ] = useState("");
+  // { key: 'name' | 'avg' | <quizId>, dir: 'asc' | 'desc' } | null (urutan default)
+  const [sort, setSort] = useState(null);
+
+  const clickSort = (key) => {
+    const primary = key === "name" ? "asc" : "desc"; // arah pertama saat diklik
+    setSort((s) => {
+      if (s?.key !== key) return { key, dir: primary };
+      if (s.dir === primary)
+        return { key, dir: primary === "asc" ? "desc" : "asc" };
+      return null; // klik ketiga -> balik ke urutan default
+    });
+  };
 
   useEffect(() => {
     let alive = true;
@@ -164,11 +196,36 @@ export default function CourseGradebook({ courseId }) {
   }, [rows]);
 
   const needle = q.trim().toLowerCase();
-  const shown = rows.filter(
-    (r) =>
-      fullName(r.user).toLowerCase().includes(needle) ||
-      (r.user?.email ?? "").toLowerCase().includes(needle),
-  );
+
+  const shown = useMemo(() => {
+    const filtered = rows.filter(
+      (r) =>
+        fullName(r.user).toLowerCase().includes(needle) ||
+        (r.user?.email ?? "").toLowerCase().includes(needle),
+    );
+    if (!sort) {
+      return [...filtered].sort((a, b) => {
+        if (a.enrolled !== b.enrolled) return a.enrolled ? -1 : 1;
+        return fullName(a.user).localeCompare(fullName(b.user), "id");
+      });
+    }
+    const mul = sort.dir === "asc" ? 1 : -1;
+    return [...filtered].sort((a, b) => {
+      const va = sortVal(a, sort.key);
+      const vb = sortVal(b, sort.key);
+      const ma = va == null || va === "";
+      const mb = vb == null || vb === "";
+      if (ma && mb) return fullName(a.user).localeCompare(fullName(b.user), "id");
+      if (ma) return 1; // yang belum ngerjain selalu di bawah
+      if (mb) return -1;
+      if (sort.key === "name")
+        return String(va).localeCompare(String(vb), "id") * mul;
+      return (
+        (va - vb) * mul ||
+        fullName(a.user).localeCompare(fullName(b.user), "id")
+      );
+    });
+  }, [rows, needle, sort]);
 
   const exportCsv = () => {
     const head = [
@@ -283,20 +340,47 @@ export default function CourseGradebook({ courseId }) {
               <table className="min-w-full border-collapse">
                 <thead>
                   <tr className="bg-zinc-50">
-                    <th className={stickyHead}>Murid</th>
+                    <th className={stickyHead}>
+                      <button
+                        type="button"
+                        onClick={() => clickSort("name")}
+                        className="flex items-center font-semibold text-zinc-500 transition-colors hover:text-zinc-800"
+                      >
+                        Murid
+                        <SortCaret
+                          state={sort?.key === "name" ? sort.dir : null}
+                        />
+                      </button>
+                    </th>
                     {quizzes.map((qz) => (
                       <th
                         key={qz.id}
                         title={qz.title}
                         className="min-w-[72px] border-b border-l border-zinc-100 px-2.5 py-2 text-center text-xs font-semibold text-zinc-500"
                       >
-                        <span className="mx-auto block max-w-[120px] truncate">
-                          {qz.title}
-                        </span>
+                        <button
+                          type="button"
+                          onClick={() => clickSort(qz.id)}
+                          className="mx-auto flex max-w-[120px] items-center justify-center transition-colors hover:text-zinc-800"
+                        >
+                          <span className="min-w-0 truncate">{qz.title}</span>
+                          <SortCaret
+                            state={sort?.key === qz.id ? sort.dir : null}
+                          />
+                        </button>
                       </th>
                     ))}
                     <th className="min-w-[72px] border-b border-l border-zinc-100 px-2.5 py-2 text-center text-xs font-semibold text-zinc-500">
-                      Rata-rata
+                      <button
+                        type="button"
+                        onClick={() => clickSort("avg")}
+                        className="mx-auto flex items-center justify-center transition-colors hover:text-zinc-800"
+                      >
+                        Rata-rata
+                        <SortCaret
+                          state={sort?.key === "avg" ? sort.dir : null}
+                        />
+                      </button>
                     </th>
                   </tr>
                 </thead>
@@ -420,8 +504,9 @@ export default function CourseGradebook({ courseId }) {
             </div>
 
             <p className="text-[11px] text-zinc-400">
-              Nilai diambil dari attempt terakhir tiap murid. {rows.length} murid
-              · {quizzes.length} latihan soal.
+              Nilai diambil dari attempt terakhir tiap murid. Klik header buat
+              urutkan (klik lagi buat balik / reset). {rows.length} murid ·{" "}
+              {quizzes.length} latihan soal.
             </p>
           </div>
         )}

@@ -15,6 +15,7 @@ import CurriculumEditor from "../../components/admin/CurriculumEditor";
 import EnrolledStudents from "../../components/admin/EnrolledStudents";
 import CourseSessionRecap from "../../components/admin/CourseSessionRecap";
 import CourseGradebook from "../../components/admin/CourseGradebook";
+import CourseLeaderboard from "../../components/admin/CourseLeaderboard";
 
 const ICONS = Object.keys(subjectIcons);
 
@@ -23,6 +24,7 @@ const TABS = [
   ["kurikulum", "Kurikulum"],
   ["murid", "Murid"],
   ["nilai", "Nilai"],
+  ["leaderboard", "Leaderboard"],
   ["presensi", "Presensi"],
   ["refleksi", "Refleksi"],
   ["feedback", "Feedback"],
@@ -392,6 +394,11 @@ export default function CourseFormPage() {
       {isEdit && status === "ready" && seen.has("nilai") && (
         <div className={tab === "nilai" ? "" : "hidden"}>
           <CourseGradebook courseId={courseId} />
+        </div>
+      )}
+      {isEdit && status === "ready" && seen.has("leaderboard") && (
+        <div className={tab === "leaderboard" ? "" : "hidden"}>
+          <CourseLeaderboard courseId={courseId} />
         </div>
       )}
       {isEdit && status === "ready" && seen.has("presensi") && (
