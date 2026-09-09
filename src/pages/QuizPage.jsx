@@ -352,7 +352,11 @@ export default function QuizPage({ review = false }) {
 
   // ── Review: lihat soal + jawaban sendiri (halaman terpisah) ──────
   if (review) {
-    if (!result)
+    // Peek: akses ditutup + by-pass -> lihat DAFTAR SOAL doang (tanpa
+    // jawaban / skor / statistik). Selain itu wajib udah punya hasil.
+    const acc = quizAccessNow(lesson, now);
+    const peek = !result && !acc.open && lesson.soal_bypass === true;
+    if (!result && !peek)
       return (
         <Navigate replace to={`/course/${courseId}/soal/${lessonId}`} />
       );
@@ -368,7 +372,7 @@ export default function QuizPage({ review = false }) {
           to={`/course/${courseId}/soal/${lessonId}`}
           className="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-500 transition-colors hover:text-zinc-800"
         >
-          <ArrowLeft size={14} /> Kembali ke hasil
+          <ArrowLeft size={14} /> {peek ? "Kembali" : "Kembali ke hasil"}
         </Link>
         {header}
 
@@ -424,7 +428,7 @@ export default function QuizPage({ review = false }) {
             <div className="flex items-center justify-between gap-2">
               <p className="text-xs text-zinc-400">
                 Soal {current + 1} dari {total}
-                {qStats?.[q.id]?.total ? (
+                {!peek && qStats?.[q.id]?.total ? (
                   <>
                     {" · Dijawab benar oleh "}
                     <span className="font-semibold text-zinc-500">
@@ -437,7 +441,7 @@ export default function QuizPage({ review = false }) {
                   </>
                 ) : null}
               </p>
-              {!isAnswered(q) && (
+              {!peek && !isAnswered(q) && (
                 <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-400">
                   Belum dijawab
                 </span>
@@ -447,14 +451,20 @@ export default function QuizPage({ review = false }) {
               <Markdown>{q.prompt}</Markdown>
             </div>
             {q.type === "number" ? (
-              <div className="mt-3 rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-700">
-                Jawaban kamu:{" "}
-                <span className="font-semibold text-brand-800">
-                  {typeof chosen === "string" && chosen.trim() !== ""
-                    ? chosen
-                    : "—"}
-                </span>
-              </div>
+              peek ? (
+                <div className="mt-3 rounded-lg border border-dashed border-zinc-300 px-3 py-2 text-sm text-zinc-400">
+                  Isian angka
+                </div>
+              ) : (
+                <div className="mt-3 rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-700">
+                  Jawaban kamu:{" "}
+                  <span className="font-semibold text-brand-800">
+                    {typeof chosen === "string" && chosen.trim() !== ""
+                      ? chosen
+                      : "—"}
+                  </span>
+                </div>
+              )
             ) : q.type === "table" ? (
               <div className="mt-3 overflow-x-auto">
                 <table className="w-full border-collapse text-sm">
@@ -505,12 +515,13 @@ export default function QuizPage({ review = false }) {
                     ))}
                   </tbody>
                 </table>
-                {(!Array.isArray(chosen) ||
-                  chosen.every((x) => x == null)) && (
-                  <p className="mt-1 text-[11px] text-zinc-400">
-                    Belum kamu jawab.
-                  </p>
-                )}
+                {!peek &&
+                  (!Array.isArray(chosen) ||
+                    chosen.every((x) => x == null)) && (
+                    <p className="mt-1 text-[11px] text-zinc-400">
+                      Belum kamu jawab.
+                    </p>
+                  )}
               </div>
             ) : (
             <div className="mt-3 flex flex-col gap-2">
@@ -669,7 +680,7 @@ export default function QuizPage({ review = false }) {
                     {bypassView && "Kamu nggak bisa mengerjakannya."}
                   </>
                 )}
-                {bypassView && " Di bawah cuma daftar soalnya buat dilihat."}
+                {bypassView && " Tapi kamu masih bisa lihat daftar soalnya."}
               </p>
             </div>
           ) : (
@@ -682,89 +693,16 @@ export default function QuizPage({ review = false }) {
               {busy ? "Memulai…" : "MULAI SEKARANG"}
             </button>
           )}
-        </div>
 
-        {bypassView && (
-          <Suspense
-            fallback={<Skeleton className="h-40 w-full rounded-2xl" />}
-          >
-            <div className="flex flex-col gap-3">
-              {questions.map((qq, i) => (
-                <div
-                  key={qq.id}
-                  className="rounded-2xl border border-zinc-200/80 bg-white p-5"
-                >
-                  <p className="text-xs text-zinc-400">
-                    Soal {i + 1} dari {total}
-                  </p>
-                  <div className="mt-1.5 text-sm font-medium text-zinc-900">
-                    <Markdown>{qq.prompt}</Markdown>
-                  </div>
-                  {qq.type === "multi" && (
-                    <p className="mt-1 text-xs font-medium text-brand-600">
-                      Bisa pilih lebih dari satu.
-                    </p>
-                  )}
-                  {qq.type === "number" ? (
-                    <div className="mt-3 rounded-lg border border-dashed border-zinc-300 px-3 py-2 text-sm text-zinc-400">
-                      Isian angka
-                    </div>
-                  ) : qq.type === "table" ? (
-                    <div className="mt-3 overflow-x-auto">
-                      <table className="w-full border-collapse text-sm">
-                        <thead>
-                          <tr>
-                            <th className="px-2 py-1.5" />
-                            {qq.options.map((col, ci) => (
-                              <th
-                                key={ci}
-                                className="px-2 py-1.5 text-center text-xs font-semibold text-zinc-500"
-                              >
-                                {col}
-                              </th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {(qq.table_rows ?? []).map((row, ri) => (
-                            <tr key={ri} className="border-t border-zinc-100">
-                              <td className="px-2 py-2 text-zinc-600">
-                                <Markdown inline>{row}</Markdown>
-                              </td>
-                              {qq.options.map((_, ci) => (
-                                <td key={ci} className="px-2 py-2 text-center">
-                                  <span className="mx-auto block h-4 w-4 rounded-full border border-zinc-300" />
-                                </td>
-                              ))}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  ) : (
-                    <div className="mt-3 flex flex-col gap-2">
-                      {qq.options.map((opt, oi) => (
-                        <div
-                          key={oi}
-                          className="flex items-center gap-2.5 rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-600"
-                        >
-                          <span
-                            className={`grid h-6 w-6 shrink-0 place-items-center border border-zinc-300 text-xs font-bold text-zinc-400 ${
-                              qq.type === "multi" ? "rounded-md" : "rounded-full"
-                            }`}
-                          >
-                            {String.fromCharCode(65 + oi)}
-                          </span>
-                          <Markdown inline>{opt}</Markdown>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </Suspense>
-        )}
+          {bypassView && (
+            <Link
+              to={`/course/${courseId}/soal/${lessonId}/review`}
+              className="mt-4 flex w-full items-center justify-center gap-1.5 rounded-lg border border-brand-500 px-4 py-2.5 text-sm font-bold text-brand-600 transition-colors hover:bg-brand-50"
+            >
+              Lihat Soal
+            </Link>
+          )}
+        </div>
       </div>
     );
   }
