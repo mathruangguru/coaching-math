@@ -343,6 +343,87 @@ export async function deleteFormResponse(id) {
   if (error) throw error;
 }
 
+// ── Pengelompokan jawaban isian (admin) ────────────────────────────
+// Tema per (lesson, field pertanyaan isian). Satu jawaban boleh masuk
+// banyak tema. RLS admin-only -- murid nggak pernah kena ini.
+
+/** { groups: [{id, field_id, name, position}], tags: [{group_id, response_id}] }. */
+export async function getAnswerGroups(lessonId) {
+  ensure();
+  const { data: groups, error } = await supabase
+    .from("coaching_form_answer_groups")
+    .select("id, field_id, name, position")
+    .eq("lesson_id", lessonId)
+    .order("position");
+  if (error) throw error;
+  const ids = (groups ?? []).map((g) => g.id);
+  let tags = [];
+  if (ids.length) {
+    const { data, error: e2 } = await supabase
+      .from("coaching_form_answer_group_tags")
+      .select("group_id, response_id")
+      .in("group_id", ids);
+    if (e2) throw e2;
+    tags = data ?? [];
+  }
+  return { groups: groups ?? [], tags };
+}
+
+export async function createAnswerGroup(lessonId, fieldId, name, position = 0) {
+  ensure();
+  const { data, error } = await supabase
+    .from("coaching_form_answer_groups")
+    .insert({
+      lesson_id: lessonId,
+      field_id: fieldId,
+      name: name.trim() || "Tema",
+      position,
+    })
+    .select("id, field_id, name, position")
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function renameAnswerGroup(id, name) {
+  ensure();
+  const { error } = await supabase
+    .from("coaching_form_answer_groups")
+    .update({ name: name.trim() || "Tema" })
+    .eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteAnswerGroup(id) {
+  ensure();
+  const { error } = await supabase
+    .from("coaching_form_answer_groups")
+    .delete()
+    .eq("id", id);
+  if (error) throw error;
+}
+
+/** Tag / lepas jawaban <responseId> dari tema <groupId>. */
+export async function setAnswerTag(groupId, responseId, on) {
+  ensure();
+  if (on) {
+    const { error } = await supabase
+      .from("coaching_form_answer_group_tags")
+      .upsert(
+        { group_id: groupId, response_id: responseId },
+        { onConflict: "group_id,response_id", ignoreDuplicates: true },
+      );
+    if (error) throw error;
+  } else {
+    const { error } = await supabase
+      .from("coaching_form_answer_group_tags")
+      .delete()
+      .eq("group_id", groupId)
+      .eq("response_id", responseId);
+    if (error) throw error;
+  }
+}
+
 // ── CSV ────────────────────────────────────────────────────────────
 
 function csvCell(v) {

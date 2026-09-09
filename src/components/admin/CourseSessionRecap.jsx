@@ -30,6 +30,11 @@ import {
   getFormResponses,
   deleteFormResponse,
   responsesToCsv,
+  getAnswerGroups,
+  createAnswerGroup,
+  renameAnswerGroup,
+  deleteAnswerGroup,
+  setAnswerTag,
 } from "../../lib/forms";
 import { getAttemptUserIdsByLesson } from "../../lib/quiz";
 import FormSummary from "../ui/FormSummary";
@@ -819,14 +824,191 @@ function PresensiRow({ lesson, usersById, courseItems = [] }) {
 const answerText = (v) =>
   Array.isArray(v) ? v.join(", ") : v == null || v === "" ? "—" : String(v);
 
+const TEXT_FIELD_TYPES = new Set(["short", "long"]);
+
+// Tab "Tema": admin bikin tema per pertanyaan isian, lalu tandai tiap
+// jawaban ke satu/lebih tema. Hasilnya kepakai di tab Ringkasan.
+function AnswerGrouping({
+  fields,
+  responses,
+  usersById,
+  groups,
+  tags,
+  onAdd,
+  onRename,
+  onRemove,
+  onToggle,
+}) {
+  const textFields = fields.filter((f) => TEXT_FIELD_TYPES.has(f.type));
+  const [sel, setSel] = useState(textFields[0]?.id ?? "");
+  const [newName, setNewName] = useState("");
+  const [editId, setEditId] = useState(null);
+  const [draft, setDraft] = useState("");
+
+  if (textFields.length === 0)
+    return (
+      <p className="rounded-lg border border-zinc-200 bg-white px-3 py-4 text-center text-xs text-zinc-400">
+        Nggak ada pertanyaan isian buat dikelompokkan.
+      </p>
+    );
+
+  const field = textFields.find((f) => f.id === sel) ?? textFields[0];
+  const fid = field.id;
+  const fGroups = groups.filter((g) => g.field_id === fid);
+  const has = (gid, rid) =>
+    tags.some((t) => t.group_id === gid && t.response_id === rid);
+  const answers = responses
+    .map((r) => ({ r, text: String(r.answers?.[fid] ?? "").trim() }))
+    .filter((x) => x.text !== "");
+
+  const submitNew = () => {
+    const n = newName.trim();
+    if (!n) return;
+    onAdd(fid, n);
+    setNewName("");
+  };
+
+  return (
+    <div className="flex flex-col gap-3 rounded-lg border border-zinc-200 bg-white p-3">
+      {textFields.length > 1 && (
+        <select
+          value={fid}
+          onChange={(e) => setSel(e.target.value)}
+          className="w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-xs text-zinc-800 outline-none focus:border-brand-500"
+        >
+          {textFields.map((f) => (
+            <option key={f.id} value={f.id}>
+              {f.label || "(tanpa label)"}
+            </option>
+          ))}
+        </select>
+      )}
+
+      {/* Daftar tema */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        {fGroups.map((g) => {
+          const cnt = tags.filter((t) => t.group_id === g.id).length;
+          return editId === g.id ? (
+            <input
+              key={g.id}
+              autoFocus
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onBlur={() => {
+                const n = draft.trim();
+                if (n && n !== g.name) onRename(g.id, n);
+                setEditId(null);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.currentTarget.blur();
+                if (e.key === "Escape") setEditId(null);
+              }}
+              className="w-32 rounded-full border border-brand-300 px-2.5 py-1 text-xs outline-none"
+            />
+          ) : (
+            <span
+              key={g.id}
+              className="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-1 text-xs"
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  setEditId(g.id);
+                  setDraft(g.name);
+                }}
+                className="font-medium text-zinc-700"
+                title="Klik buat ganti nama"
+              >
+                {g.name}
+              </button>
+              <span className="tabular-nums text-zinc-400">{cnt}</span>
+              <button
+                type="button"
+                onClick={() => onRemove(g.id)}
+                aria-label="Hapus tema"
+                className="text-zinc-300 transition-colors hover:text-rose-500"
+              >
+                <Trash2 size={11} />
+              </button>
+            </span>
+          );
+        })}
+        <span className="inline-flex items-center gap-1">
+          <input
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && submitNew()}
+            placeholder="Tema baru…"
+            className="w-28 rounded-full border border-zinc-300 px-2.5 py-1 text-xs outline-none focus:border-brand-500"
+          />
+          <button
+            type="button"
+            onClick={submitNew}
+            aria-label="Tambah tema"
+            className="grid h-6 w-6 shrink-0 place-items-center rounded-full border border-zinc-200 text-zinc-500 transition-colors hover:bg-zinc-50"
+          >
+            <Plus size={12} />
+          </button>
+        </span>
+      </div>
+
+      {/* Jawaban + toggle tema */}
+      {fGroups.length === 0 ? (
+        <p className="text-xs text-zinc-400">
+          Bikin tema dulu di atas, terus tandai tiap jawaban.
+        </p>
+      ) : answers.length === 0 ? (
+        <p className="text-xs text-zinc-400">
+          Belum ada jawaban buat pertanyaan ini.
+        </p>
+      ) : (
+        <ul className="flex flex-col divide-y divide-zinc-100">
+          {answers.map(({ r, text }) => {
+            const u = usersById.get(r.user_id);
+            return (
+              <li key={r.id} className="py-2">
+                <p className="text-[11px] font-medium text-zinc-500">
+                  {u ? fullName(u) : r.user_id}
+                </p>
+                <p className="mt-0.5 whitespace-pre-wrap text-xs text-zinc-700">
+                  {text}
+                </p>
+                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                  {fGroups.map((g) => {
+                    const on = has(g.id, r.id);
+                    return (
+                      <button
+                        key={g.id}
+                        type="button"
+                        onClick={() => onToggle(g.id, r.id, !on)}
+                        className={`rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors ${
+                          on
+                            ? "border-brand-500 bg-brand-500 text-white"
+                            : "border-zinc-200 text-zinc-500 hover:border-brand-400"
+                        }`}
+                      >
+                        {g.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 // Dipakai buat lesson tipe 'refleksi' MAUPUN 'feedback' -- struktur data
 // & submission-nya identik (form in-app), cuma beda label + (buat
 // feedback) subjudul "buat {target_name}".
 function FormLessonRow({ lesson, usersById }) {
   const [open, setOpen] = useState(false);
-  const [data, setData] = useState(null); // { form, responses } | null
+  const [data, setData] = useState(null); // { form, responses, groups, tags } | null
   const [failed, setFailed] = useState(false);
-  const [tab, setTab] = useState("ringkasan"); // ringkasan | jawaban
+  const [tab, setTab] = useState("ringkasan"); // ringkasan | jawaban | tema
   const loadedRef = useRef(false);
 
   const isFeedback = lesson.type === "feedback";
@@ -842,9 +1024,10 @@ function FormLessonRow({ lesson, usersById }) {
     Promise.all([
       getForm(lesson.form_id),
       getFormResponses(lesson.form_id, lesson.id),
+      getAnswerGroups(lesson.id).catch(() => ({ groups: [], tags: [] })),
     ])
-      .then(([form, responses]) => {
-        setData({ form, responses });
+      .then(([form, responses, g]) => {
+        setData({ form, responses, groups: g.groups, tags: g.tags });
         setFailed(false);
       })
       .catch((err) => {
@@ -853,6 +1036,44 @@ function FormLessonRow({ lesson, usersById }) {
         setFailed(true);
       });
   }, [lesson.form_id, lesson.id]);
+
+  // ── Pengelompokan tema (optimistic + reload kalau gagal) ──────────
+  const addGroup = async (fieldId, name) => {
+    const pos = data.groups.filter((g) => g.field_id === fieldId).length;
+    try {
+      const g = await createAnswerGroup(lesson.id, fieldId, name, pos);
+      setData((d) => ({ ...d, groups: [...d.groups, g] }));
+    } catch (err) {
+      window.alert(`Gagal: ${err?.message ?? err}`);
+    }
+  };
+  const renameGroup = (id, name) => {
+    setData((d) => ({
+      ...d,
+      groups: d.groups.map((g) => (g.id === id ? { ...g, name } : g)),
+    }));
+    renameAnswerGroup(id, name).catch(() => load());
+  };
+  const removeGroup = (id) => {
+    if (!window.confirm("Hapus tema ini? Jawaban nggak ikut kehapus.")) return;
+    setData((d) => ({
+      ...d,
+      groups: d.groups.filter((g) => g.id !== id),
+      tags: d.tags.filter((t) => t.group_id !== id),
+    }));
+    deleteAnswerGroup(id).catch(() => load());
+  };
+  const toggleTag = (groupId, responseId, on) => {
+    setData((d) => ({
+      ...d,
+      tags: on
+        ? [...d.tags, { group_id: groupId, response_id: responseId }]
+        : d.tags.filter(
+            (t) => !(t.group_id === groupId && t.response_id === responseId),
+          ),
+    }));
+    setAnswerTag(groupId, responseId, on).catch(() => load());
+  };
 
   useEffect(() => {
     if (!open || !lesson.form_id || loadedRef.current) return;
@@ -950,6 +1171,7 @@ function FormLessonRow({ lesson, usersById }) {
                   {[
                     ["ringkasan", "Ringkasan"],
                     ["jawaban", "Jawaban"],
+                    ["tema", "Tema"],
                   ].map(([k, label]) => (
                     <button
                       key={k}
@@ -975,7 +1197,27 @@ function FormLessonRow({ lesson, usersById }) {
               </div>
 
               {tab === "ringkasan" && (
-                <FormSummary form={data.form} responses={data.responses} paged />
+                <FormSummary
+                  form={data.form}
+                  responses={data.responses}
+                  groups={data.groups}
+                  tags={data.tags}
+                  paged
+                />
+              )}
+
+              {tab === "tema" && (
+                <AnswerGrouping
+                  fields={fields}
+                  responses={data.responses}
+                  usersById={usersById}
+                  groups={data.groups}
+                  tags={data.tags}
+                  onAdd={addGroup}
+                  onRename={renameGroup}
+                  onRemove={removeGroup}
+                  onToggle={toggleTag}
+                />
               )}
 
               {tab === "jawaban" && (

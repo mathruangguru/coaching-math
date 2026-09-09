@@ -54,10 +54,24 @@ function TextAnswers({ texts }) {
  * `form` harus bawa `.fields`. `responses` = [{ answers, ... }].
  * `paged` = true -> satu pertanyaan per layar (nav Sebelumnya/Berikutnya),
  * dipakai pas ini salah satu tab (nggak perlu semua keliatan sekaligus).
+ * `groups` / `tags` (opsional, admin) -> jawaban isian dikelompokkan per tema.
  */
-export default function FormSummary({ form, responses, paged = false }) {
+export default function FormSummary({
+  form,
+  responses,
+  paged = false,
+  groups = [],
+  tags = [],
+}) {
   const [idx, setIdx] = useState(0);
   const rows = useMemo(() => {
+    // response_id -> Set(group_id)
+    const tagsByResp = new Map();
+    for (const t of tags) {
+      if (!tagsByResp.has(t.response_id)) tagsByResp.set(t.response_id, new Set());
+      tagsByResp.get(t.response_id).add(t.group_id);
+    }
+
     const fields = (form?.fields ?? []).filter((f) => !SKIP.has(f.type));
     return fields.map((f) => {
       const vals = responses
@@ -102,17 +116,39 @@ export default function FormSummary({ form, responses, paged = false }) {
         };
       }
 
-      const texts = vals
-        .map((v) => String(v).trim())
-        .filter((t) => t.length >= MIN_TEXT_LEN);
+      const items = responses
+        .map((r) => ({ id: r.id, text: String(r.answers?.[f.id] ?? "").trim() }))
+        .filter((x) => x.text.length >= MIN_TEXT_LEN);
+      const texts = items.map((x) => x.text);
+
+      const fGroups = groups.filter((g) => g.field_id === f.id);
+      const buckets = fGroups.length
+        ? fGroups.map((g) => ({
+            name: g.name,
+            texts: items
+              .filter((x) => tagsByResp.get(x.id)?.has(g.id))
+              .map((x) => x.text),
+          }))
+        : null;
+      const ungrouped = fGroups.length
+        ? items
+            .filter((x) => {
+              const s = tagsByResp.get(x.id);
+              return !s || fGroups.every((g) => !s.has(g.id));
+            })
+            .map((x) => x.text)
+        : [];
+
       return {
         f,
         kind: "text",
         n: texts.length,
         texts,
+        buckets,
+        ungrouped,
       };
     });
-  }, [form, responses]);
+  }, [form, responses, groups, tags]);
 
   if (rows.length === 0) return null;
 
@@ -250,6 +286,37 @@ export default function FormSummary({ form, responses, paged = false }) {
             {r.kind === "text" &&
               (r.n === 0 ? (
                 <p className="mt-1 text-xs text-zinc-300">Belum ada jawaban.</p>
+              ) : r.buckets ? (
+                <div className="mt-1 flex flex-col gap-2.5">
+                  {r.buckets.map((b, bi) => (
+                    <div key={bi}>
+                      <p className="text-[11px] font-semibold text-zinc-600">
+                        {b.name}
+                        <span className="ml-1 font-normal text-zinc-400">
+                          · {b.texts.length}
+                        </span>
+                      </p>
+                      {b.texts.length === 0 ? (
+                        <p className="mt-1 text-[11px] text-zinc-300">
+                          Belum ada.
+                        </p>
+                      ) : (
+                        <TextAnswers texts={b.texts} />
+                      )}
+                    </div>
+                  ))}
+                  {r.ungrouped.length > 0 && (
+                    <div>
+                      <p className="text-[11px] font-semibold text-zinc-400">
+                        Belum dikelompokkan
+                        <span className="ml-1 font-normal">
+                          · {r.ungrouped.length}
+                        </span>
+                      </p>
+                      <TextAnswers texts={r.ungrouped} />
+                    </div>
+                  )}
+                </div>
               ) : (
                 <TextAnswers texts={r.texts} />
               ))}
