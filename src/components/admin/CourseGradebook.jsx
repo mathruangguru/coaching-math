@@ -76,8 +76,17 @@ export default function CourseGradebook({ courseId }) {
   const [rows, setRows] = useState([]);
   const [q, setQ] = useState("");
   const [copied, setCopied] = useState(false);
+  const [hidden, setHidden] = useState(() => new Set()); // quizId yang disembunyiin
   // { key: 'name' | 'avg' | <quizId>, dir: 'asc' | 'desc' } | null (urutan default)
   const [sort, setSort] = useState(null);
+
+  const toggleQuiz = (id) =>
+    setHidden((h) => {
+      const n = new Set(h);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n; // boleh sembunyiin semua — tombol "semua" balikin
+    });
 
   const clickSort = (key) => {
     const primary = key === "name" ? "asc" : "desc"; // arah pertama saat diklik
@@ -174,13 +183,47 @@ export default function CourseGradebook({ courseId }) {
     };
   }, [courseId]);
 
+  // Filter kolom: latihan soal yang ditampilkan (default semua).
+  const visibleQuizzes = useMemo(
+    () => quizzes.filter((qz) => !hidden.has(qz.id)),
+    [quizzes, hidden],
+  );
+
+  // Sort yang berlaku: diabaikan kalau kolomnya lagi disembunyiin.
+  const effSort =
+    sort && sort.key !== "name" && sort.key !== "avg" && hidden.has(sort.key)
+      ? null
+      : sort;
+
+  // avgPct / doneCount dihitung ulang atas latihan soal yang KELIHATAN.
+  const rowsView = useMemo(
+    () =>
+      rows.map((r) => {
+        let sum = 0;
+        let done = 0;
+        for (const qz of visibleQuizzes) {
+          const c = r.cells[qz.id];
+          if (c) {
+            sum += c.pct;
+            done += 1;
+          }
+        }
+        return {
+          ...r,
+          avgPct: done ? Math.round(sum / done) : null,
+          doneCount: done,
+        };
+      }),
+    [rows, visibleQuizzes],
+  );
+
   // Rata-rata per kolom (soal) + jumlah murid yang ngerjain.
   const colStats = useMemo(() => {
     const m = {};
-    for (const qz of quizzes) {
+    for (const qz of visibleQuizzes) {
       let sum = 0;
       let n = 0;
-      for (const r of rows) {
+      for (const r of rowsView) {
         const c = r.cells[qz.id];
         if (c) {
           sum += c.pct;
@@ -190,67 +233,68 @@ export default function CourseGradebook({ courseId }) {
       m[qz.id] = { avg: n ? Math.round(sum / n) : null, n };
     }
     return m;
-  }, [quizzes, rows]);
+  }, [visibleQuizzes, rowsView]);
 
   const overall = useMemo(() => {
-    const vals = rows.map((r) => r.avgPct).filter((v) => v != null);
+    const vals = rowsView.map((r) => r.avgPct).filter((v) => v != null);
     return vals.length
       ? Math.round(vals.reduce((s, v) => s + v, 0) / vals.length)
       : null;
-  }, [rows]);
+  }, [rowsView]);
 
   const needle = q.trim().toLowerCase();
 
   const shown = useMemo(() => {
-    const filtered = rows.filter(
+    const filtered = rowsView.filter(
       (r) =>
         fullName(r.user).toLowerCase().includes(needle) ||
         (r.user?.email ?? "").toLowerCase().includes(needle),
     );
-    if (!sort) {
+    if (!effSort) {
       return [...filtered].sort((a, b) => {
         if (a.enrolled !== b.enrolled) return a.enrolled ? -1 : 1;
         return fullName(a.user).localeCompare(fullName(b.user), "id");
       });
     }
-    const mul = sort.dir === "asc" ? 1 : -1;
+    const mul = effSort.dir === "asc" ? 1 : -1;
     return [...filtered].sort((a, b) => {
-      const va = sortVal(a, sort.key);
-      const vb = sortVal(b, sort.key);
+      const va = sortVal(a, effSort.key);
+      const vb = sortVal(b, effSort.key);
       const ma = va == null || va === "";
       const mb = vb == null || vb === "";
       if (ma && mb) return fullName(a.user).localeCompare(fullName(b.user), "id");
       if (ma) return 1; // yang belum ngerjain selalu di bawah
       if (mb) return -1;
-      if (sort.key === "name")
+      if (effSort.key === "name")
         return String(va).localeCompare(String(vb), "id") * mul;
       return (
         (va - vb) * mul ||
         fullName(a.user).localeCompare(fullName(b.user), "id")
       );
     });
-  }, [rows, needle, sort]);
+  }, [rowsView, needle, effSort]);
 
   // Matriks nilai sebagai baris teks — dipakai export CSV & copy TSV.
+  // Tiap latihan soal jadi 2 kolom: skor ("13/30") + persen (angka "43").
   const tableMatrix = () => {
     const head = [
       "Nama",
       "Email",
       "Status",
-      ...quizzes.map((qz) => qz.title),
+      ...visibleQuizzes.flatMap((qz) => [qz.title, `${qz.title} (%)`]),
       "Rata-rata (%)",
       "Selesai",
     ];
-    const body = rows.map((r) => [
+    const body = rowsView.map((r) => [
       fullName(r.user) || r.uid,
       r.user?.email ?? "",
       r.enrolled ? "enrolled" : "tidak enroll",
-      ...quizzes.map((qz) => {
+      ...visibleQuizzes.flatMap((qz) => {
         const c = r.cells[qz.id];
-        return c ? `${c.score}/${c.total} (${c.pct}%)` : "";
+        return c ? [`${c.score}/${c.total}`, c.pct] : ["", ""];
       }),
       r.avgPct ?? "",
-      `${r.doneCount}/${quizzes.length}`,
+      `${r.doneCount}/${visibleQuizzes.length}`,
     ]);
     return [head, ...body];
   };
@@ -363,6 +407,40 @@ export default function CourseGradebook({ courseId }) {
 
         {status === "ready" && rows.length > 0 && (
           <div className="flex flex-col gap-3">
+            {quizzes.length > 1 && (
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-zinc-400">
+                  Latihan soal
+                </span>
+                {quizzes.map((qz) => {
+                  const on = !hidden.has(qz.id);
+                  return (
+                    <button
+                      key={qz.id}
+                      type="button"
+                      onClick={() => toggleQuiz(qz.id)}
+                      className={`max-w-[180px] truncate rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
+                        on
+                          ? "border-brand-300 bg-brand-50 text-brand-700"
+                          : "border-zinc-200 bg-white text-zinc-400 line-through"
+                      }`}
+                    >
+                      {qz.title}
+                    </button>
+                  );
+                })}
+                {hidden.size > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setHidden(new Set())}
+                    className="text-[11px] font-medium text-brand-600 transition-colors hover:text-brand-700"
+                  >
+                    tampilkan semua
+                  </button>
+                )}
+              </div>
+            )}
+
             {rows.length > 8 && (
               <label className="relative sm:max-w-xs">
                 <Search
@@ -378,6 +456,11 @@ export default function CourseGradebook({ courseId }) {
               </label>
             )}
 
+            {visibleQuizzes.length === 0 ? (
+              <p className="rounded-lg border border-dashed border-zinc-300 px-3 py-4 text-center text-xs text-zinc-400">
+                Semua latihan soal disembunyiin. Pilih minimal satu di atas.
+              </p>
+            ) : (
             <div className="no-scrollbar overflow-x-auto rounded-xl border border-zinc-200">
               <table className="min-w-full border-collapse">
                 <thead>
@@ -390,11 +473,11 @@ export default function CourseGradebook({ courseId }) {
                       >
                         Murid
                         <SortCaret
-                          state={sort?.key === "name" ? sort.dir : null}
+                          state={effSort?.key === "name" ? effSort.dir : null}
                         />
                       </button>
                     </th>
-                    {quizzes.map((qz) => (
+                    {visibleQuizzes.map((qz) => (
                       <th
                         key={qz.id}
                         title={qz.title}
@@ -407,7 +490,7 @@ export default function CourseGradebook({ courseId }) {
                         >
                           <span className="min-w-0 truncate">{qz.title}</span>
                           <SortCaret
-                            state={sort?.key === qz.id ? sort.dir : null}
+                            state={effSort?.key === qz.id ? effSort.dir : null}
                           />
                         </button>
                       </th>
@@ -420,7 +503,7 @@ export default function CourseGradebook({ courseId }) {
                       >
                         Rata-rata
                         <SortCaret
-                          state={sort?.key === "avg" ? sort.dir : null}
+                          state={effSort?.key === "avg" ? effSort.dir : null}
                         />
                       </button>
                     </th>
@@ -442,7 +525,7 @@ export default function CourseGradebook({ courseId }) {
                           )}
                         </span>
                       </td>
-                      {quizzes.map((qz) => {
+                      {visibleQuizzes.map((qz) => {
                         const c = r.cells[qz.id];
                         return (
                           <td
@@ -480,7 +563,7 @@ export default function CourseGradebook({ courseId }) {
                               {r.avgPct}%
                             </span>
                             <span className="block text-[10px] text-zinc-400">
-                              {r.doneCount}/{quizzes.length}
+                              {r.doneCount}/{visibleQuizzes.length}
                             </span>
                           </>
                         ) : (
@@ -492,7 +575,7 @@ export default function CourseGradebook({ courseId }) {
                   {shown.length === 0 && (
                     <tr>
                       <td
-                        colSpan={quizzes.length + 2}
+                        colSpan={visibleQuizzes.length + 2}
                         className="px-3 py-4 text-center text-xs text-zinc-400"
                       >
                         Nggak ada yang cocok.
@@ -505,7 +588,7 @@ export default function CourseGradebook({ courseId }) {
                     <td className="sticky left-0 z-10 border-t border-zinc-100 bg-zinc-50 px-3 py-2 text-xs font-semibold text-zinc-500">
                       Rata-rata kelas
                     </td>
-                    {quizzes.map((qz) => {
+                    {visibleQuizzes.map((qz) => {
                       const st = colStats[qz.id];
                       return (
                         <td
@@ -544,11 +627,13 @@ export default function CourseGradebook({ courseId }) {
                 </tfoot>
               </table>
             </div>
+            )}
 
             <p className="text-[11px] text-zinc-400">
               Nilai diambil dari attempt terakhir tiap murid. Klik header buat
               urutkan (klik lagi buat balik / reset). {rows.length} murid ·{" "}
-              {quizzes.length} latihan soal.
+              {visibleQuizzes.length}
+              {hidden.size > 0 ? ` dari ${quizzes.length}` : ""} latihan soal.
             </p>
           </div>
         )}
