@@ -116,15 +116,16 @@ Deno.serve(async (req) => {
 
   const { data: questions, error: qErr } = await admin
     .from("coaching_questions")
-    .select("id")
+    .select("id, type")
     .eq("set_id", setId);
   if (qErr) return json({ error: qErr.message }, 400);
   if (!questions?.length) return json({ error: "Set soal kosong" }, 400);
 
   const ids = questions.map((q) => q.id);
+  const typeMap = new Map(questions.map((q) => [q.id, q.type ?? "single"]));
   const { data: keys, error: kErr } = await admin
     .from("coaching_question_keys")
-    .select("question_id, answer, answers")
+    .select("question_id, answer, answers, answer_num, answer_tol")
     .in("question_id", ids);
   if (kErr) return json({ error: kErr.message }, 400);
 
@@ -136,16 +137,44 @@ Deno.serve(async (req) => {
   const same = (a: number[], b: number[]) =>
     a.length > 0 && a.length === b.length && a.every((v, i) => v === b[i]);
 
-  const keyMap = new Map(
+  // "3,14" / " 3.14 " -> 3.14 ; kalau nggak bisa diparse -> NaN.
+  const parseNum = (v: unknown): number => {
+    if (typeof v === "number") return v;
+    if (typeof v !== "string") return NaN;
+    const s = v.trim().replace(",", ".");
+    return s === "" ? NaN : Number(s);
+  };
+
+  const idxKeys = new Map(
     (keys ?? []).map((k) => [
       k.question_id,
       norm(k.answers?.length ? k.answers : [k.answer ?? 0]),
     ])
   );
+  const numKeys = new Map(
+    (keys ?? []).map((k) => [
+      k.question_id,
+      {
+        num: k.answer_num == null ? NaN : Number(k.answer_num),
+        tol: Math.abs(Number(k.answer_tol) || 0),
+      },
+    ])
+  );
   const results: Record<string, boolean> = {};
   let score = 0;
   for (const qid of ids) {
-    const ok = same(norm(answers[qid]), keyMap.get(qid) ?? []);
+    let ok: boolean;
+    if (typeMap.get(qid) === "number") {
+      const key = numKeys.get(qid);
+      const v = parseNum(answers[qid]);
+      ok =
+        !!key &&
+        Number.isFinite(key.num) &&
+        Number.isFinite(v) &&
+        Math.abs(v - key.num) <= key.tol;
+    } else {
+      ok = same(norm(answers[qid]), idxKeys.get(qid) ?? []);
+    }
     results[qid] = ok;
     if (ok) score += 1;
   }

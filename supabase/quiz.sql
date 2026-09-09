@@ -35,12 +35,14 @@ update public.coaching_questions
   set code = upper(substr(md5(random()::text || id), 1, 8))
   where code is null;
 
--- Tipe soal: 'single' (pilihan ganda) / 'multi' (checklist, >1 jawaban benar).
+-- Tipe soal: 'single' (pilihan ganda) / 'multi' (checklist, >1 jawaban
+-- benar) / 'number' (isian angka — murid ngetik angka, dicek pas ± toleransi).
 alter table public.coaching_questions
   add column if not exists type text not null default 'single';
 alter table public.coaching_questions drop constraint if exists coaching_questions_type_check;
 alter table public.coaching_questions
-  add constraint coaching_questions_type_check check (type in ('single', 'multi'));
+  add constraint coaching_questions_type_check
+    check (type in ('single', 'multi', 'number'));
 
 -- Kunci jawaban dipisah: murid nggak boleh bisa baca ini lewat API.
 create table if not exists public.coaching_question_keys (
@@ -55,6 +57,12 @@ alter table public.coaching_question_keys
 update public.coaching_question_keys
   set answers = array[answer]
   where cardinality(answers) = 0;
+
+-- Kunci buat tipe 'number': nilai benar + toleransi (± absolut). tol 0 =
+-- harus persis. answers[]/answer nggak dipakai buat tipe ini.
+alter table public.coaching_question_keys
+  add column if not exists answer_num numeric,
+  add column if not exists answer_tol numeric not null default 0;
 
 -- Attempt murid: skor + snapshot jawaban. 1x per (user, set).
 create table if not exists public.coaching_quiz_attempts (

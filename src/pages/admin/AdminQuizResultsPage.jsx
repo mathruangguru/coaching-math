@@ -20,6 +20,29 @@ const letters = (v) =>
     .map((i) => String.fromCharCode(65 + i))
     .join("") || "–";
 
+const parseNum = (v) => {
+  if (v == null || v === "") return NaN;
+  return Number(String(v).trim().replace(",", "."));
+};
+// Kunci soal isian angka, buat baris "Kunci" di matrix.
+const numKeyLabel = (q) =>
+  q.answer_num == null
+    ? "–"
+    : `${q.answer_num}${Number(q.answer_tol) > 0 ? ` ±${q.answer_tol}` : ""}`;
+// Jawaban murid buat soal ini benar?
+const qCorrect = (q, chosen) => {
+  if (q.type === "number") {
+    const v = parseNum(chosen);
+    const key = q.answer_num == null ? NaN : Number(q.answer_num);
+    return (
+      Number.isFinite(v) &&
+      Number.isFinite(key) &&
+      Math.abs(v - key) <= Math.abs(Number(q.answer_tol) || 0)
+    );
+  }
+  return sameAnswerSet(chosen, keyOf(q));
+};
+
 function fullName(u) {
   return (
     [u.first_name, u.last_name].filter(Boolean).join(" ") || u.email || u.id
@@ -121,8 +144,12 @@ const th =
   "border border-zinc-100 px-2.5 py-1.5 text-xs font-semibold text-zinc-500";
 const td = "border border-zinc-100 px-2.5 py-1.5";
 
-function Cell({ chosen, keyArr, active, onEnter }) {
-  if (toAnswerArray(chosen).length === 0) {
+function Cell({ q, chosen, active, onEnter }) {
+  const isNum = q.type === "number";
+  const blank = isNum
+    ? chosen == null || String(chosen).trim() === ""
+    : toAnswerArray(chosen).length === 0;
+  if (blank) {
     return (
       <td
         onMouseEnter={onEnter}
@@ -134,7 +161,7 @@ function Cell({ chosen, keyArr, active, onEnter }) {
       </td>
     );
   }
-  const ok = sameAnswerSet(chosen, keyArr);
+  const ok = qCorrect(q, chosen);
   return (
     <td
       onMouseEnter={onEnter}
@@ -142,7 +169,7 @@ function Cell({ chosen, keyArr, active, onEnter }) {
         ok ? "bg-teal-50 text-teal-700" : "bg-rose-50 text-rose-700"
       } ${active ? "ring-1 ring-inset ring-brand-300" : ""}`}
     >
-      {letters(chosen)}
+      {isNum ? String(chosen) : letters(chosen)}
     </td>
   );
 }
@@ -183,7 +210,7 @@ function ResultTable({
   const graded = [...attempts, ...ongoing];
   const stats = questions.map((q) => {
     const correct = graded.filter((a) =>
-      sameAnswerSet(a.answers?.[q.id], keyOf(q))
+      qCorrect(q, a.answers?.[q.id])
     ).length;
     return graded.length ? Math.round((correct / graded.length) * 100) : 0;
   });
@@ -242,7 +269,7 @@ function ResultTable({
                     : "text-zinc-600"
                 }`}
               >
-                {letters(keyOf(q))}
+                {q.type === "number" ? numKeyLabel(q) : letters(keyOf(q))}
               </td>
             ))}
             {onReset && <td className={td} />}
@@ -297,8 +324,8 @@ function ResultTable({
                 {questions.map((q, i) => (
                   <Cell
                     key={i}
+                    q={q}
                     chosen={a.answers?.[q.id]}
-                    keyArr={keyOf(q)}
                     active={hover?.col === i}
                     onEnter={enterCol(i)}
                   />
@@ -354,8 +381,8 @@ function ResultTable({
                 {questions.map((q, i) => (
                   <Cell
                     key={i}
+                    q={q}
                     chosen={p.answers?.[q.id]}
-                    keyArr={keyOf(q)}
                     active={hover?.col === i}
                     onEnter={enterCol(i)}
                   />
@@ -440,12 +467,25 @@ function QuestionAnalytics({ questions, attempts }) {
     const n = attempts.length;
     return questions
       .map((q, idx) => {
+        const isNum = q.type === "number";
         const keyArr = keyOf(q);
         const opts = (q.options ?? []).map(() => 0);
+        const numDist = new Map(); // jawaban -> count (soal isian angka)
         let correct = 0;
         let blank = 0;
         for (const a of attempts) {
-          const picked = toAnswerArray(a.answers?.[q.id]);
+          const raw = a.answers?.[q.id];
+          if (isNum) {
+            const s = raw == null ? "" : String(raw).trim();
+            if (s === "") {
+              blank += 1;
+              continue;
+            }
+            if (qCorrect(q, raw)) correct += 1;
+            numDist.set(s, (numDist.get(s) ?? 0) + 1);
+            continue;
+          }
+          const picked = toAnswerArray(raw);
           if (picked.length === 0) {
             blank += 1;
             continue;
@@ -457,9 +497,14 @@ function QuestionAnalytics({ questions, attempts }) {
         return {
           id: q.id,
           num: idx + 1,
+          isNum,
           prompt: (q.prompt ?? "").trim(),
           options: q.options ?? [],
           keyArr,
+          numKey: isNum ? numKeyLabel(q) : null,
+          numDist: [...numDist.entries()]
+            .map(([val, c]) => [val, c, qCorrect(q, val)])
+            .sort((a, b) => b[1] - a[1]),
           n,
           correct,
           blank,
@@ -513,6 +558,31 @@ function QuestionAnalytics({ questions, attempts }) {
                   {r.blank > 0 && ` · ${r.blank} kosong`}
                 </span>
               </div>
+              {r.isNum ? (
+                <div className="flex flex-col gap-2">
+                  <p className="text-[11px] text-zinc-500">
+                    Kunci:{" "}
+                    <span className="font-bold text-teal-700">{r.numKey}</span>
+                  </p>
+                  {r.numDist.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {r.numDist.map(([val, c, isKey]) => (
+                        <span
+                          key={val}
+                          className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] tabular-nums ${
+                            isKey
+                              ? "border-teal-300 bg-teal-50 font-medium text-teal-700"
+                              : "border-zinc-200 bg-zinc-50 text-zinc-500"
+                          }`}
+                        >
+                          {val}
+                          <span className="text-zinc-400">×{c}</span>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
               <div className="flex flex-col gap-2.5">
                 {r.options.map((opt, oi) => {
                   const isKey = r.keyArr.includes(oi);
@@ -560,6 +630,7 @@ function QuestionAnalytics({ questions, attempts }) {
                   );
                 })}
               </div>
+              )}
             </div>
           </li>
         ))}
