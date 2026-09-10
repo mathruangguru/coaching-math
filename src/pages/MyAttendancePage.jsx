@@ -1,34 +1,84 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
-import { ArrowLeft, Check, X } from "lucide-react";
+import { ArrowLeft, Check, X, UserCheck } from "lucide-react";
 import { useCourse } from "../hooks/useCourse";
-import { getMyAttendanceDetail } from "../lib/sessions";
+import { getMyAttendanceDetail, checkInRound } from "../lib/sessions";
+import { supabase, hasSupabase } from "../lib/supabase";
 import Skeleton from "../components/ui/Skeleton";
 
 export default function MyAttendancePage() {
   const { courseId } = useParams();
   const { status, course, canView } = useCourse(courseId);
   const [state, setState] = useState({ status: "loading", lessons: [] });
+  const [checking, setChecking] = useState(null); // round id yang lagi di-check-in
+  const [err, setErr] = useState("");
+
+  const presensiLessons = useMemo(
+    () =>
+      (course?.sections ?? [])
+        .flatMap((s) => s.items ?? [])
+        .filter((it) => it.type === "presensi")
+        .map((it) => ({ id: it.id, title: it.title })),
+    [course],
+  );
+
+  const reload = useCallback(() => {
+    getMyAttendanceDetail(presensiLessons)
+      .then((data) => setState({ status: "ready", lessons: data }))
+      .catch((e) => {
+        console.error("[MyAttendancePage] gagal memuat presensi:", e);
+        setState({ status: "error", lessons: [] });
+      });
+  }, [presensiLessons]);
 
   useEffect(() => {
     if (status !== "ready" || !canView || !course) return;
-    const lessons = (course.sections ?? [])
-      .flatMap((s) => s.items ?? [])
-      .filter((it) => it.type === "presensi")
-      .map((it) => ({ id: it.id, title: it.title }));
-    let alive = true;
-    getMyAttendanceDetail(lessons)
-      .then((data) => {
-        if (alive) setState({ status: "ready", lessons: data });
-      })
-      .catch((err) => {
-        console.error("[MyAttendancePage] gagal memuat presensi:", err);
-        if (alive) setState({ status: "error", lessons: [] });
-      });
+    reload();
+  }, [status, canView, course, reload]);
+
+  // Ikutin admin buka/tutup ronde secara live -> tombol "Hadir" muncul/hilang.
+  useEffect(() => {
+    if (!hasSupabase || status !== "ready" || !canView) return;
+    const ids = presensiLessons.map((l) => l.id);
+    if (!ids.length) return;
+    const ch = supabase
+      .channel(`my_attendance:${courseId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "coaching_attendance_rounds",
+          filter: `lesson_id=in.(${ids.join(",")})`,
+        },
+        () => reload(),
+      )
+      .subscribe();
     return () => {
-      alive = false;
+      supabase.removeChannel(ch);
     };
-  }, [status, canView, course]);
+  }, [status, canView, courseId, presensiLessons, reload]);
+
+  const checkIn = async (round) => {
+    setChecking(round.id);
+    setErr("");
+    try {
+      await checkInRound(round.id);
+      setState((s) => ({
+        ...s,
+        lessons: s.lessons.map((l) => ({
+          ...l,
+          rounds: l.rounds.map((r) =>
+            r.id === round.id ? { ...r, attended: true } : r,
+          ),
+        })),
+      }));
+    } catch (e) {
+      setErr(e?.message ?? "Gagal presensi. Coba lagi.");
+    } finally {
+      setChecking(null);
+    }
+  };
 
   const backLink = (
     <Link
@@ -69,6 +119,7 @@ export default function MyAttendancePage() {
   const { lessons } = state;
   const allRounds = lessons.flatMap((l) => l.rounds);
   const attended = allRounds.filter((r) => r.attended).length;
+  const openNow = allRounds.filter((r) => r.is_open && !r.attended);
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-5">
@@ -108,6 +159,20 @@ export default function MyAttendancePage() {
               </p>
             </div>
           )}
+
+          {openNow.length > 0 && (
+            <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/60 px-4 py-3">
+              <UserCheck size={18} className="shrink-0 text-emerald-600" />
+              <p className="min-w-0 flex-1 text-sm font-medium text-emerald-800">
+                {openNow.length === 1
+                  ? `Presensi "${openNow[0].label}" lagi dibuka.`
+                  : `${openNow.length} sesi presensi lagi dibuka.`}{" "}
+                Tandai hadir di bawah.
+              </p>
+            </div>
+          )}
+          {err && <p className="text-xs text-rose-600">{err}</p>}
+
           <div className="flex flex-col gap-3">
             {lessons.map((l) => (
               <div
@@ -123,25 +188,40 @@ export default function MyAttendancePage() {
                   </p>
                 ) : (
                   <ul className="divide-y divide-zinc-100">
-                    {l.rounds.map((r) => (
-                      <li
-                        key={r.id}
-                        className="flex items-center justify-between gap-3 px-4 py-2.5"
-                      >
-                        <span className="min-w-0 truncate text-sm text-zinc-700">
-                          {r.label}
-                        </span>
-                        {r.attended ? (
-                          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-600">
-                            <Check size={12} strokeWidth={3} /> Hadir
+                    {l.rounds.map((r) => {
+                      const canCheckIn = !r.attended && r.is_open;
+                      return (
+                        <li
+                          key={r.id}
+                          className={`flex items-center justify-between gap-3 px-4 py-2.5 ${
+                            canCheckIn ? "bg-emerald-50/50" : ""
+                          }`}
+                        >
+                          <span className="min-w-0 truncate text-sm text-zinc-700">
+                            {r.label}
                           </span>
-                        ) : (
-                          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-semibold text-zinc-400">
-                            <X size={12} strokeWidth={3} /> Tidak hadir
-                          </span>
-                        )}
-                      </li>
-                    ))}
+                          {r.attended ? (
+                            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-600">
+                              <Check size={12} strokeWidth={3} /> Hadir
+                            </span>
+                          ) : canCheckIn ? (
+                            <button
+                              type="button"
+                              onClick={() => checkIn(r)}
+                              disabled={checking === r.id}
+                              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-brand-600 disabled:opacity-50"
+                            >
+                              <UserCheck size={13} />
+                              {checking === r.id ? "Mencatat…" : "Hadir sekarang"}
+                            </button>
+                          ) : (
+                            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-semibold text-zinc-400">
+                              <X size={12} strokeWidth={3} /> Tidak hadir
+                            </span>
+                          )}
+                        </li>
+                      );
+                    })}
                   </ul>
                 )}
               </div>
