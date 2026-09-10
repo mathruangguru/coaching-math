@@ -42,6 +42,19 @@ const fmtClock = (ms) => {
   return h > 0 ? `${h}:${p(m)}:${p(s % 60)}` : `${p(m)}:${p(s % 60)}`;
 };
 
+// Jawaban isian angka: cuma digit, satu pemisah desimal (. atau ,), minus
+// di depan. Buang spasi/huruf/simbol lain langsung pas ketik / paste.
+const sanitizeNum = (raw) => {
+  let s = String(raw ?? "").replace(/[^0-9.,-]/g, "");
+  const neg = s[0] === "-";
+  s = s.replace(/-/g, "");
+  const sep = s.search(/[.,]/);
+  if (sep !== -1) {
+    s = s.slice(0, sep + 1) + s.slice(sep + 1).replace(/[.,]/g, "");
+  }
+  return (neg ? "-" : "") + s;
+};
+
 export default function QuizPage({ review = false }) {
   const { courseId, lessonId } = useParams();
   const [data, setData] = useState({ status: "loading" });
@@ -840,12 +853,20 @@ export default function QuizPage({ review = false }) {
                 <input
                   type="text"
                   inputMode="decimal"
+                  autoComplete="off"
                   value={
                     typeof answers[q.id] === "string" ? answers[q.id] : ""
                   }
                   onChange={(e) =>
-                    setAnswers((a) => ({ ...a, [q.id]: e.target.value }))
+                    setAnswers((a) => ({
+                      ...a,
+                      [q.id]: sanitizeNum(e.target.value),
+                    }))
                   }
+                  onKeyDown={(e) => {
+                    if (e.key === " " || e.key === "Spacebar")
+                      e.preventDefault();
+                  }}
                   placeholder="Ketik jawaban berupa angka…"
                   className="w-full max-w-xs rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none transition-colors focus:border-brand-500"
                 />
