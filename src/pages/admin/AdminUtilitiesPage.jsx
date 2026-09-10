@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { FerrisWheel, Timer } from "lucide-react";
+import { FerrisWheel, Timer, PenTool } from "lucide-react";
 
 const utils = [
   {
@@ -15,6 +15,13 @@ const utils = [
     desc: "Hitung mundur buat latihan atau kuis.",
     icon: Timer,
     tint: "bg-sky-50 text-sky-600",
+  },
+  {
+    to: "/admin/utilitas/whiteboard",
+    label: "Whiteboard",
+    desc: "Papan corat-coret. Kesimpan, bisa dishare ke murid.",
+    icon: PenTool,
+    tint: "bg-rose-50 text-rose-600",
   },
 ];
 
