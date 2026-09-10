@@ -4,15 +4,23 @@ import { ArrowLeft, Play } from "lucide-react";
 import { getCourse } from "../lib/courses";
 import { youtubeId } from "../lib/youtube";
 import Skeleton from "../components/ui/Skeleton";
-import YoutubePlayer from "../components/ui/YoutubePlayer";
 
-// Poster sendiri + klik buat play. Pas jalan pakai player custom
-// (YoutubePlayer) — tanpa judul / logo / share YouTube.
+// Poster sendiri + klik buat play. Pas jalan pakai embed YouTube apa
+// adanya (kontrol asli: kualitas, subtitle/CC, layar penuh).
 function YoutubeEmbed({ id, title }) {
   const [play, setPlay] = useState(false);
   const [lowRes, setLowRes] = useState(false);
 
-  if (play) return <YoutubePlayer id={id} title={title} />;
+  if (play)
+    return (
+      <iframe
+        src={`https://www.youtube.com/embed/${id}?autoplay=1&rel=0&modestbranding=1&cc_lang_pref=id`}
+        title={title}
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+        allowFullScreen
+        className="aspect-video w-full rounded-xl border border-zinc-200 bg-black"
+      />
+    );
 
   return (
     <button
