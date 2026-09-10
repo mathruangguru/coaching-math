@@ -63,6 +63,7 @@ export async function getMyAttendanceDetail(lessons) {
     rounds: x.rounds.map((r) => ({
       id: r.id,
       label: r.label,
+      is_open: !!r.is_open,
       attended: mine.has(r.id),
     })),
   }));

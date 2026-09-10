@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { getCourse } from "../../lib/courses";
 import { getUsers } from "../../lib/users";
+import { getCourseEnrollments } from "../../lib/enroll";
 import { supabase, hasSupabase } from "../../lib/supabase";
 import {
   getRounds,
@@ -320,7 +321,44 @@ function ImportRound({ lessonId, soalSrc, formSrc, rounds, onDone }) {
   );
 }
 
-function PresensiRow({ lesson, usersById, courseItems = [] }) {
+// Tandai satu murid hadir di sebuah ronde (admin). Boleh ke ronde tertutup.
+function AddAttendee({ students, taken, onAdd }) {
+  const [busy, setBusy] = useState(false);
+  if (!students.length) return null;
+  const avail = students.filter((u) => !taken.has(u.id));
+  return (
+    <select
+      value=""
+      disabled={busy || avail.length === 0}
+      onChange={async (e) => {
+        const uid = e.target.value;
+        if (!uid) return;
+        setBusy(true);
+        try {
+          await onAdd(uid);
+        } finally {
+          setBusy(false);
+        }
+      }}
+      className="rounded-md border border-zinc-300 bg-white px-2 py-1 text-[11px] text-zinc-600 outline-none focus:border-brand-500 disabled:opacity-50"
+    >
+      <option value="">
+        {busy
+          ? "menandai…"
+          : avail.length
+            ? "+ tandai hadir…"
+            : "semua sudah hadir"}
+      </option>
+      {avail.map((u) => (
+        <option key={u.id} value={u.id}>
+          {fullName(u)}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+function PresensiRow({ lesson, usersById, courseItems = [], students = [] }) {
   const [open, setOpen] = useState(false);
   const [rounds, setRounds] = useState(null); // null | [{ ...round, people: [] }]
   const [showImport, setShowImport] = useState(false);
@@ -439,6 +477,30 @@ function PresensiRow({ lesson, usersById, courseItems = [] }) {
       setRounds((p) => p.filter((x) => x.id !== r.id));
     } catch (err) {
       window.alert(`Gagal: ${err?.message ?? err}`);
+    }
+  };
+
+  // Tandai satu murid hadir di ronde r (optimistic; realtime + load resync).
+  const addAttendee = async (r, uid) => {
+    setRounds((p) =>
+      p.map((x) =>
+        x.id === r.id
+          ? {
+              ...x,
+              people: [
+                ...x.people,
+                { user_id: uid, checked_in_at: new Date().toISOString() },
+              ],
+            }
+          : x,
+      ),
+    );
+    try {
+      await bulkCheckIn(r.id, [uid]);
+      load();
+    } catch (err) {
+      window.alert(`Gagal: ${err?.message ?? err}`);
+      load();
     }
   };
 
@@ -747,18 +809,21 @@ function PresensiRow({ lesson, usersById, courseItems = [] }) {
                       <Trash2 size={12} />
                     </button>
                   </div>
-                  {r.people.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-1.5 border-t border-zinc-100 pt-2.5">
-                      {r.people.map((p) => (
-                        <AttendeeAvatar
-                          key={p.user_id}
-                          user={usersById.get(p.user_id)}
-                          uid={p.user_id}
-                          at={p.checked_in_at}
-                        />
-                      ))}
-                    </div>
-                  )}
+                  <div className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-zinc-100 pt-2.5">
+                    {r.people.map((p) => (
+                      <AttendeeAvatar
+                        key={p.user_id}
+                        user={usersById.get(p.user_id)}
+                        uid={p.user_id}
+                        at={p.checked_in_at}
+                      />
+                    ))}
+                    <AddAttendee
+                      students={students}
+                      taken={new Set(r.people.map((p) => p.user_id))}
+                      onAdd={(uid) => addAttendee(r, uid)}
+                    />
+                  </div>
                 </div>
               ))}
 
@@ -1291,14 +1356,26 @@ export default function CourseSessionRecap({ courseId, only }) {
   const [lessons, setLessons] = useState([]);
   const [courseItems, setCourseItems] = useState([]);
   const [usersById, setUsersById] = useState(new Map());
+  const [students, setStudents] = useState([]); // murid enrolled, urut nama
 
   const kinds = only ? [only] : ["presensi", "refleksi", "feedback"];
 
   useEffect(() => {
     let alive = true;
-    Promise.all([getCourse(courseId), getUsers()])
-      .then(([course, users]) => {
+    Promise.all([
+      getCourse(courseId),
+      getUsers(),
+      getCourseEnrollments(courseId).catch(() => []),
+    ])
+      .then(([course, users, enrollments]) => {
         if (!alive) return;
+        const byId = new Map(users.map((u) => [u.id, u]));
+        setStudents(
+          enrollments
+            .map((e) => byId.get(e.user_id))
+            .filter(Boolean)
+            .sort((a, b) => fullName(a).localeCompare(fullName(b), "id")),
+        );
         const all = (course?.sections ?? []).flatMap((s) => s.items ?? []);
         const items = all.filter((it) =>
           only
@@ -1322,7 +1399,7 @@ export default function CourseSessionRecap({ courseId, only }) {
               form_id: i.form_id,
             }))
         );
-        setUsersById(new Map(users.map((u) => [u.id, u])));
+        setUsersById(byId);
         setStatus("ready");
       })
       .catch((err) => {
@@ -1385,6 +1462,7 @@ export default function CourseSessionRecap({ courseId, only }) {
                   lesson={l}
                   usersById={usersById}
                   courseItems={courseItems}
+                  students={students}
                 />
               ) : (
                 <FormLessonRow key={l.id} lesson={l} usersById={usersById} />
