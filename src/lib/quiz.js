@@ -653,7 +653,7 @@ export async function getQuizProgressAudit(userId, setId) {
   ensure();
   const { data, error } = await supabase
     .from("coaching_quiz_progress_audit")
-    .select("op, started_at, actor, logged_at")
+    .select("id, op, started_at, answers, actor, logged_at")
     .eq("user_id", userId)
     .eq("set_id", setId)
     .order("logged_at", { ascending: false });
