@@ -644,6 +644,24 @@ export async function getAllAttempts() {
 }
 
 /**
+ * Riwayat insert/update/delete coaching_quiz_progress buat satu (user, set)
+ * — nelusurin kejadian ganjil (mis. durasi kebaca 0 padahal jawaban penuh).
+ * Butuh supabase/quiz-progress-guard.sql (tabel + trigger audit) udah
+ * dijalankan. RLS admin-only. Urut terbaru dulu.
+ */
+export async function getQuizProgressAudit(userId, setId) {
+  ensure();
+  const { data, error } = await supabase
+    .from("coaching_quiz_progress_audit")
+    .select("op, started_at, actor, logged_at")
+    .eq("user_id", userId)
+    .eq("set_id", setId)
+    .order("logged_at", { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
+/**
  * Semua attempt buat sekumpulan lesson soal (satu course) — buat gradebook
  * admin. Dijaga RLS "coaching_quiz_attempts admin read".
  * Bentuk: { id, user_id, lesson_id, set_id, score, total, duration_sec, created_at }[]

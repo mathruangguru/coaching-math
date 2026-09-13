@@ -1,11 +1,20 @@
 import { Suspense, lazy, useEffect, useMemo, useState } from "react";
-import { Search, ArrowLeft, ArrowRight, RotateCcw, Check } from "lucide-react";
+import {
+  Search,
+  ArrowLeft,
+  ArrowRight,
+  RotateCcw,
+  Check,
+  History,
+  X,
+} from "lucide-react";
 import { getUsers } from "../../lib/users";
 import {
   getQuestionSets,
   getQuestionSetAdmin,
   getAllAttempts,
   getAllQuizProgress,
+  getQuizProgressAudit,
   deleteAttempt,
   toAnswerArray,
   sameAnswerSet,
@@ -98,6 +107,149 @@ function fmtAgo(iso) {
   const h = Math.round(m / 60);
   if (h < 24) return `${h} jam lalu`;
   return `${Math.round(h / 24)} hari lalu`;
+}
+
+function fmtDateTime(iso) {
+  if (!iso) return "—";
+  try {
+    return new Date(iso).toLocaleString("id-ID", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+  } catch {
+    return "—";
+  }
+}
+
+const AUDIT_OP_STYLE = {
+  INSERT: "bg-teal-50 text-teal-700",
+  UPDATE: "bg-zinc-100 text-zinc-500",
+  DELETE: "bg-rose-50 text-rose-600",
+};
+const AUDIT_OP_LABEL = {
+  INSERT: "Mulai (insert)",
+  UPDATE: "Autosave (update)",
+  DELETE: "Selesai / dihapus",
+};
+
+/**
+ * Riwayat coaching_quiz_progress buat satu (user, set) — dari tabel audit
+ * (supabase/quiz-progress-guard.sql). Ketuk ikon jam di kolom Waktu buat
+ * nelusurin kejadian ganjil (mis. durasi 0 padahal jawaban penuh).
+ */
+function ProgressAuditModal({ userId, setId, userName, onClose }) {
+  const [rows, setRows] = useState(null); // null = loading
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    getQuizProgressAudit(userId, setId)
+      .then((d) => alive && setRows(d))
+      .catch((err) => {
+        console.error("[admin] gagal memuat audit progress:", err);
+        if (alive) setFailed(true);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [userId, setId]);
+
+  useEffect(() => {
+    const onKey = (e) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-zinc-900/40 p-4 sm:p-8"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between gap-3 border-b border-zinc-100 px-5 py-3.5">
+          <div className="min-w-0">
+            <h3 className="truncate text-sm font-bold text-zinc-900">
+              Riwayat pengerjaan
+            </h3>
+            <p className="truncate text-xs text-zinc-400">{userName}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Tutup"
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="max-h-[60vh] overflow-y-auto p-5">
+          {rows === null && !failed && (
+            <div className="flex flex-col gap-2">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Skeleton key={i} className="h-12 w-full rounded-lg" />
+              ))}
+            </div>
+          )}
+          {failed && (
+            <p className="text-xs text-rose-500">
+              Gagal memuat. Pastikan{" "}
+              <code className="rounded bg-zinc-100 px-1 py-0.5">
+                supabase/quiz-progress-guard.sql
+              </code>{" "}
+              udah dijalankan.
+            </p>
+          )}
+          {rows && rows.length === 0 && (
+            <p className="text-xs text-zinc-400">
+              Belum ada riwayat (murid belum pernah mulai ngerjain set ini).
+            </p>
+          )}
+          {rows && rows.length > 0 && (
+            <ul className="flex flex-col gap-2">
+              {rows.map((r, i) => (
+                <li
+                  key={i}
+                  className="rounded-lg border border-zinc-100 px-3 py-2"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span
+                      className={`rounded px-1.5 py-0.5 text-[11px] font-semibold ${
+                        AUDIT_OP_STYLE[r.op] ?? "bg-zinc-100 text-zinc-500"
+                      }`}
+                    >
+                      {AUDIT_OP_LABEL[r.op] ?? r.op}
+                    </span>
+                    <span className="shrink-0 text-[11px] text-zinc-400">
+                      {fmtDateTime(r.logged_at)}
+                    </span>
+                  </div>
+                  <p className="mt-1.5 text-[11px] text-zinc-500">
+                    {r.actor ? "Dari akun murid sendiri" : "Dari sistem (quiz-submit)"}
+                    {r.started_at && (
+                      <>
+                        {" · started_at: "}
+                        <span className="font-medium text-zinc-700">
+                          {fmtDateTime(r.started_at)}
+                        </span>
+                      </>
+                    )}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 const answeredOf = (ans) =>
@@ -224,6 +376,8 @@ function ResultTable({
 }) {
   // { col, pos, maxH } — kolom yang lagi di-hover + posisi popup teks soal.
   const [hover, setHover] = useState(null);
+  // { userId, setId, userName } | null — target modal riwayat progress.
+  const [auditFor, setAuditFor] = useState(null);
   const enterCol = (i) => (e) => {
     const r = e.currentTarget.getBoundingClientRect();
     const vw = window.innerWidth || 1024;
@@ -354,7 +508,23 @@ function ResultTable({
                     a.duration_sec != null ? "text-zinc-600" : "text-zinc-300"
                   }`}
                 >
-                  {a.duration_sec != null ? fmtDur(a.duration_sec) : "—"}
+                  <span className="inline-flex items-center gap-1">
+                    {a.duration_sec != null ? fmtDur(a.duration_sec) : "—"}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setAuditFor({
+                          userId: a.user_id,
+                          setId: a.set_id,
+                          userName: u ? fullName(u) : a.user_id,
+                        })
+                      }
+                      title="Lihat riwayat pengerjaan"
+                      className="grid h-5 w-5 shrink-0 place-items-center rounded text-zinc-300 transition-colors hover:bg-zinc-100 hover:text-zinc-600"
+                    >
+                      <History size={12} />
+                    </button>
+                  </span>
                 </td>
                 <td className={`${td} whitespace-nowrap`}>
                   <ScorePill score={a.score} total={a.total} />
@@ -406,7 +576,23 @@ function ResultTable({
                   </td>
                 )}
                 <td className={`${td} whitespace-nowrap text-xs text-amber-600`}>
-                  mulai {fmtAgo(p.started_at)}
+                  <span className="inline-flex items-center gap-1">
+                    mulai {fmtAgo(p.started_at)}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setAuditFor({
+                          userId: p.user_id,
+                          setId: p.set_id,
+                          userName: u ? fullName(u) : p.user_id,
+                        })
+                      }
+                      title="Lihat riwayat pengerjaan"
+                      className="grid h-5 w-5 shrink-0 place-items-center rounded text-amber-400 transition-colors hover:bg-amber-100 hover:text-amber-700"
+                    >
+                      <History size={12} />
+                    </button>
+                  </span>
                 </td>
                 <td className={`${td} whitespace-nowrap text-xs text-zinc-300`}>
                   —
@@ -457,6 +643,15 @@ function ResultTable({
             )}
           </div>
         </div>
+      )}
+
+      {auditFor && (
+        <ProgressAuditModal
+          userId={auditFor.userId}
+          setId={auditFor.setId}
+          userName={auditFor.userName}
+          onClose={() => setAuditFor(null)}
+        />
       )}
     </div>
   );
