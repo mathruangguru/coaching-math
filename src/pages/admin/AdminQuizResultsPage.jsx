@@ -75,6 +75,41 @@ const qCorrect = (q, chosen) => {
   return sameAnswerSet(chosen, keyOf(q));
 };
 
+// Format jawaban murid (bukan kunci) buat satu soal — dipakai di modal
+// riwayat progress buat nampilin detail autosave. null = belum dijawab.
+function answerLabel(q, chosen) {
+  if (!q) return chosen == null ? null : String(chosen);
+  const isNum = q.type === "number";
+  const isTable = q.type === "table";
+  const blank = isNum
+    ? chosen == null || String(chosen).trim() === ""
+    : isTable
+      ? !Array.isArray(chosen) || chosen.every((x) => x == null)
+      : toAnswerArray(chosen).length === 0;
+  if (blank) return null;
+  if (isNum) return String(chosen);
+  if (isTable)
+    return tablePickLabel(chosen, q.table_rows?.length ?? rowKeysOf(q).length);
+  return letters(chosen);
+}
+
+// Soal yang jawabannya berubah antara dua snapshot answers jsonb berurutan.
+function diffAnswers(prev, curr) {
+  const keys = new Set([
+    ...Object.keys(prev ?? {}),
+    ...Object.keys(curr ?? {}),
+  ]);
+  const out = [];
+  for (const qid of keys) {
+    const before = (prev ?? {})[qid];
+    const after = (curr ?? {})[qid];
+    if (JSON.stringify(before ?? null) !== JSON.stringify(after ?? null)) {
+      out.push({ qid, before, after });
+    }
+  }
+  return out;
+}
+
 function fullName(u) {
   return (
     [u.first_name, u.last_name].filter(Boolean).join(" ") || u.email || u.id
@@ -141,9 +176,32 @@ const AUDIT_OP_LABEL = {
  * (supabase/quiz-progress-guard.sql). Ketuk ikon jam di kolom Waktu buat
  * nelusurin kejadian ganjil (mis. durasi 0 padahal jawaban penuh).
  */
-function ProgressAuditModal({ userId, setId, userName, onClose }) {
+function ProgressAuditModal({ userId, setId, userName, questions, onClose }) {
   const [rows, setRows] = useState(null); // null = loading
   const [failed, setFailed] = useState(false);
+
+  const qIndex = useMemo(() => {
+    const m = new Map();
+    (questions ?? []).forEach((q, i) => m.set(q.id, i + 1));
+    return m;
+  }, [questions]);
+  const qById = useMemo(() => {
+    const m = new Map();
+    (questions ?? []).forEach((q) => m.set(q.id, q));
+    return m;
+  }, [questions]);
+  // Soal yang berubah tiap event UPDATE (autosave), dibanding snapshot
+  // sebelumnya secara kronologis — key: audit row id.
+  const diffById = useMemo(() => {
+    const out = new Map();
+    if (!rows) return out;
+    const chrono = [...rows].reverse();
+    chrono.forEach((r, i) => {
+      if (r.op !== "UPDATE") return;
+      out.set(r.id, diffAnswers(chrono[i - 1]?.answers, r.answers));
+    });
+    return out;
+  }, [rows]);
 
   useEffect(() => {
     let alive = true;
@@ -214,36 +272,72 @@ function ProgressAuditModal({ userId, setId, userName, onClose }) {
           )}
           {rows && rows.length > 0 && (
             <ul className="flex flex-col gap-2">
-              {rows.map((r, i) => (
-                <li
-                  key={i}
-                  className="rounded-lg border border-zinc-100 px-3 py-2"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span
-                      className={`rounded px-1.5 py-0.5 text-[11px] font-semibold ${
-                        AUDIT_OP_STYLE[r.op] ?? "bg-zinc-100 text-zinc-500"
-                      }`}
-                    >
-                      {AUDIT_OP_LABEL[r.op] ?? r.op}
-                    </span>
-                    <span className="shrink-0 text-[11px] text-zinc-400">
-                      {fmtDateTime(r.logged_at)}
-                    </span>
-                  </div>
-                  <p className="mt-1.5 text-[11px] text-zinc-500">
-                    {r.actor ? "Dari akun murid sendiri" : "Dari sistem (quiz-submit)"}
-                    {r.started_at && (
-                      <>
-                        {" · started_at: "}
-                        <span className="font-medium text-zinc-700">
-                          {fmtDateTime(r.started_at)}
-                        </span>
-                      </>
+              {rows.map((r) => {
+                const diff = diffById.get(r.id) ?? [];
+                return (
+                  <li
+                    key={r.id}
+                    className="rounded-lg border border-zinc-100 px-3 py-2"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span
+                        className={`rounded px-1.5 py-0.5 text-[11px] font-semibold ${
+                          AUDIT_OP_STYLE[r.op] ?? "bg-zinc-100 text-zinc-500"
+                        }`}
+                      >
+                        {AUDIT_OP_LABEL[r.op] ?? r.op}
+                      </span>
+                      <span className="shrink-0 text-[11px] text-zinc-400">
+                        {fmtDateTime(r.logged_at)}
+                      </span>
+                    </div>
+                    <p className="mt-1.5 text-[11px] text-zinc-500">
+                      {r.actor ? "Dari akun murid sendiri" : "Dari sistem (quiz-submit)"}
+                      {r.started_at && (
+                        <>
+                          {" · started_at: "}
+                          <span className="font-medium text-zinc-700">
+                            {fmtDateTime(r.started_at)}
+                          </span>
+                        </>
+                      )}
+                    </p>
+                    {r.op === "UPDATE" && diff.length > 0 && (
+                      <ul className="mt-1.5 flex flex-col gap-0.5 border-t border-zinc-100 pt-1.5">
+                        {diff.map(({ qid, before, after }) => {
+                          const q = qById.get(qid);
+                          const num = qIndex.get(qid) ?? "?";
+                          const afterLabel = answerLabel(q, after);
+                          const beforeLabel = answerLabel(q, before);
+                          return (
+                            <li key={qid} className="text-[11px] text-zinc-600">
+                              <span className="font-semibold text-zinc-700">
+                                Soal {num}:
+                              </span>{" "}
+                              {afterLabel == null ? (
+                                <span className="text-zinc-400">dikosongin</span>
+                              ) : beforeLabel == null ? (
+                                <span className="font-medium text-zinc-800">
+                                  {afterLabel}
+                                </span>
+                              ) : (
+                                <>
+                                  <span className="text-zinc-400 line-through">
+                                    {beforeLabel}
+                                  </span>{" "}
+                                  <span className="font-medium text-zinc-800">
+                                    {afterLabel}
+                                  </span>
+                                </>
+                              )}
+                            </li>
+                          );
+                        })}
+                      </ul>
                     )}
-                  </p>
-                </li>
-              ))}
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>
@@ -650,6 +744,7 @@ function ResultTable({
           userId={auditFor.userId}
           setId={auditFor.setId}
           userName={auditFor.userName}
+          questions={questions}
           onClose={() => setAuditFor(null)}
         />
       )}
