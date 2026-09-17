@@ -158,6 +158,7 @@ export default function AdminFormFormPage() {
   const hasOptions = (t) => OPTION_TYPES.includes(t);
   // check boleh 1 pernyataan; single/multi minimal 2 opsi.
   const minOptions = (t) => (t === "check" ? 1 : 2);
+  const requiredCount = form.fields.filter((f) => f.required).length;
 
   return (
     <div className="flex flex-col gap-5">
@@ -234,6 +235,11 @@ export default function AdminFormFormPage() {
 
       {/* Fields */}
       <div className="flex flex-col gap-3">
+        {form.fields.length > 0 && (
+          <p className="text-xs text-zinc-400">
+            {form.fields.length} pertanyaan · {requiredCount} wajib diisi
+          </p>
+        )}
         {form.fields.length === 0 && (
           <p className="rounded-2xl border border-dashed border-zinc-300 bg-white px-6 py-8 text-center text-sm text-zinc-400">
             Belum ada field.
