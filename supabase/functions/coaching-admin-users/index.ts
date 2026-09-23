@@ -11,11 +11,11 @@
 //
 // Deploy (--no-verify-jwt wajib, kalau nggak preflight CORS ditolak 401;
 // auth tetap dicek di dalam function):
-//   supabase functions deploy admin-users --no-verify-jwt
+//   supabase functions deploy coaching-admin-users --no-verify-jwt
 // atau paste file ini di Dashboard -> Edge Functions -> Deploy a new function
 // lalu matikan toggle "Verify JWT" di tab Settings.
 //
-// Dipanggil dari app: supabase.functions.invoke("admin-users", { body: {...} })
+// Dipanggil dari app: supabase.functions.invoke("coaching-admin-users", { body: {...} })
 // — header Authorization ikut otomatis.
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
