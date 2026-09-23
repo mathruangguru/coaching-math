@@ -435,6 +435,50 @@ export async function bulkCreateQuestions(setId, items, startPosition = 0) {
   }));
 }
 
+/**
+ * Salin set soal (semua soal + kunci jawabannya) jadi set baru
+ * "<judul> (salinan)". Attempt & progress murid dikunci per (user, set),
+ * jadi lesson hasil duplikat harus pakai set salinan, bukan set yang sama
+ * (kalau nggak, murid yang udah ngerjain aslinya kebaca "sudah selesai").
+ * Balikin id set baru. Butuh caller = admin (baca kunci).
+ */
+export async function duplicateQuestionSet(setId) {
+  ensure();
+  const src = await getQuestionSetAdmin(setId);
+  if (!src) throw new Error("Set soal tidak ditemukan.");
+  const copy = await createQuestionSet({
+    title: `${src.title} (salinan)`,
+    description: src.description,
+  });
+  try {
+    await updateQuestionSet(copy.id, {
+      title: copy.title,
+      description: copy.description,
+      timeLimitMin: src.time_limit_min,
+      intro: src.intro,
+    });
+    if (src.questions.length) {
+      await bulkCreateQuestions(
+        copy.id,
+        src.questions.map((q) => ({
+          prompt: q.prompt,
+          type: q.type,
+          options: q.options,
+          answers: q.answers,
+          answerNum: q.answer_num,
+          answerTol: q.answer_tol,
+          tableRows: q.table_rows,
+          rowKeys: q.row_keys,
+        }))
+      );
+    }
+  } catch (e) {
+    await deleteQuestionSet(copy.id).catch(() => {});
+    throw e;
+  }
+  return copy.id;
+}
+
 export async function updateQuestion(
   id,
   { prompt, options, type, answers, answerNum, answerTol, tableRows, rowKeys }

@@ -40,3 +40,19 @@ export async function deleteLessonImage(url) {
     .remove([decodeURIComponent(m[1])])
     .catch(() => {});
 }
+
+/**
+ * Salin file gambar lesson ke path baru milik `newLessonId` (duplikat
+ * pertemuan) — lihat copyLessonPdf. URL non-storage dibalikin apa adanya.
+ */
+export async function copyLessonImage(url, newLessonId) {
+  if (!hasSupabase || !url) return url ?? null;
+  const m = String(url).match(/\/lesson-images\/(.+?)(?:\?|$)/);
+  if (!m) return url;
+  const from = decodeURIComponent(m[1]);
+  const ext = from.split(".").pop() || "png";
+  const to = `${newLessonId}/${crypto.randomUUID()}.${ext}`;
+  const { error } = await supabase.storage.from(BUCKET).copy(from, to);
+  if (error) throw error;
+  return supabase.storage.from(BUCKET).getPublicUrl(to).data.publicUrl;
+}

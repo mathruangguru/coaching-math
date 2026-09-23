@@ -29,3 +29,21 @@ export async function deleteLessonPdf(url) {
     .remove([decodeURIComponent(m[1])])
     .catch(() => {});
 }
+
+/**
+ * Salin file PDF lesson ke path baru milik `newLessonId` (duplikat
+ * pertemuan). File nggak boleh dishare antar lesson: "Ganti"/"Hapus" di
+ * satu lesson ngehapus objek storage-nya. URL non-storage dibalikin apa
+ * adanya (nggak ada yang perlu disalin).
+ */
+export async function copyLessonPdf(url, newLessonId) {
+  if (!hasSupabase || !url) return url ?? null;
+  const m = String(url).match(/\/lesson-files\/(.+?)(?:\?|$)/);
+  if (!m) return url;
+  const to = `${newLessonId}/${crypto.randomUUID()}.pdf`;
+  const { error } = await supabase.storage
+    .from(BUCKET)
+    .copy(decodeURIComponent(m[1]), to);
+  if (error) throw error;
+  return supabase.storage.from(BUCKET).getPublicUrl(to).data.publicUrl;
+}
