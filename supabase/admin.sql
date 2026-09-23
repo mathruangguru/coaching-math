@@ -28,7 +28,7 @@ alter table public.coaching_profiles enable row level security;
 
 grant select, update on public.coaching_profiles to authenticated;
 
--- service_role (dipakai Edge Function admin-users) — project ini nggak
+-- service_role (dipakai Edge Function coaching-admin-users) — project ini nggak
 -- auto-grant, jadi eksplisit. Bypass RLS + butuh privilege tabel.
 grant all on public.coaching_profiles         to service_role;
 grant all on public.coaching_courses          to service_role;
@@ -197,6 +197,6 @@ create policy "coaching_lessons read"
 --   admin       = akses /admin, edit course, TAMBAH user aja.
 --   super_admin = admin + hapus user / ganti role / set password user.
 -- Setelah punya 1 super admin, user berikutnya dibuat dari /admin/users
--- (lewat Edge Function admin-users). Syarat di Supabase:
+-- (lewat Edge Function coaching-admin-users). Syarat di Supabase:
 --   Authentication -> Providers -> Email -> "Confirm email" OFF.
 --   "Allow new users to sign up" boleh OFF.

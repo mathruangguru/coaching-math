@@ -54,7 +54,7 @@ Katalog tetap bisa dibaca `anon` di level DB, tapi UI-nya di balik login.
    - `is_admin()` (admin/super_admin) + `is_super_admin()` + policy:
      admin baca semua profile, super_admin ubah profile orang lain,
      write admin-only untuk `coaching_courses` / `_sections` / `_lessons`
-2. **Deploy Edge Function `admin-users`** (lihat bagian bawah) — dipakai
+2. **Deploy Edge Function `coaching-admin-users`** (lihat bagian bawah) — dipakai
    buat create / set-password / delete user.
 3. **Authentication → Providers → Email**:
    - **"Confirm email" → OFF** (user bikinan admin bisa langsung login)
@@ -80,12 +80,12 @@ Role: `student` < `admin` < `super_admin`.
 | Set password user (kasus lupa) | — | ✅ |
 | Hapus user (cascade profile & progress; nggak bisa diri sendiri) | — | ✅ |
 
-- **Buat user** lewat Admin API di Edge Function `admin-users` → **nggak
+- **Buat user** lewat Admin API di Edge Function `coaching-admin-users` → **nggak
   kirim email** (nggak kena rate limit), sesi admin nggak keganti.
 - Admin biasa lihat daftar user tapi cuma sebagai badge role — tanpa
   tombol aksi. Gate-nya di `is_super_admin()` (policy + trigger
   `guard_profile_role`) dan di Edge Function.
-- Aksi selain "buat user" butuh Edge Function `admin-users` ke-deploy.
+- Aksi selain "buat user" butuh Edge Function `coaching-admin-users` ke-deploy.
 
 ### Profil (semua user) — `/profile`
 
@@ -94,7 +94,7 @@ RLS "update own"; kolom `role` dijaga trigger `guard_profile_role` biar
 user biasa nggak bisa naikin dirinya jadi admin. Ganti password sendiri
 pakai `supabase.auth.updateUser` (nggak butuh Edge Function).
 
-### Edge Function: `admin-users`
+### Edge Function: `coaching-admin-users`
 
 Create / set-password / delete user butuh `service_role` → nggak boleh di
 frontend. Satu function, `action`-based (`create` | `set_password` |
@@ -102,10 +102,15 @@ frontend. Satu function, `action`-based (`create` | `set_password` |
 
 Project ref: `fvepworawhlsghsjhsca` (bukan rahasia — subdomain URL Supabase).
 
+> Namanya sengaja diprefix `coaching-`: project Supabase ini juga dipakai
+> project lain, dan nama function itu global per project — `admin-users`
+> polos pernah ketimpa deploy dari project lain. Jangan deploy function
+> bernama `admin-users` / `quiz-submit` polos dari repo lain ke project ini.
+
 ```bash
 supabase login
 supabase link --project-ref fvepworawhlsghsjhsca   # sekali aja
-supabase functions deploy admin-users
+supabase functions deploy coaching-admin-users
 ```
 
 `verify_jwt = false` udah diset di `supabase/config.toml` — tanpa itu,
@@ -114,8 +119,8 @@ preflight CORS (OPTIONS) dari browser ditolak 401 dan app dapat
 `caller.auth.getUser()` + `role = 'admin'`.
 (Deploy via dashboard paste: matikan toggle **Verify JWT** di tab Settings.)
 
-Atau paste `supabase/functions/admin-users/index.ts` di
-**Dashboard → Edge Functions → Deploy a new function** (nama: `admin-users`).
+Atau paste `supabase/functions/coaching-admin-users/index.ts` di
+**Dashboard → Edge Functions → Deploy a new function** (nama: `coaching-admin-users`).
 `SUPABASE_URL` / `SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY`
 di-inject otomatis — nggak perlu set secret. Sebelum di-deploy, tombol
 buat/set-password/hapus di `/admin/users` akan error.
@@ -185,7 +190,7 @@ tanpa `form_id` tapi punya `url` tetap buka link eksternal.
 | `branches.sql` | `coaching_branches` + `coaching_profiles.branch_id` + RLS (baca semua, tulis admin) |
 | `forms.sql` | `coaching_forms` / `_form_fields` / `_form_responses` + `coaching_lessons.form_id` + RLS |
 | `seed.sql` | data awal PATOM (mirror `src/data/mock.js`) |
-| `functions/admin-users/` | Edge Function: admin create / set-password / delete user |
+| `functions/coaching-admin-users/` | Edge Function: admin create / set-password / delete user |
 | `functions/quiz-submit/` | Edge Function: nilai & simpan attempt kuis murid |
 
 Kode klien: `src/lib/supabase.js` (client), `src/lib/courses.js`

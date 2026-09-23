@@ -5,12 +5,12 @@ function assertReady() {
 }
 
 /**
- * Panggil Edge Function `admin-users`. Semua operasi user yang butuh
+ * Panggil Edge Function `coaching-admin-users`. Semua operasi user yang butuh
  * service_role lewat sini (create / set_password / delete).
  */
 async function callAdminUsers(body) {
   assertReady();
-  const { data, error } = await supabase.functions.invoke("admin-users", {
+  const { data, error } = await supabase.functions.invoke("coaching-admin-users", {
     body,
   });
   if (error) {
@@ -23,7 +23,7 @@ async function callAdminUsers(body) {
     }
     throw new Error(
       detail ||
-        "Gagal. Pastikan Edge Function 'admin-users' sudah di-deploy."
+        "Gagal. Pastikan Edge Function 'coaching-admin-users' sudah di-deploy."
     );
   }
   return data;
