@@ -5,6 +5,7 @@ import {
   ChevronLeft,
   Plus,
   Trash2,
+  Copy,
   Layers,
   Link2,
   ListChecks,
@@ -18,6 +19,7 @@ import {
 import {
   getCourse,
   createSection,
+  duplicateSection,
   updateSection,
   deleteSection,
   reorderSections,
@@ -442,6 +444,41 @@ export default function CurriculumEditor({ courseId }) {
     });
   };
 
+  const duplicateSectionAt = (section, index) => {
+    const hasSets = section.items.some((it) => it.question_set_id);
+    const ok = window.confirm(
+      `Duplikat "${section.title}" beserta ${section.items.length} materinya?\n\n` +
+        `Salinan mulai sebagai draft (belum publish)${
+          hasSets ? " dan set soalnya ikut disalin jadi set baru" : ""
+        }. Jadwal pertemuan, jadwal/akses soal, target feedback, dan ronde presensi nggak ikut disalin.`,
+    );
+    if (!ok) return;
+    run(async () => {
+      const { id, failedFiles } = await duplicateSection(
+        courseId,
+        section,
+        sections.length,
+      );
+      // Taruh persis setelah aslinya.
+      const order = sections.map((s) => s.id);
+      order.splice(index + 1, 0, id);
+      await reorderSections(order);
+      const [data, sets] = await Promise.all([
+        getCourse(courseId),
+        getQuestionSets(),
+      ]);
+      setSections(data?.sections ?? []);
+      setQuestionSets(sets);
+      setSelSecId(id);
+      setSelLesId(null);
+      setMobileStep("items");
+      if (failedFiles)
+        window.alert(
+          `Pertemuan berhasil diduplikat, tapi ${failedFiles} file (PDF/gambar) gagal disalin — upload ulang di materinya.`,
+        );
+    });
+  };
+
   const moveSection = (index, dir) => {
     const to = index + dir;
     if (to < 0 || to >= sections.length) return;
@@ -709,13 +746,28 @@ export default function CurriculumEditor({ courseId }) {
             />
             Buka default
           </label>
-          <button
-            type="button"
-            onClick={() => removeSection(activeSec)}
-            className="ml-auto inline-flex items-center gap-1 rounded-md border border-rose-200 px-2 py-1 font-medium text-rose-600 transition-colors hover:bg-rose-50"
-          >
-            <Trash2 size={11} /> Hapus
-          </button>
+          <div className="ml-auto flex items-center gap-1.5">
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() =>
+                duplicateSectionAt(
+                  activeSec,
+                  sections.findIndex((s) => s.id === activeSec.id),
+                )
+              }
+              className="inline-flex items-center gap-1 rounded-md border border-zinc-200 px-2 py-1 font-medium text-zinc-600 transition-colors hover:bg-zinc-50 disabled:opacity-50"
+            >
+              <Copy size={11} /> Duplikat
+            </button>
+            <button
+              type="button"
+              onClick={() => removeSection(activeSec)}
+              className="inline-flex items-center gap-1 rounded-md border border-rose-200 px-2 py-1 font-medium text-rose-600 transition-colors hover:bg-rose-50"
+            >
+              <Trash2 size={11} /> Hapus
+            </button>
+          </div>
         </div>
       </div>
 

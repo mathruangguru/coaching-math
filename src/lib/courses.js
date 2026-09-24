@@ -1,5 +1,8 @@
 import { supabase, hasSupabase } from "./supabase";
 import { myCourses, courseSections } from "../data/mock";
+import { duplicateQuestionSet } from "./quiz";
+import { copyLessonPdf } from "./pdf";
+import { copyLessonImage } from "./images";
 
 /**
  * Daftar course. Bentuk: { id, title, description, icon }[]
@@ -306,4 +309,105 @@ export async function reorderLessons(orderedIds) {
       supabase.from("coaching_lessons").update({ position: i }).eq("id", id)
     )
   );
+}
+
+/**
+ * Duplikat satu pertemuan (section) beserta subbagian & materinya.
+ * `src` = section dari getCourse (items sudah urut tampilan).
+ *
+ * Disalin: judul (+ " (salinan)"), buka-default, subbagian, dan tiap materi
+ * (tipe, judul, durasi, link, isi, form, pertanyaan refleksi, setelan
+ * download/bypass). Soal -> set soal ikut disalin jadi set baru; PDF/gambar
+ * -> file storage disalin ke path baru.
+ * Direset: publish_status = "none" (draft), jadwal pertemuan (meet_at),
+ * setelan akses/jadwal soal, target feedback, dan ronde presensi (kosong).
+ *
+ * Balikin { id, failedFiles } — failedFiles = jumlah PDF/gambar yang gagal
+ * disalin (materinya tetap dibuat, filenya kosong).
+ */
+export async function duplicateSection(courseId, src, position) {
+  ensureSupabase();
+  const secId = crypto.randomUUID();
+  const { error: secErr } = await supabase
+    .from("coaching_course_sections")
+    .insert({
+      id: secId,
+      course_id: courseId,
+      title: `${src.title} (salinan)`,
+      position,
+      default_open: src.default_open !== false,
+    });
+  if (secErr) throw secErr;
+
+  let failedFiles = 0;
+  try {
+    const subs = [...(src.subsections ?? [])].sort(
+      (a, b) => (a.position ?? 0) - (b.position ?? 0)
+    );
+    const subMap = new Map(subs.map((s) => [s.id, crypto.randomUUID()]));
+    if (subs.length) {
+      const { error } = await supabase.from("coaching_course_subsections").insert(
+        subs.map((s, i) => ({
+          id: subMap.get(s.id),
+          section_id: secId,
+          title: s.title ?? "",
+          position: i,
+        }))
+      );
+      if (error) throw error;
+    }
+
+    // Satu salinan per set soal berbeda (dua materi yang pakai set sama
+    // tetap berbagi satu salinan).
+    const setMap = new Map();
+    for (const it of src.items) {
+      if (it.question_set_id && !setMap.has(it.question_set_id))
+        setMap.set(it.question_set_id, await duplicateQuestionSet(it.question_set_id));
+    }
+
+    const rows = [];
+    for (const [i, it] of src.items.entries()) {
+      const id = crypto.randomUUID();
+      let url = it.url || null;
+      if (url && (it.type === "pdf" || it.type === "image")) {
+        try {
+          url =
+            it.type === "pdf"
+              ? await copyLessonPdf(url, id)
+              : await copyLessonImage(url, id);
+        } catch (e) {
+          console.error("[duplicateSection] gagal menyalin file:", e);
+          failedFiles += 1;
+          url = null;
+        }
+      }
+      rows.push({
+        id,
+        section_id: secId,
+        type: it.type,
+        title: it.title,
+        duration: it.duration || null,
+        url,
+        question_set_id: setMap.get(it.question_set_id) ?? null,
+        form_id: it.form_id || null,
+        prompt: it.prompt?.trim() || null,
+        content: it.content?.trim() || null,
+        publish_status: "none",
+        allow_download: it.allow_download ?? true,
+        soal_bypass: it.soal_bypass ?? false,
+        subsection_id: subMap.get(it.subsection_id) ?? null,
+        position: i,
+      });
+    }
+    if (rows.length) {
+      const { error } = await supabase.from("coaching_lessons").insert(rows);
+      if (error) throw error;
+    }
+  } catch (e) {
+    // Jangan ninggalin pertemuan setengah jadi (lesson & subbagian ikut
+    // kehapus lewat cascade).
+    await supabase.from("coaching_course_sections").delete().eq("id", secId);
+    throw e;
+  }
+  return { id: secId, failedFiles };
 }
