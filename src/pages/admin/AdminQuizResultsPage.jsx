@@ -6,6 +6,7 @@ import {
   RotateCcw,
   Check,
   History,
+  Flag,
   X,
 } from "lucide-react";
 import { getUsers } from "../../lib/users";
@@ -15,6 +16,10 @@ import {
   getAllAttempts,
   getAllQuizProgress,
   getQuizProgressAudit,
+  getQuizAutosaveBursts,
+  getQuizAiReviews,
+  setQuizAiReview,
+  clearQuizAiReview,
   deleteAttempt,
   toAnswerArray,
   sameAnswerSet,
@@ -170,6 +175,275 @@ const AUDIT_OP_LABEL = {
   UPDATE: "Autosave (update)",
   DELETE: "Selesai / dihapus",
 };
+
+// ── Flag "AI Detected" ──────────────────────────────────────────────
+// Sinyal otomatis = petunjuk lemah buat ngarahin admin, BUKAN bukti. Yang
+// menentukan tetap keputusan admin (confirmed / dismissed), disimpan di
+// coaching_quiz_ai_reviews (supabase/quiz-ai-flag.sql).
+const AI_FAST_SEC_PER_Q = 10; // rata-rata detik per soal di bawah ini...
+const AI_FAST_MIN_PCT = 80; // ...dengan skor minimal segini = mencurigakan
+const AI_BURST_MIN = 4; // soal terisi sekaligus di satu autosave
+
+function aiSignals(a, burst) {
+  const out = [];
+  const total = a.total || 0;
+  if (a.duration_sec != null && total >= 3) {
+    const per = a.duration_sec / total;
+    const p = pct(a.score, a.total);
+    if (per < AI_FAST_SEC_PER_Q && p >= AI_FAST_MIN_PCT) {
+      out.push(
+        `Waktu sangat singkat: ${fmtDur(a.duration_sec)} untuk ${total} soal (~${Math.round(per)} dtk/soal) dengan skor ${p}%.`
+      );
+    }
+  }
+  if (burst >= AI_BURST_MIN) {
+    out.push(
+      `${burst} soal terisi sekaligus dalam satu autosave — biasanya jawaban masuk satu per satu.`
+    );
+  }
+  return out;
+}
+
+// Muat burst autosave + keputusan admin buat semua set yang ada di `attempts`.
+// Gagal (mis. SQL belum dijalankan) -> diam, sinyal waktu tetap jalan.
+function useAiFlags(attempts) {
+  const setKey = useMemo(
+    () =>
+      [...new Set(attempts.map((a) => a.set_id).filter(Boolean))]
+        .sort()
+        .join("|") + `#${attempts.length}`,
+    [attempts]
+  );
+  const [state, setState] = useState({
+    bursts: new Map(),
+    reviews: new Map(),
+  });
+
+  useEffect(() => {
+    let alive = true;
+    const ids = setKey.split("#")[0].split("|").filter(Boolean);
+    Promise.all(
+      ids.map(async (id) => {
+        const [b, r] = await Promise.all([
+          getQuizAutosaveBursts(id).catch((e) => {
+            console.warn("[admin] burst autosave nggak kebaca:", e);
+            return new Map();
+          }),
+          getQuizAiReviews(id).catch((e) => {
+            console.warn("[admin] review AI nggak kebaca:", e);
+            return new Map();
+          }),
+        ]);
+        return { id, b, r };
+      })
+    ).then((res) => {
+      if (!alive) return;
+      const bursts = new Map();
+      const reviews = new Map();
+      for (const { id, b, r } of res) {
+        for (const [uid, n] of b) bursts.set(`${uid}|${id}`, n);
+        for (const [aid, v] of r) reviews.set(aid, v);
+      }
+      setState({ bursts, reviews });
+    });
+    return () => {
+      alive = false;
+    };
+  }, [setKey]);
+
+  const setReview = (attemptId, review) =>
+    setState((s) => {
+      const reviews = new Map(s.reviews);
+      if (review) reviews.set(attemptId, review);
+      else reviews.delete(attemptId);
+      return { ...s, reviews };
+    });
+
+  return { ...state, setReview };
+}
+
+function AiFlagButton({ flag, onClick }) {
+  const pill =
+    "inline-flex shrink-0 items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-bold leading-none ring-1 transition-colors";
+  if (flag.verdict === "confirmed")
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        title={
+          flag.note
+            ? `AI Detected — ${flag.note}`
+            : "AI Detected (ditandai admin). Klik buat ubah."
+        }
+        className={`${pill} bg-rose-50 text-rose-600 ring-rose-200 hover:bg-rose-100`}
+      >
+        <Flag size={10} /> AI Detected
+      </button>
+    );
+  if (!flag.verdict && flag.signals.length > 0)
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        title={`Terindikasi AI — ${flag.signals.join(" ")}`}
+        className={`${pill} bg-amber-50 text-amber-700 ring-amber-200 hover:bg-amber-100`}
+      >
+        <Flag size={10} /> Terindikasi AI
+      </button>
+    );
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={
+        flag.verdict === "dismissed"
+          ? "Sudah ditinjau: bukan AI"
+          : "Tandai AI Detected"
+      }
+      className={`grid h-5 w-5 shrink-0 place-items-center rounded transition-colors hover:bg-zinc-100 ${
+        flag.verdict === "dismissed"
+          ? "text-teal-400 hover:text-teal-600"
+          : "text-zinc-300 hover:text-zinc-600"
+      }`}
+    >
+      <Flag size={12} />
+    </button>
+  );
+}
+
+function AiReviewModal({ userName, flag, onSave, onClear, onClose }) {
+  const [note, setNote] = useState(flag.note ?? "");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  useEffect(() => {
+    const onKey = (e) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  // Sukses -> parent nutup modal (unmount), jadi busy nggak perlu di-reset.
+  const run = async (fn) => {
+    setBusy(true);
+    setErr("");
+    try {
+      await fn();
+    } catch (e) {
+      console.error("[admin] gagal simpan review AI:", e);
+      setErr(
+        "Gagal menyimpan. Pastikan supabase/quiz-ai-flag.sql sudah dijalankan."
+      );
+      setBusy(false);
+    }
+  };
+
+  const status =
+    flag.verdict === "confirmed"
+      ? { text: "AI Detected", cls: "bg-rose-50 text-rose-600" }
+      : flag.verdict === "dismissed"
+        ? { text: "Ditinjau — bukan AI", cls: "bg-teal-50 text-teal-700" }
+        : { text: "Belum ditinjau", cls: "bg-zinc-100 text-zinc-500" };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-zinc-900/40 p-4 sm:p-8"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between gap-3 border-b border-zinc-100 px-5 py-3.5">
+          <div className="min-w-0">
+            <h3 className="truncate text-sm font-bold text-zinc-900">
+              Tinjau dugaan AI
+            </h3>
+            <p className="truncate text-xs text-zinc-400">{userName}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Tutup"
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="flex flex-col gap-3 p-5">
+          <p className="text-xs text-zinc-500">
+            Status:{" "}
+            <span
+              className={`rounded px-1.5 py-0.5 text-[11px] font-semibold ${status.cls}`}
+            >
+              {status.text}
+            </span>
+          </p>
+
+          <div>
+            <p className="text-xs font-semibold text-zinc-700">Sinyal otomatis</p>
+            {flag.signals.length > 0 ? (
+              <ul className="mt-1.5 flex flex-col gap-1 rounded-lg bg-amber-50 px-3 py-2 text-[11px] text-amber-800">
+                {flag.signals.map((s) => (
+                  <li key={s}>• {s}</li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-1 text-[11px] text-zinc-400">
+                Nggak ada sinyal otomatis buat jawaban ini.
+              </p>
+            )}
+            <p className="mt-1.5 text-[11px] text-zinc-400">
+              Sinyal cuma petunjuk, bukan bukti — keputusan tetap di kamu.
+            </p>
+          </div>
+
+          <label className="block text-xs font-semibold text-zinc-700">
+            Catatan (opsional)
+            <textarea
+              rows={2}
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Alasan / bukti yang kamu lihat…"
+              className="mt-1 w-full resize-y rounded-lg border border-zinc-300 px-3 py-2 text-xs font-normal text-zinc-900 outline-none transition-colors focus:border-brand-500"
+            />
+          </label>
+
+          {err && <p className="text-xs text-rose-500">{err}</p>}
+
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => run(() => onSave("confirmed", note))}
+              className="rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-rose-700 disabled:opacity-50"
+            >
+              Tandai AI Detected
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => run(() => onSave("dismissed", note))}
+              className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-semibold text-zinc-700 transition-colors hover:bg-zinc-50 disabled:opacity-50"
+            >
+              Bukan AI
+            </button>
+            {flag.verdict && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => run(onClear)}
+                className="ml-auto text-xs font-medium text-zinc-400 transition-colors hover:text-zinc-700 disabled:opacity-50"
+              >
+                Hapus tanda
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /**
  * Riwayat coaching_quiz_progress buat satu (user, set) — dari tabel audit
@@ -472,6 +746,17 @@ function ResultTable({
   const [hover, setHover] = useState(null);
   // { userId, setId, userName } | null — target modal riwayat progress.
   const [auditFor, setAuditFor] = useState(null);
+  const ai = useAiFlags(attempts);
+  // { attempt, userName } | null — target modal tinjau dugaan AI.
+  const [reviewFor, setReviewFor] = useState(null);
+  const flagOf = (a) => {
+    const review = ai.reviews.get(a.id);
+    return {
+      verdict: review?.verdict ?? null,
+      note: review?.note ?? "",
+      signals: aiSignals(a, ai.bursts.get(`${a.user_id}|${a.set_id}`) ?? 0),
+    };
+  };
   const enterCol = (i) => (e) => {
     const r = e.currentTarget.getBoundingClientRect();
     const vw = window.innerWidth || 1024;
@@ -618,6 +903,15 @@ function ResultTable({
                     >
                       <History size={12} />
                     </button>
+                    <AiFlagButton
+                      flag={flagOf(a)}
+                      onClick={() =>
+                        setReviewFor({
+                          attempt: a,
+                          userName: u ? fullName(u) : a.user_id,
+                        })
+                      }
+                    />
                   </span>
                 </td>
                 <td className={`${td} whitespace-nowrap`}>
@@ -746,6 +1040,28 @@ function ResultTable({
           userName={auditFor.userName}
           questions={questions}
           onClose={() => setAuditFor(null)}
+        />
+      )}
+
+      {reviewFor && (
+        <AiReviewModal
+          userName={reviewFor.userName}
+          flag={flagOf(reviewFor.attempt)}
+          onSave={async (verdict, note) => {
+            const review = await setQuizAiReview(
+              reviewFor.attempt.id,
+              verdict,
+              note
+            );
+            ai.setReview(reviewFor.attempt.id, review);
+            setReviewFor(null);
+          }}
+          onClear={async () => {
+            await clearQuizAiReview(reviewFor.attempt.id);
+            ai.setReview(reviewFor.attempt.id, null);
+            setReviewFor(null);
+          }}
+          onClose={() => setReviewFor(null)}
         />
       )}
     </div>

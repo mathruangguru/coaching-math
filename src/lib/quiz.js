@@ -706,6 +706,72 @@ export async function getQuizProgressAudit(userId, setId) {
 }
 
 /**
+ * Burst autosave per murid di satu set: Map(user_id -> jumlah terbanyak soal
+ * yang terisi sekaligus di satu autosave). Sinyal "terindikasi AI". Butuh
+ * supabase/quiz-ai-flag.sql (fungsi quiz_autosave_bursts). Admin-only.
+ */
+export async function getQuizAutosaveBursts(setId) {
+  ensure();
+  const { data, error } = await supabase.rpc("quiz_autosave_bursts", {
+    p_set_id: setId,
+  });
+  if (error) throw error;
+  return new Map((data ?? []).map((r) => [r.user_id, r.max_burst]));
+}
+
+/**
+ * Keputusan admin soal "AI Detected" buat semua attempt di satu set:
+ * Map(attempt_id -> { verdict: "confirmed" | "dismissed", note, reviewed_at }).
+ * Tabel admin-only (supabase/quiz-ai-flag.sql).
+ */
+export async function getQuizAiReviews(setId) {
+  ensure();
+  const { data, error } = await supabase
+    .from("coaching_quiz_ai_reviews")
+    .select(
+      "attempt_id, verdict, note, reviewed_at, attempt:coaching_quiz_attempts!inner(set_id)"
+    )
+    .eq("attempt.set_id", setId);
+  if (error) throw error;
+  return new Map(
+    data.map((r) => [
+      r.attempt_id,
+      { verdict: r.verdict, note: r.note, reviewed_at: r.reviewed_at },
+    ])
+  );
+}
+
+/** Simpan / ganti keputusan admin buat satu attempt. */
+export async function setQuizAiReview(attemptId, verdict, note) {
+  ensure();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const row = {
+    attempt_id: attemptId,
+    verdict,
+    note: note?.trim() || null,
+    reviewed_by: user?.id ?? null,
+    reviewed_at: new Date().toISOString(),
+  };
+  const { error } = await supabase
+    .from("coaching_quiz_ai_reviews")
+    .upsert(row, { onConflict: "attempt_id" });
+  if (error) throw error;
+  return { verdict, note: row.note, reviewed_at: row.reviewed_at };
+}
+
+/** Hapus keputusan admin (balik ke "belum ditinjau"). */
+export async function clearQuizAiReview(attemptId) {
+  ensure();
+  const { error } = await supabase
+    .from("coaching_quiz_ai_reviews")
+    .delete()
+    .eq("attempt_id", attemptId);
+  if (error) throw error;
+}
+
+/**
  * Semua attempt buat sekumpulan lesson soal (satu course) — buat gradebook
  * admin. Dijaga RLS "coaching_quiz_attempts admin read".
  * Bentuk: { id, user_id, lesson_id, set_id, score, total, duration_sec, created_at }[]
