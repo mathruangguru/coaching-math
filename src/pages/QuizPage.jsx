@@ -9,6 +9,7 @@ import {
   openQuizProgress,
   getQuizProgress,
   saveQuizDraft,
+  logQuizTabAway,
   getQuestionStats,
   quizAccessNow,
 } from "../lib/quiz";
@@ -192,6 +193,28 @@ export default function QuizPage({ review = false }) {
     }, 800);
     return () => clearTimeout(t);
   }, [answers, data, result, started]);
+
+  // Catat tiap murid pindah tab lalu balik (buat riwayat pengerjaan admin).
+  useEffect(() => {
+    if (data.status !== "ready" || !data.set || result || !started) return;
+    const setId = data.set.id;
+    let hiddenAt = null;
+    const onVisibility = () => {
+      if (document.hidden) {
+        hiddenAt = Date.now();
+        return;
+      }
+      if (hiddenAt == null) return;
+      const away = Date.now() - hiddenAt;
+      hiddenAt = null;
+      if (away < 1000) return; // kedip sekilas, abaikan
+      logQuizTabAway(setId, away).catch((e) =>
+        console.warn("[QuizPage] log pindah tab gagal:", e)
+      );
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, [data, result, started]);
 
   // Detak per detik buat tampilan timer.
   useEffect(() => {

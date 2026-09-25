@@ -16,6 +16,7 @@ import {
   getAllAttempts,
   getAllQuizProgress,
   getQuizProgressAudit,
+  getQuizTabAways,
   getQuizAutosaveBursts,
   getQuizAiReviews,
   setQuizAiReview,
@@ -445,13 +446,40 @@ function AiReviewModal({ userName, flag, onSave, onClear, onClose }) {
   );
 }
 
+// "+22m 7d" = berapa lama setelah `startedIso` kejadian `iso` terjadi.
+function fmtElapsed(iso, startedIso) {
+  if (!iso || !startedIso) return "—";
+  const sec = Math.round((new Date(iso) - new Date(startedIso)) / 1000);
+  return sec < 0 ? `−${fmtDur(-sec)}` : `+${fmtDur(sec)}`;
+}
+
+function fmtClock(iso) {
+  try {
+    return new Date(iso)
+      .toLocaleTimeString("id-ID", {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hourCycle: "h23",
+      })
+      .replace(/\./g, ":");
+  } catch {
+    return "—";
+  }
+}
+
+const auditCell = "border border-zinc-100 px-2.5 py-1.5 align-top";
+
 /**
- * Riwayat coaching_quiz_progress buat satu (user, set) — dari tabel audit
- * (supabase/quiz-progress-guard.sql). Ketuk ikon jam di kolom Waktu buat
- * nelusurin kejadian ganjil (mis. durasi 0 padahal jawaban penuh).
+ * Riwayat pengerjaan satu (user, set): tabel kejadian dari tabel audit
+ * progress (supabase/quiz-progress-guard.sql) + catatan pindah tab
+ * (supabase/quiz-tab-away.sql), lengkap dengan "berapa lama setelah mulai".
+ * Ketuk ikon jam di kolom Waktu buat nelusurin kejadian ganjil (mis.
+ * durasi 0 padahal jawaban penuh, atau jawaban masuk pas habis pindah tab).
  */
 function ProgressAuditModal({ userId, setId, userName, questions, onClose }) {
   const [rows, setRows] = useState(null); // null = loading
+  const [aways, setAways] = useState([]);
   const [failed, setFailed] = useState(false);
 
   const qIndex = useMemo(() => {
@@ -477,10 +505,49 @@ function ProgressAuditModal({ userId, setId, userName, questions, onClose }) {
     return out;
   }, [rows]);
 
+  // Waktu mulai = started_at dari event INSERT (Mulai); kalau nggak ada
+  // (progress lama sebelum audit), started_at paling awal yang tercatat.
+  const startedAt = useMemo(() => {
+    if (!rows) return null;
+    const ins = rows.find((r) => r.op === "INSERT" && r.started_at);
+    if (ins) return ins.started_at;
+    const all = rows.map((r) => r.started_at).filter(Boolean);
+    return all.length
+      ? all.reduce((a, b) => (new Date(a) <= new Date(b) ? a : b))
+      : null;
+  }, [rows]);
+
+  // Audit + pindah tab digabung, terbaru dulu.
+  const timeline = useMemo(() => {
+    if (!rows) return null;
+    return [
+      ...rows.map((r) => ({ kind: "audit", id: r.id, at: r.logged_at, r })),
+      ...aways.map((w) => ({
+        kind: "away",
+        id: `away:${w.id}`,
+        at: w.created_at,
+        w,
+      })),
+    ].sort((a, b) => new Date(b.at) - new Date(a.at));
+  }, [rows, aways]);
+
+  const awayTotalMs = aways.reduce((n, w) => n + w.away_ms, 0);
+
   useEffect(() => {
     let alive = true;
-    getQuizProgressAudit(userId, setId)
-      .then((d) => alive && setRows(d))
+    Promise.all([
+      getQuizProgressAudit(userId, setId),
+      // Tabel pindah tab opsional (SQL-nya bisa belum dijalankan).
+      getQuizTabAways(userId, setId).catch((err) => {
+        console.warn("[admin] catatan pindah tab nggak kebaca:", err);
+        return [];
+      }),
+    ])
+      .then(([d, w]) => {
+        if (!alive) return;
+        setRows(d);
+        setAways(w);
+      })
       .catch((err) => {
         console.error("[admin] gagal memuat audit progress:", err);
         if (alive) setFailed(true);
@@ -502,7 +569,7 @@ function ProgressAuditModal({ userId, setId, userName, questions, onClose }) {
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white shadow-xl"
+        className="w-full max-w-3xl rounded-2xl border border-zinc-200 bg-white shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between gap-3 border-b border-zinc-100 px-5 py-3.5">
@@ -510,7 +577,23 @@ function ProgressAuditModal({ userId, setId, userName, questions, onClose }) {
             <h3 className="truncate text-sm font-bold text-zinc-900">
               Riwayat pengerjaan
             </h3>
-            <p className="truncate text-xs text-zinc-400">{userName}</p>
+            <p className="truncate text-xs text-zinc-400">
+              {userName}
+              {startedAt && (
+                <>
+                  {" · mulai "}
+                  <span className="font-medium text-zinc-600">
+                    {fmtDateTime(startedAt)}
+                  </span>
+                </>
+              )}
+            </p>
+            {aways.length > 0 && (
+              <p className="mt-0.5 text-xs font-medium text-violet-600">
+                Pindah tab {aways.length}× · total pergi{" "}
+                {fmtDur(awayTotalMs / 1000)}
+              </p>
+            )}
           </div>
           <button
             type="button"
@@ -522,11 +605,11 @@ function ProgressAuditModal({ userId, setId, userName, questions, onClose }) {
           </button>
         </div>
 
-        <div className="max-h-[60vh] overflow-y-auto p-5">
+        <div className="max-h-[70vh] overflow-auto p-5">
           {rows === null && !failed && (
             <div className="flex flex-col gap-2">
               {Array.from({ length: 3 }).map((_, i) => (
-                <Skeleton key={i} className="h-12 w-full rounded-lg" />
+                <Skeleton key={i} className="h-10 w-full rounded-lg" />
               ))}
             </div>
           )}
@@ -539,80 +622,136 @@ function ProgressAuditModal({ userId, setId, userName, questions, onClose }) {
               udah dijalankan.
             </p>
           )}
-          {rows && rows.length === 0 && (
+          {timeline && timeline.length === 0 && (
             <p className="text-xs text-zinc-400">
               Belum ada riwayat (murid belum pernah mulai ngerjain set ini).
             </p>
           )}
-          {rows && rows.length > 0 && (
-            <ul className="flex flex-col gap-2">
-              {rows.map((r) => {
-                const diff = diffById.get(r.id) ?? [];
-                return (
-                  <li
-                    key={r.id}
-                    className="rounded-lg border border-zinc-100 px-3 py-2"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span
-                        className={`rounded px-1.5 py-0.5 text-[11px] font-semibold ${
-                          AUDIT_OP_STYLE[r.op] ?? "bg-zinc-100 text-zinc-500"
-                        }`}
-                      >
-                        {AUDIT_OP_LABEL[r.op] ?? r.op}
-                      </span>
-                      <span className="shrink-0 text-[11px] text-zinc-400">
-                        {fmtDateTime(r.logged_at)}
-                      </span>
-                    </div>
-                    <p className="mt-1.5 text-[11px] text-zinc-500">
-                      {r.actor ? "Dari akun murid sendiri" : "Dari sistem (quiz-submit)"}
-                      {r.started_at && (
-                        <>
-                          {" · started_at: "}
-                          <span className="font-medium text-zinc-700">
-                            {fmtDateTime(r.started_at)}
+          {timeline && timeline.length > 0 && (
+            <table className="w-full min-w-[34rem] border-collapse text-left text-xs">
+              <thead>
+                <tr className="bg-zinc-50 text-[11px] font-semibold text-zinc-500">
+                  <th className={auditCell}>Waktu</th>
+                  <th className={auditCell}>Sejak mulai</th>
+                  <th className={auditCell}>Kejadian</th>
+                  <th className={auditCell}>Detail</th>
+                </tr>
+              </thead>
+              <tbody>
+                {timeline.map((e) => {
+                  if (e.kind === "away") {
+                    const leftIso = new Date(
+                      new Date(e.w.created_at).getTime() - e.w.away_ms
+                    ).toISOString();
+                    return (
+                      <tr key={e.id} className="bg-violet-50/60">
+                        <td className={`${auditCell} whitespace-nowrap text-zinc-600`}>
+                          {fmtDateTime(e.w.created_at)}
+                        </td>
+                        <td
+                          className={`${auditCell} whitespace-nowrap font-semibold text-violet-700`}
+                        >
+                          {fmtElapsed(e.w.created_at, startedAt)}
+                        </td>
+                        <td className={auditCell}>
+                          <span className="rounded bg-violet-100 px-1.5 py-0.5 text-[11px] font-semibold text-violet-700">
+                            Pindah tab
                           </span>
-                        </>
-                      )}
-                    </p>
-                    {r.op === "UPDATE" && diff.length > 0 && (
-                      <ul className="mt-1.5 flex flex-col gap-0.5 border-t border-zinc-100 pt-1.5">
-                        {diff.map(({ qid, before, after }) => {
-                          const q = qById.get(qid);
-                          const num = qIndex.get(qid) ?? "?";
-                          const afterLabel = answerLabel(q, after);
-                          const beforeLabel = answerLabel(q, before);
-                          return (
-                            <li key={qid} className="text-[11px] text-zinc-600">
-                              <span className="font-semibold text-zinc-700">
-                                Soal {num}:
-                              </span>{" "}
-                              {afterLabel == null ? (
-                                <span className="text-zinc-400">dikosongin</span>
-                              ) : beforeLabel == null ? (
-                                <span className="font-medium text-zinc-800">
-                                  {afterLabel}
-                                </span>
-                              ) : (
-                                <>
-                                  <span className="text-zinc-400 line-through">
-                                    {beforeLabel}
+                        </td>
+                        <td className={`${auditCell} text-zinc-600`}>
+                          Keluar{" "}
+                          <span className="font-medium text-zinc-800">
+                            {fmtClock(leftIso)}
+                          </span>{" "}
+                          ({fmtElapsed(leftIso, startedAt)}), balik{" "}
+                          <span className="font-medium text-zinc-800">
+                            {fmtClock(e.w.created_at)}
+                          </span>{" "}
+                          — pergi{" "}
+                          <span className="font-semibold text-violet-700">
+                            {fmtDur(e.w.away_ms / 1000)}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  }
+
+                  const r = e.r;
+                  const diff = diffById.get(r.id) ?? [];
+                  return (
+                    <tr key={e.id}>
+                      <td className={`${auditCell} whitespace-nowrap text-zinc-600`}>
+                        {fmtDateTime(r.logged_at)}
+                      </td>
+                      <td
+                        className={`${auditCell} whitespace-nowrap font-semibold text-zinc-700`}
+                      >
+                        {fmtElapsed(r.logged_at, startedAt)}
+                      </td>
+                      <td className={auditCell}>
+                        <span
+                          className={`whitespace-nowrap rounded px-1.5 py-0.5 text-[11px] font-semibold ${
+                            AUDIT_OP_STYLE[r.op] ?? "bg-zinc-100 text-zinc-500"
+                          }`}
+                        >
+                          {AUDIT_OP_LABEL[r.op] ?? r.op}
+                        </span>
+                        <p className="mt-1 text-[10px] text-zinc-400">
+                          {r.actor ? "akun murid" : "sistem"}
+                        </p>
+                      </td>
+                      <td className={`${auditCell} text-zinc-600`}>
+                        {r.op === "UPDATE" && diff.length > 0 ? (
+                          <ul className="flex flex-col gap-0.5">
+                            {diff.map(({ qid, before, after }) => {
+                              const q = qById.get(qid);
+                              const num = qIndex.get(qid) ?? "?";
+                              const afterLabel = answerLabel(q, after);
+                              const beforeLabel = answerLabel(q, before);
+                              return (
+                                <li key={qid}>
+                                  <span className="font-semibold text-zinc-700">
+                                    Soal {num}:
                                   </span>{" "}
-                                  <span className="font-medium text-zinc-800">
-                                    {afterLabel}
-                                  </span>
-                                </>
-                              )}
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
+                                  {afterLabel == null ? (
+                                    <span className="text-zinc-400">
+                                      dikosongin
+                                    </span>
+                                  ) : beforeLabel == null ? (
+                                    <span className="font-medium text-zinc-800">
+                                      {afterLabel}
+                                    </span>
+                                  ) : (
+                                    <>
+                                      <span className="text-zinc-400 line-through">
+                                        {beforeLabel}
+                                      </span>{" "}
+                                      <span className="font-medium text-zinc-800">
+                                        {afterLabel}
+                                      </span>
+                                    </>
+                                  )}
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        ) : r.op === "INSERT" ? (
+                          <span className="text-zinc-400">
+                            Sesi dimulai (started_at dicatat server).
+                          </span>
+                        ) : r.op === "DELETE" ? (
+                          <span className="text-zinc-400">
+                            Progress dibersihkan — dikirim/selesai.
+                          </span>
+                        ) : (
+                          <span className="text-zinc-300">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           )}
         </div>
       </div>

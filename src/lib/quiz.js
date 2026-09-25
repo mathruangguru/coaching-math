@@ -625,6 +625,33 @@ export async function saveQuizDraft(setId, answers) {
 }
 
 /**
+ * Catat murid pindah tab lalu balik pas lagi ngerjain (`awayMs` = lama
+ * pergi). Jam server dipakai sebagai waktu "balik". Butuh
+ * supabase/quiz-tab-away.sql; kegagalan nggak boleh ganggu pengerjaan.
+ */
+export async function logQuizTabAway(setId, awayMs) {
+  if (!hasSupabase) return;
+  const { error } = await supabase.from("coaching_quiz_tab_aways").insert({
+    set_id: setId,
+    away_ms: Math.min(Math.max(0, Math.round(awayMs)), 86400000),
+  });
+  if (error) throw error;
+}
+
+/** Riwayat pindah tab satu (user, set), terbaru dulu. Admin-only (RLS). */
+export async function getQuizTabAways(userId, setId) {
+  ensure();
+  const { data, error } = await supabase
+    .from("coaching_quiz_tab_aways")
+    .select("id, away_ms, created_at")
+    .eq("user_id", userId)
+    .eq("set_id", setId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
+/**
  * Kirim jawaban -> dinilai di Edge Function -> { score, total, results }.
  */
 export async function submitQuiz(lessonId, setId, answers, durationMs) {
