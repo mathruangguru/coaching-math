@@ -638,6 +638,31 @@ export async function logQuizTabAway(setId, awayMs) {
   if (error) throw error;
 }
 
+/**
+ * Catat murid membuka satu soal (awal sesi + tiap pindah nomor). Butuh
+ * supabase/quiz-nav-log.sql; kegagalan nggak boleh ganggu pengerjaan.
+ */
+export async function logQuizNav(setId, questionId) {
+  if (!hasSupabase) return;
+  const { error } = await supabase
+    .from("coaching_quiz_nav_log")
+    .insert({ set_id: setId, question_id: questionId });
+  if (error) throw error;
+}
+
+/** Riwayat buka-soal satu (user, set), terbaru dulu. Admin-only (RLS). */
+export async function getQuizNavLog(userId, setId) {
+  ensure();
+  const { data, error } = await supabase
+    .from("coaching_quiz_nav_log")
+    .select("id, question_id, created_at")
+    .eq("user_id", userId)
+    .eq("set_id", setId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
 /** Riwayat pindah tab satu (user, set), terbaru dulu. Admin-only (RLS). */
 export async function getQuizTabAways(userId, setId) {
   ensure();

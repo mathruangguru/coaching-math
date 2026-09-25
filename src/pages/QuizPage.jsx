@@ -10,6 +10,7 @@ import {
   getQuizProgress,
   saveQuizDraft,
   logQuizTabAway,
+  logQuizNav,
   getQuestionStats,
   quizAccessNow,
 } from "../lib/quiz";
@@ -215,6 +216,18 @@ export default function QuizPage({ review = false }) {
     document.addEventListener("visibilitychange", onVisibility);
     return () => document.removeEventListener("visibilitychange", onVisibility);
   }, [data, result, started]);
+
+  // Catat tiap murid buka nomor soal (awal sesi/lanjut + tiap pindah nomor).
+  const lastNavRef = useRef(null);
+  useEffect(() => {
+    if (data.status !== "ready" || !data.set || result || !started) return;
+    const qid = data.set.questions?.[current]?.id;
+    if (!qid || lastNavRef.current === qid) return;
+    lastNavRef.current = qid;
+    logQuizNav(data.set.id, qid).catch((e) =>
+      console.warn("[QuizPage] log buka soal gagal:", e)
+    );
+  }, [current, data, result, started]);
 
   // Detak per detik buat tampilan timer.
   useEffect(() => {
