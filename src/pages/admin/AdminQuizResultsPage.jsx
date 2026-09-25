@@ -17,6 +17,7 @@ import {
   getAllQuizProgress,
   getQuizProgressAudit,
   getQuizTabAways,
+  getQuizNavLog,
   getQuizAutosaveBursts,
   getQuizAiReviews,
   setQuizAiReview,
@@ -480,6 +481,8 @@ const auditCell = "border border-zinc-100 px-2.5 py-1.5 align-top";
 function ProgressAuditModal({ userId, setId, userName, questions, onClose }) {
   const [rows, setRows] = useState(null); // null = loading
   const [aways, setAways] = useState([]);
+  const [navs, setNavs] = useState([]);
+  const [showNav, setShowNav] = useState(true);
   const [failed, setFailed] = useState(false);
 
   const qIndex = useMemo(() => {
@@ -517,11 +520,14 @@ function ProgressAuditModal({ userId, setId, userName, questions, onClose }) {
       : null;
   }, [rows]);
 
-  // Audit + pindah tab digabung, terbaru dulu.
+  // Audit + pindah tab + buka soal digabung, terbaru dulu.
   const timeline = useMemo(() => {
     if (!rows) return null;
     return [
       ...rows.map((r) => ({ kind: "audit", id: r.id, at: r.logged_at, r })),
+      ...(showNav
+        ? navs.map((n) => ({ kind: "nav", id: `nav:${n.id}`, at: n.created_at, n }))
+        : []),
       ...aways.map((w) => ({
         kind: "away",
         id: `away:${w.id}`,
@@ -529,7 +535,7 @@ function ProgressAuditModal({ userId, setId, userName, questions, onClose }) {
         w,
       })),
     ].sort((a, b) => new Date(b.at) - new Date(a.at));
-  }, [rows, aways]);
+  }, [rows, aways, navs, showNav]);
 
   const awayTotalMs = aways.reduce((n, w) => n + w.away_ms, 0);
 
@@ -542,11 +548,16 @@ function ProgressAuditModal({ userId, setId, userName, questions, onClose }) {
         console.warn("[admin] catatan pindah tab nggak kebaca:", err);
         return [];
       }),
+      getQuizNavLog(userId, setId).catch((err) => {
+        console.warn("[admin] catatan buka soal nggak kebaca:", err);
+        return [];
+      }),
     ])
-      .then(([d, w]) => {
+      .then(([d, w, n]) => {
         if (!alive) return;
         setRows(d);
         setAways(w);
+        setNavs(n);
       })
       .catch((err) => {
         console.error("[admin] gagal memuat audit progress:", err);
@@ -594,6 +605,16 @@ function ProgressAuditModal({ userId, setId, userName, questions, onClose }) {
                 {fmtDur(awayTotalMs / 1000)}
               </p>
             )}
+            {navs.length > 0 && (
+              <label className="mt-1 flex w-fit cursor-pointer items-center gap-1.5 text-xs font-medium text-sky-700">
+                <input
+                  type="checkbox"
+                  checked={showNav}
+                  onChange={(e) => setShowNav(e.target.checked)}
+                />
+                Tampilkan perpindahan soal ({navs.length})
+              </label>
+            )}
           </div>
           <button
             type="button"
@@ -639,6 +660,32 @@ function ProgressAuditModal({ userId, setId, userName, questions, onClose }) {
               </thead>
               <tbody>
                 {timeline.map((e) => {
+                  if (e.kind === "nav") {
+                    const num = qIndex.get(e.n.question_id);
+                    return (
+                      <tr key={e.id} className="bg-sky-50/50">
+                        <td className={`${auditCell} whitespace-nowrap text-zinc-600`}>
+                          {fmtDateTime(e.n.created_at)}
+                        </td>
+                        <td
+                          className={`${auditCell} whitespace-nowrap font-semibold text-sky-700`}
+                        >
+                          {fmtElapsed(e.n.created_at, startedAt)}
+                        </td>
+                        <td className={auditCell}>
+                          <span className="whitespace-nowrap rounded bg-sky-100 px-1.5 py-0.5 text-[11px] font-semibold text-sky-700">
+                            Buka soal
+                          </span>
+                        </td>
+                        <td className={`${auditCell} text-zinc-600`}>
+                          Soal{" "}
+                          <span className="font-semibold text-zinc-800">
+                            {num ?? "?"}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  }
                   if (e.kind === "away") {
                     const leftIso = new Date(
                       new Date(e.w.created_at).getTime() - e.w.away_ms
