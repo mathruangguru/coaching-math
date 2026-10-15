@@ -3,41 +3,58 @@ import { supabase, hasSupabase } from "./supabase";
 // Keaktifan murid per sesi (jenis materi 'keaktifan'). Admin yang mencatat,
 // murid cuma melihat. Butuh supabase/keaktifan.sql.
 
-// key = nilai `kind` di DB. `label` = nama pendek (admin), `sentence` = yang
-// dibaca murid ("Kamu …").
+// key = nilai di kolom `kinds` (array) di DB. Tiga toggle yang boleh
+// dikombinasikan per murid per materi.
 export const ACTIVITY_KINDS = [
-  {
-    key: "presentasi",
-    label: "Presentasi",
-    sentence: "Kamu melakukan presentasi pada sesi ini",
-  },
-  {
-    key: "tanya_jawab",
-    label: "Tanya Jawab",
-    sentence:
-      "Kamu aktif berdiskusi melalui sesi tanya jawab pada sesi ini",
-  },
-  {
-    key: "on_chat",
-    label: "On Chat",
-    sentence: "Kamu aktif berdiskusi melalui chat pada sesi ini",
-  },
-  {
-    key: "tanya_jawab_on_chat",
-    label: "Tanya Jawab dan On Chat",
-    sentence:
-      "Kamu aktif berdiskusi melalui sesi tanya jawab maupun melalui chat pada sesi ini",
-  },
+  { key: "presentasi", label: "Presentasi" },
+  { key: "tanya_jawab", label: "Tanya Jawab" },
+  { key: "on_chat", label: "On Chat" },
 ];
 
-export const activityKind = (key) =>
-  ACTIVITY_KINDS.find((k) => k.key === key) ?? null;
+const ORDER = ACTIVITY_KINDS.map((k) => k.key);
+
+// ["a", "b", "c"] -> "a, b dan c"
+const joinId = (xs) =>
+  xs.length <= 1
+    ? (xs[0] ?? "")
+    : `${xs.slice(0, -1).join(", ")} dan ${xs[xs.length - 1]}`;
+
+/**
+ * Ringkasan buat murid dari kombinasi toggle: { label, sentence } atau null
+ * kalau kosong. Contoh:
+ *   [presentasi]                -> "Kamu melakukan presentasi pada sesi ini"
+ *   [tanya_jawab, on_chat]      -> "Kamu aktif berdiskusi melalui sesi tanya
+ *                                   jawab maupun melalui chat pada sesi ini"
+ *   [presentasi, on_chat]       -> "Kamu melakukan presentasi dan aktif
+ *                                   berdiskusi melalui chat pada sesi ini"
+ */
+export function activitySummary(kinds) {
+  const set = new Set(Array.isArray(kinds) ? kinds : []);
+  const picked = ORDER.filter((k) => set.has(k));
+  if (picked.length === 0) return null;
+
+  const tj = set.has("tanya_jawab");
+  const chat = set.has("on_chat");
+  const parts = [];
+  if (set.has("presentasi")) parts.push("melakukan presentasi");
+  if (tj && chat)
+    parts.push("aktif berdiskusi melalui sesi tanya jawab maupun melalui chat");
+  else if (tj) parts.push("aktif berdiskusi melalui sesi tanya jawab");
+  else if (chat) parts.push("aktif berdiskusi melalui chat");
+
+  return {
+    label: joinId(
+      picked.map((k) => ACTIVITY_KINDS.find((x) => x.key === k).label)
+    ),
+    sentence: `Kamu ${parts.join(" dan ")} pada sesi ini`,
+  };
+}
 
 function ensure() {
   if (!hasSupabase) throw new Error("Supabase belum dikonfigurasi.");
 }
 
-/** Catatan keaktifan milik user yang login: { [lessonId]: kind }. */
+/** Catatan keaktifan milik user yang login: { [lessonId]: kinds[] }. */
 export async function getMyActivityMarks(lessonIds) {
   if (!hasSupabase || !lessonIds?.length) return {};
   const {
@@ -48,29 +65,30 @@ export async function getMyActivityMarks(lessonIds) {
   // catatan murid lain ikut kebaca sebagai milik admin.
   const { data, error } = await supabase
     .from("coaching_activity_marks")
-    .select("lesson_id, kind")
+    .select("lesson_id, kinds")
     .eq("user_id", user.id)
     .in("lesson_id", lessonIds);
   if (error) throw error;
-  return Object.fromEntries(data.map((r) => [r.lesson_id, r.kind]));
+  return Object.fromEntries(data.map((r) => [r.lesson_id, r.kinds]));
 }
 
-/** Admin: semua catatan buat daftar lesson. Bentuk: { lesson_id, user_id, kind }[]. */
+/** Admin: semua catatan buat daftar lesson. Bentuk: { lesson_id, user_id, kinds[] }[]. */
 export async function getActivityMarks(lessonIds) {
   ensure();
   if (!lessonIds?.length) return [];
   const { data, error } = await supabase
     .from("coaching_activity_marks")
-    .select("lesson_id, user_id, kind")
+    .select("lesson_id, user_id, kinds")
     .in("lesson_id", lessonIds);
   if (error) throw error;
   return data;
 }
 
-/** Admin: set / ganti catatan seorang murid. `kind` null = hapus catatan. */
-export async function setActivityMark(lessonId, userId, kind) {
+/** Admin: set / ganti catatan seorang murid. `kinds` kosong = hapus catatan. */
+export async function setActivityMark(lessonId, userId, kinds) {
   ensure();
-  if (!kind) {
+  const clean = ORDER.filter((k) => kinds?.includes(k));
+  if (clean.length === 0) {
     const { error } = await supabase
       .from("coaching_activity_marks")
       .delete()
@@ -86,7 +104,7 @@ export async function setActivityMark(lessonId, userId, kind) {
     {
       lesson_id: lessonId,
       user_id: userId,
-      kind,
+      kinds: clean,
       marked_by: user?.id ?? null,
       updated_at: new Date().toISOString(),
     },

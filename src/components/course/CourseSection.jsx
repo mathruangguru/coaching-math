@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { ChevronDown, Check, Sparkles } from "lucide-react";
 import { useAuth } from "../../context/auth-context";
 import LessonIcon from "../ui/LessonIcon";
-import { activityKind } from "../../lib/activity";
+import { activitySummary } from "../../lib/activity";
 
 const typeTint = {
   materi: "bg-zinc-100 text-zinc-500",
@@ -242,7 +242,7 @@ const GRID = "grid items-start gap-3 sm:grid-cols-2 lg:grid-cols-3";
 
 // Banner keaktifan murid di pertemuan ini (dicatat admin). Nggak ada catatan
 // = nggak ada banner.
-function ActivityBanner({ kind }) {
+function ActivityBanner({ summary }) {
   return (
     <div className="flex items-center gap-3 rounded-xl border border-teal-200 bg-teal-50/60 px-4 py-3">
       <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-teal-500 text-white">
@@ -250,10 +250,10 @@ function ActivityBanner({ kind }) {
       </span>
       <div className="min-w-0">
         <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-teal-700">
-          Keaktifan · {kind.label}
+          Keaktifan · {summary.label}
         </p>
         <p className="text-sm font-semibold leading-snug text-zinc-900">
-          {kind.sentence}.
+          {summary.sentence}.
         </p>
       </div>
     </div>
@@ -272,7 +272,7 @@ export default function CourseSection({
   // cuma buat murid yang dicatat aktif oleh admin.
   const banners = section.items
     .filter((it) => it.type === "keaktifan")
-    .map((it) => activityKind(progress.activity?.[it.id]))
+    .map((it) => activitySummary(progress.activity?.[it.id]))
     .filter(Boolean);
   const items = section.items.filter((it) => it.type !== "keaktifan");
 
@@ -328,8 +328,8 @@ export default function CourseSection({
 
       {open && (
         <div className="mt-2 flex flex-col gap-4">
-          {banners.map((k, i) => (
-            <ActivityBanner key={`${k.key}:${i}`} kind={k} />
+          {banners.map((b, i) => (
+            <ActivityBanner key={i} summary={b} />
           ))}
           {groups.map((g) =>
             g.title == null ? (
