@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { ChevronDown, Check } from "lucide-react";
+import { ChevronDown, Check, Sparkles } from "lucide-react";
 import { useAuth } from "../../context/auth-context";
 import LessonIcon from "../ui/LessonIcon";
 import { activityKind } from "../../lib/activity";
@@ -17,7 +17,6 @@ const typeTint = {
   presensi: "bg-emerald-50 text-emerald-600",
   refleksi: "bg-rose-50 text-rose-600",
   feedback: "bg-indigo-50 text-indigo-600",
-  keaktifan: "bg-fuchsia-50 text-fuchsia-600",
 };
 
 const pill = "rounded px-1.5 py-0.5 text-[10px] font-semibold";
@@ -54,15 +53,7 @@ function DoneBadge({ children }) {
   );
 }
 
-function CardInner({
-  item,
-  done,
-  att,
-  score,
-  quizStarted,
-  isFeedbackTarget,
-  activity,
-}) {
+function CardInner({ item, done, att, score, quizStarted, isFeedbackTarget }) {
   const soon =
     (item.type === "soal" && !item.question_set_id) ||
     (item.type === "form" && !item.form_id && !item.url) ||
@@ -91,16 +82,8 @@ function CardInner({
   const isPresensi = !!att && att.rounds > 0;
   const hadirPenuh = isPresensi && att.mine >= att.rounds;
 
-  const isKeaktifan = item.type === "keaktifan";
-
   const hasMetaRow =
-    meta ||
-    isForm ||
-    isFeedback ||
-    isQuiz ||
-    isPresensi ||
-    isKeaktifan ||
-    notPublish;
+    meta || isForm || isFeedback || isQuiz || isPresensi || notPublish;
 
   return (
     <>
@@ -156,13 +139,6 @@ function CardInner({
                 </span>
               ))}
 
-            {isKeaktifan &&
-              (activity ? (
-                <DoneBadge>Aktif · {activityKind(activity)?.label}</DoneBadge>
-              ) : (
-                <span className={pillMuted}>Belum tercatat</span>
-              ))}
-
             {notPublish && <span className={pillMuted}>Not publish</span>}
           </span>
         )}
@@ -195,7 +171,6 @@ function LessonCard({ item, courseId, progress, profile }) {
   const article = item.type === "materi" && item.content;
   const quiz = item.type === "soal" && item.question_set_id;
   const presensi = item.type === "presensi";
-  const keaktifan = item.type === "keaktifan";
   const feedback =
     item.type === "feedback" && item.form_id && item.target_user_id;
   const isFeedbackTarget = feedback && profile?.id === item.target_user_id;
@@ -226,8 +201,7 @@ function LessonCard({ item, courseId, progress, profile }) {
     quiz ||
     inAppForm ||
     feedback ||
-    presensi ||
-    keaktifan
+    presensi
   ) {
     const to = recording
       ? `/course/${courseId}/recording/${item.id}`
@@ -241,9 +215,7 @@ function LessonCard({ item, courseId, progress, profile }) {
               ? `/course/${courseId}/materi/${item.id}`
               : presensi
                 ? `/course/${courseId}/presensi/${item.id}`
-                : keaktifan
-                  ? `/course/${courseId}/keaktifan/${item.id}`
-                  : inAppForm || feedback
+                : inAppForm || feedback
                   ? `/course/${courseId}/${item.type}/${item.id}`
                   : `/course/${courseId}/soal/${item.id}`;
     return (
@@ -255,7 +227,6 @@ function LessonCard({ item, courseId, progress, profile }) {
           score={score}
           quizStarted={quizStarted}
           isFeedbackTarget={isFeedbackTarget}
-          activity={keaktifan ? progress.activity?.[item.id] : null}
         />
       </Link>
     );
@@ -269,6 +240,26 @@ function LessonCard({ item, courseId, progress, profile }) {
 
 const GRID = "grid items-start gap-3 sm:grid-cols-2 lg:grid-cols-3";
 
+// Banner keaktifan murid di pertemuan ini (dicatat admin). Nggak ada catatan
+// = nggak ada banner.
+function ActivityBanner({ kind }) {
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-teal-200 bg-teal-50/60 px-4 py-3">
+      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-teal-500 text-white">
+        <Sparkles size={16} />
+      </span>
+      <div className="min-w-0">
+        <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-teal-700">
+          Keaktifan · {kind.label}
+        </p>
+        <p className="text-sm font-semibold leading-snug text-zinc-900">
+          {kind.sentence}.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export default function CourseSection({
   section,
   courseId,
@@ -277,13 +268,21 @@ export default function CourseSection({
   const [open, setOpen] = useState(section.default_open !== false);
   const { profile } = useAuth();
 
+  // Materi 'keaktifan' bukan kartu: jadi banner di atas pertemuan ini, dan
+  // cuma buat murid yang dicatat aktif oleh admin.
+  const banners = section.items
+    .filter((it) => it.type === "keaktifan")
+    .map((it) => activityKind(progress.activity?.[it.id]))
+    .filter(Boolean);
+  const items = section.items.filter((it) => it.type !== "keaktifan");
+
   // Grup materi: yang tanpa subbagian dulu, lalu tiap subbagian (urut
   // position) beserta materinya. Subbagian kosong disembunyiin.
   const subs = [...(section.subsections ?? [])].sort(
     (a, b) => (a.position ?? 0) - (b.position ?? 0),
   );
   const subIds = new Set(subs.map((s) => s.id));
-  const loose = section.items.filter(
+  const loose = items.filter(
     (it) => !it.subsection_id || !subIds.has(it.subsection_id),
   );
   const groups = [
@@ -292,7 +291,7 @@ export default function CourseSection({
       .map((s) => ({
         key: s.id,
         title: s.title,
-        items: section.items.filter((it) => it.subsection_id === s.id),
+        items: items.filter((it) => it.subsection_id === s.id),
       }))
       .filter((g) => g.items.length > 0),
   ].filter((g) => g.items.length > 0);
@@ -323,12 +322,15 @@ export default function CourseSection({
           {section.title}
         </span>
         <span className="shrink-0 text-xs font-medium text-zinc-400">
-          {section.items.length} materi
+          {items.length} materi
         </span>
       </button>
 
       {open && (
         <div className="mt-2 flex flex-col gap-4">
+          {banners.map((k, i) => (
+            <ActivityBanner key={`${k.key}:${i}`} kind={k} />
+          ))}
           {groups.map((g) =>
             g.title == null ? (
               <div key={g.key} className={GRID}>

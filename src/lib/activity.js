@@ -40,9 +40,16 @@ function ensure() {
 /** Catatan keaktifan milik user yang login: { [lessonId]: kind }. */
 export async function getMyActivityMarks(lessonIds) {
   if (!hasSupabase || !lessonIds?.length) return {};
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return {};
+  // Filter user_id eksplisit: admin lolos RLS ke SEMUA baris, jadi tanpa ini
+  // catatan murid lain ikut kebaca sebagai milik admin.
   const { data, error } = await supabase
     .from("coaching_activity_marks")
     .select("lesson_id, kind")
+    .eq("user_id", user.id)
     .in("lesson_id", lessonIds);
   if (error) throw error;
   return Object.fromEntries(data.map((r) => [r.lesson_id, r.kind]));
