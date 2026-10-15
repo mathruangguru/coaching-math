@@ -220,6 +220,7 @@ const typeTint = {
   form: "bg-violet-50 text-violet-600",
   presensi: "bg-emerald-50 text-emerald-600",
   refleksi: "bg-rose-50 text-rose-600",
+  keaktifan: "bg-fuchsia-50 text-fuchsia-600",
 };
 
 const cell =

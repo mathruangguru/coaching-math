@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { ChevronDown, Check } from "lucide-react";
 import { useAuth } from "../../context/auth-context";
 import LessonIcon from "../ui/LessonIcon";
+import { activityKind } from "../../lib/activity";
 
 const typeTint = {
   materi: "bg-zinc-100 text-zinc-500",
@@ -16,6 +17,7 @@ const typeTint = {
   presensi: "bg-emerald-50 text-emerald-600",
   refleksi: "bg-rose-50 text-rose-600",
   feedback: "bg-indigo-50 text-indigo-600",
+  keaktifan: "bg-fuchsia-50 text-fuchsia-600",
 };
 
 const pill = "rounded px-1.5 py-0.5 text-[10px] font-semibold";
@@ -52,7 +54,15 @@ function DoneBadge({ children }) {
   );
 }
 
-function CardInner({ item, done, att, score, quizStarted, isFeedbackTarget }) {
+function CardInner({
+  item,
+  done,
+  att,
+  score,
+  quizStarted,
+  isFeedbackTarget,
+  activity,
+}) {
   const soon =
     (item.type === "soal" && !item.question_set_id) ||
     (item.type === "form" && !item.form_id && !item.url) ||
@@ -81,8 +91,16 @@ function CardInner({ item, done, att, score, quizStarted, isFeedbackTarget }) {
   const isPresensi = !!att && att.rounds > 0;
   const hadirPenuh = isPresensi && att.mine >= att.rounds;
 
+  const isKeaktifan = item.type === "keaktifan";
+
   const hasMetaRow =
-    meta || isForm || isFeedback || isQuiz || isPresensi || notPublish;
+    meta ||
+    isForm ||
+    isFeedback ||
+    isQuiz ||
+    isPresensi ||
+    isKeaktifan ||
+    notPublish;
 
   return (
     <>
@@ -138,6 +156,13 @@ function CardInner({ item, done, att, score, quizStarted, isFeedbackTarget }) {
                 </span>
               ))}
 
+            {isKeaktifan &&
+              (activity ? (
+                <DoneBadge>Aktif · {activityKind(activity)?.label}</DoneBadge>
+              ) : (
+                <span className={pillMuted}>Belum tercatat</span>
+              ))}
+
             {notPublish && <span className={pillMuted}>Not publish</span>}
           </span>
         )}
@@ -155,6 +180,7 @@ const EMPTY_PROGRESS = {
   att: {},
   score: {},
   quizStarted: new Set(),
+  activity: {},
 };
 
 function LessonCard({ item, courseId, progress, profile }) {
@@ -169,6 +195,7 @@ function LessonCard({ item, courseId, progress, profile }) {
   const article = item.type === "materi" && item.content;
   const quiz = item.type === "soal" && item.question_set_id;
   const presensi = item.type === "presensi";
+  const keaktifan = item.type === "keaktifan";
   const feedback =
     item.type === "feedback" && item.form_id && item.target_user_id;
   const isFeedbackTarget = feedback && profile?.id === item.target_user_id;
@@ -199,7 +226,8 @@ function LessonCard({ item, courseId, progress, profile }) {
     quiz ||
     inAppForm ||
     feedback ||
-    presensi
+    presensi ||
+    keaktifan
   ) {
     const to = recording
       ? `/course/${courseId}/recording/${item.id}`
@@ -213,7 +241,9 @@ function LessonCard({ item, courseId, progress, profile }) {
               ? `/course/${courseId}/materi/${item.id}`
               : presensi
                 ? `/course/${courseId}/presensi/${item.id}`
-                : inAppForm || feedback
+                : keaktifan
+                  ? `/course/${courseId}/keaktifan/${item.id}`
+                  : inAppForm || feedback
                   ? `/course/${courseId}/${item.type}/${item.id}`
                   : `/course/${courseId}/soal/${item.id}`;
     return (
@@ -225,6 +255,7 @@ function LessonCard({ item, courseId, progress, profile }) {
           score={score}
           quizStarted={quizStarted}
           isFeedbackTarget={isFeedbackTarget}
+          activity={keaktifan ? progress.activity?.[item.id] : null}
         />
       </Link>
     );

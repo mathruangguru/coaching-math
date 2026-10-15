@@ -18,6 +18,7 @@ import ImagePage from "./pages/ImagePage";
 import QuizPage from "./pages/QuizPage";
 import FormPage from "./pages/FormPage";
 import PresensiPage from "./pages/PresensiPage";
+import KeaktifanPage from "./pages/KeaktifanPage";
 import ProfilePage from "./pages/ProfilePage";
 import RequireAdmin from "./components/admin/RequireAdmin";
 import AdminLayout from "./components/admin/AdminLayout";
@@ -90,6 +91,10 @@ export default function App() {
           <Route
             path="course/:courseId/presensi/:lessonId"
             element={<PresensiPage />}
+          />
+          <Route
+            path="course/:courseId/keaktifan/:lessonId"
+            element={<KeaktifanPage />}
           />
           <Route
             path="course/:courseId/refleksi"

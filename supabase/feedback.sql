@@ -23,7 +23,8 @@ alter table public.coaching_lessons drop constraint if exists coaching_lessons_t
 alter table public.coaching_lessons
   add constraint coaching_lessons_type_check
     check (type in ('materi', 'soal', 'meet', 'recording', 'slide', 'pdf',
-                    'form', 'presensi', 'refleksi', 'feedback', 'image'));
+                    'form', 'presensi', 'refleksi', 'feedback', 'image',
+                    'keaktifan'));
 
 -- target_user_id = "orang X" ronde ini. target_name didenormalisasi
 -- (nama tersimpan pas admin milih) -- murid biasa nggak bisa baca

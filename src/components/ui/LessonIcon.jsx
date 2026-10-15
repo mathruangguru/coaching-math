@@ -11,6 +11,7 @@ import {
   UserCheck,
   NotebookPen,
   MessageSquareHeart,
+  Sparkles,
   Circle,
 } from "lucide-react";
 
@@ -26,6 +27,7 @@ const icons = {
   presensi: UserCheck,
   refleksi: NotebookPen,
   feedback: MessageSquareHeart,
+  keaktifan: Sparkles,
 };
 
 // Merender ikon sesuai tipe item materi.
