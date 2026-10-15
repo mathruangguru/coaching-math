@@ -15,6 +15,7 @@ import {
   quizAccessNow,
 } from "../lib/quiz";
 import Skeleton from "../components/ui/Skeleton";
+import ScratchUpload from "../components/quiz/ScratchUpload";
 
 const Markdown = lazy(() => import("../components/ui/Markdown"));
 
@@ -661,6 +662,9 @@ export default function QuizPage({ review = false }) {
             Lihat Soal
           </Link>
         </div>
+        {lesson.scratch_enabled === true && (
+          <ScratchUpload lessonId={lessonId} />
+        )}
         {timeUpModal}
       </div>
     );

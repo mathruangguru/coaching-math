@@ -7,6 +7,7 @@ import {
   Check,
   History,
   Flag,
+  Image as ImageIcon,
   X,
 } from "lucide-react";
 import { getUsers } from "../../lib/users";
@@ -26,6 +27,7 @@ import {
   toAnswerArray,
   sameAnswerSet,
 } from "../../lib/quiz";
+import { getScratchCounts, listScratch } from "../../lib/scratch";
 import Skeleton from "../../components/ui/Skeleton";
 
 const Markdown = lazy(() => import("../../components/ui/Markdown"));
@@ -262,6 +264,38 @@ function useAiFlags(attempts) {
     });
 
   return { ...state, setReview };
+}
+
+// Jumlah foto coret-coretan per attempt (Map attempt_id -> n). Gagal (mis.
+// SQL belum dijalankan) -> kosong, tabel tetap jalan.
+function useScratchCounts(attempts) {
+  const setKey = useMemo(
+    () =>
+      [...new Set(attempts.map((a) => a.set_id).filter(Boolean))]
+        .sort()
+        .join("|") + `#${attempts.length}`,
+    [attempts]
+  );
+  const [counts, setCounts] = useState(() => new Map());
+
+  // Ikut ke-refresh tiap `attempts` diganti (auto-refresh halaman 15 dtk),
+  // biar foto yang baru masuk muncul tanpa reload.
+  useEffect(() => {
+    let alive = true;
+    const ids = setKey.split("#")[0].split("|").filter(Boolean);
+    Promise.all(ids.map((id) => getScratchCounts(id).catch(() => new Map())))
+      .then((maps) => {
+        if (!alive) return;
+        const all = new Map();
+        for (const m of maps) for (const [k, v] of m) all.set(k, v);
+        setCounts(all);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [setKey, attempts]);
+
+  return counts;
 }
 
 function AiFlagButton({ flag, onClick }) {
@@ -806,6 +840,105 @@ function ProgressAuditModal({ userId, setId, userName, questions, onClose }) {
   );
 }
 
+// Foto coret-coretan satu attempt (dikumpulkan murid setelah submit).
+function ScratchModal({ attempt, userName, onClose }) {
+  const [files, setFiles] = useState(null); // null = loading
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    listScratch(attempt.id)
+      .then((d) => alive && setFiles(d))
+      .catch((err) => {
+        console.error("[admin] gagal memuat coret-coretan:", err);
+        if (alive) setFailed(true);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [attempt.id]);
+
+  useEffect(() => {
+    const onKey = (e) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-zinc-900/40 p-4 sm:p-8"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-2xl rounded-2xl border border-zinc-200 bg-white shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between gap-3 border-b border-zinc-100 px-5 py-3.5">
+          <div className="min-w-0">
+            <h3 className="truncate text-sm font-bold text-zinc-900">
+              Coret-coretan
+            </h3>
+            <p className="truncate text-xs text-zinc-400">
+              {userName} · submit {fmtDateTime(attempt.created_at)}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Tutup"
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700"
+          >
+            <X size={16} />
+          </button>
+        </div>
+        <div className="max-h-[70vh] overflow-y-auto p-5">
+          {files === null && !failed && (
+            <Skeleton className="h-40 w-full rounded-lg" />
+          )}
+          {failed && (
+            <p className="text-xs text-rose-500">
+              Gagal memuat. Pastikan{" "}
+              <code className="rounded bg-zinc-100 px-1 py-0.5">
+                supabase/quiz-scratch.sql
+              </code>{" "}
+              udah dijalankan.
+            </p>
+          )}
+          {files && files.length === 0 && (
+            <p className="text-xs text-zinc-400">Belum ada foto.</p>
+          )}
+          {files && files.length > 0 && (
+            <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {files.map((f, i) => (
+                <li key={f.id}>
+                  <a
+                    href={f.url ?? undefined}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block aspect-square overflow-hidden rounded-lg border border-zinc-200 bg-zinc-50"
+                  >
+                    {f.url && (
+                      <img
+                        src={f.url}
+                        alt={`Coret-coretan ${i + 1}`}
+                        className="h-full w-full object-cover"
+                      />
+                    )}
+                  </a>
+                  <p className="mt-1 text-[11px] text-zinc-400">
+                    #{i + 1} · {fmtElapsed(f.created_at, attempt.created_at)}{" "}
+                    setelah submit
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const answeredOf = (ans) =>
   Object.values(ans ?? {}).filter((v) =>
     Array.isArray(v) ? v.length > 0 : v != null && v !== ""
@@ -933,6 +1066,9 @@ function ResultTable({
   // { userId, setId, userName } | null — target modal riwayat progress.
   const [auditFor, setAuditFor] = useState(null);
   const ai = useAiFlags(attempts);
+  const scratchCounts = useScratchCounts(attempts);
+  // { attempt, userName } | null — target modal foto coret-coretan.
+  const [scratchFor, setScratchFor] = useState(null);
   // { attempt, userName } | null — target modal tinjau dugaan AI.
   const [reviewFor, setReviewFor] = useState(null);
   const flagOf = (a) => {
@@ -1089,6 +1225,21 @@ function ResultTable({
                     >
                       <History size={12} />
                     </button>
+                    {(scratchCounts.get(a.id) ?? 0) > 0 && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setScratchFor({
+                            attempt: a,
+                            userName: u ? fullName(u) : a.user_id,
+                          })
+                        }
+                        title="Lihat foto coret-coretan"
+                        className="inline-flex shrink-0 items-center gap-0.5 rounded px-1 py-0.5 text-[10px] font-bold leading-none text-sky-600 ring-1 ring-sky-200 transition-colors hover:bg-sky-50"
+                      >
+                        <ImageIcon size={11} /> {scratchCounts.get(a.id)}
+                      </button>
+                    )}
                     <AiFlagButton
                       flag={flagOf(a)}
                       onClick={() =>
@@ -1226,6 +1377,14 @@ function ResultTable({
           userName={auditFor.userName}
           questions={questions}
           onClose={() => setAuditFor(null)}
+        />
+      )}
+
+      {scratchFor && (
+        <ScratchModal
+          attempt={scratchFor.attempt}
+          userName={scratchFor.userName}
+          onClose={() => setScratchFor(null)}
         />
       )}
 
