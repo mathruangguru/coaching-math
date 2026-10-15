@@ -22,7 +22,7 @@ export default function CourseActivity({ courseId }) {
   const [state, setState] = useState({ status: "loading" });
   const [students, setStudents] = useState([]); // [{ id, name, email }]
   const [lessons, setLessons] = useState([]); // [{ id, title, section }]
-  const [marks, setMarks] = useState(() => new Map()); // `${lessonId}|${userId}` -> kind
+  const [marks, setMarks] = useState(() => new Map()); // `${lessonId}|${userId}` -> kinds[]
   const [q, setQ] = useState("");
   const [savingKey, setSavingKey] = useState(null);
 
@@ -51,7 +51,9 @@ export default function CourseActivity({ courseId }) {
             .sort((a, b) => a.name.localeCompare(b.name, "id"))
         );
         setLessons(ls);
-        setMarks(new Map(rows.map((r) => [`${r.lesson_id}|${r.user_id}`, r.kind])));
+        setMarks(
+          new Map(rows.map((r) => [`${r.lesson_id}|${r.user_id}`, r.kinds ?? []]))
+        );
         setState({ status: "ready" });
       } catch (err) {
         console.error("[admin] gagal memuat keaktifan:", err);
@@ -74,20 +76,23 @@ export default function CourseActivity({ courseId }) {
     [students, needle]
   );
 
-  const change = async (lessonId, userId, kind) => {
+  const toggle = async (lessonId, userId, kindKey) => {
     const key = `${lessonId}|${userId}`;
-    const prev = marks.get(key) ?? null;
-    const apply = (k) =>
+    const prev = marks.get(key) ?? [];
+    const next = prev.includes(kindKey)
+      ? prev.filter((k) => k !== kindKey)
+      : [...prev, kindKey];
+    const apply = (ks) =>
       setMarks((m) => {
         const n = new Map(m);
-        if (k) n.set(key, k);
+        if (ks.length) n.set(key, ks);
         else n.delete(key);
         return n;
       });
-    apply(kind);
+    apply(next);
     setSavingKey(key);
     try {
-      await setActivityMark(lessonId, userId, kind);
+      await setActivityMark(lessonId, userId, next);
     } catch (err) {
       console.error("[admin] gagal menyimpan keaktifan:", err);
       apply(prev);
@@ -142,10 +147,13 @@ export default function CourseActivity({ courseId }) {
       {lessons.map((lesson) => {
         const counts = ACTIVITY_KINDS.map((k) => ({
           ...k,
-          n: students.filter((s) => marks.get(`${lesson.id}|${s.id}`) === k.key)
-            .length,
+          n: students.filter((s) =>
+            marks.get(`${lesson.id}|${s.id}`)?.includes(k.key)
+          ).length,
         }));
-        const total = counts.reduce((n, c) => n + c.n, 0);
+        const total = students.filter(
+          (s) => (marks.get(`${lesson.id}|${s.id}`)?.length ?? 0) > 0
+        ).length;
         return (
           <section
             key={lesson.id}
@@ -178,7 +186,7 @@ export default function CourseActivity({ courseId }) {
               <ul className="divide-y divide-zinc-100">
                 {shown.map((s) => {
                   const key = `${lesson.id}|${s.id}`;
-                  const kind = marks.get(key) ?? "";
+                  const picked = marks.get(key) ?? [];
                   return (
                     <li
                       key={s.id}
@@ -193,24 +201,25 @@ export default function CourseActivity({ courseId }) {
                             menyimpan…
                           </span>
                         )}
-                        <select
-                          value={kind}
-                          onChange={(e) =>
-                            change(lesson.id, s.id, e.target.value || null)
-                          }
-                          className={`rounded-md border px-2 py-1 text-xs outline-none focus:border-brand-500 ${
-                            kind
-                              ? "border-teal-200 bg-teal-50 font-semibold text-teal-700"
-                              : "border-zinc-200 bg-white text-zinc-400"
-                          }`}
-                        >
-                          <option value="">— belum tercatat —</option>
-                          {ACTIVITY_KINDS.map((k) => (
-                            <option key={k.key} value={k.key}>
+                        {ACTIVITY_KINDS.map((k) => {
+                          const on = picked.includes(k.key);
+                          return (
+                            <button
+                              key={k.key}
+                              type="button"
+                              role="switch"
+                              aria-checked={on}
+                              onClick={() => toggle(lesson.id, s.id, k.key)}
+                              className={`rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors ${
+                                on
+                                  ? "border-teal-500 bg-teal-500 text-white"
+                                  : "border-zinc-200 bg-white text-zinc-400 hover:border-zinc-300 hover:text-zinc-600"
+                              }`}
+                            >
                               {k.label}
-                            </option>
-                          ))}
-                        </select>
+                            </button>
+                          );
+                        })}
                       </span>
                     </li>
                   );

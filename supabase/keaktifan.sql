@@ -15,20 +15,52 @@ alter table public.coaching_lessons
                     'keaktifan'));
 
 -- ── Catatan keaktifan ──────────────────────────────────────────────────
---   presentasi          melakukan presentasi pada sesi ini
---   tanya_jawab         aktif berdiskusi lewat sesi tanya jawab
---   on_chat             aktif berdiskusi lewat chat
---   tanya_jawab_on_chat aktif lewat tanya jawab MAUPUN chat
--- Satu catatan per (lesson, murid); nggak ada baris = belum tercatat aktif.
+-- Tiga toggle yang boleh dikombinasikan per murid per materi:
+--   presentasi   melakukan presentasi pada sesi ini
+--   tanya_jawab  aktif berdiskusi lewat sesi tanya jawab
+--   on_chat      aktif berdiskusi lewat chat
+-- (tanya_jawab + on_chat = "Tanya Jawab dan On Chat".) Satu baris per
+-- (lesson, murid); nggak ada baris = belum tercatat aktif.
 create table if not exists public.coaching_activity_marks (
   lesson_id  text not null references public.coaching_lessons (id) on delete cascade,
   user_id    uuid not null references auth.users (id) on delete cascade,
-  kind       text not null
-             check (kind in ('presentasi', 'tanya_jawab', 'on_chat', 'tanya_jawab_on_chat')),
+  kinds      text[] not null default '{}',
   marked_by  uuid references auth.users (id) on delete set null,
   updated_at timestamptz not null default now(),
   primary key (lesson_id, user_id)
 );
+
+-- Versi pertama pakai satu kolom `kind` (4 pilihan). Pindahkan datanya ke
+-- `kinds` lalu buang kolom lama. Aman diulang (no-op kalau `kind` sudah nggak ada).
+alter table public.coaching_activity_marks
+  add column if not exists kinds text[] not null default '{}';
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'coaching_activity_marks'
+      and column_name = 'kind'
+  ) then
+    update public.coaching_activity_marks
+      set kinds = case kind
+        when 'tanya_jawab_on_chat' then array['tanya_jawab', 'on_chat']
+        else array[kind]
+      end
+      where cardinality(kinds) = 0;
+    alter table public.coaching_activity_marks drop column kind;
+  end if;
+end $$;
+
+alter table public.coaching_activity_marks
+  drop constraint if exists coaching_activity_marks_kinds_check;
+alter table public.coaching_activity_marks
+  add constraint coaching_activity_marks_kinds_check
+    check (
+      cardinality(kinds) between 1 and 3
+      and kinds <@ array['presentasi', 'tanya_jawab', 'on_chat']
+    );
+
 create index if not exists coaching_activity_marks_user_idx
   on public.coaching_activity_marks (user_id);
 
