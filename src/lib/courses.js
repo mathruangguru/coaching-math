@@ -37,7 +37,7 @@ export async function getCourse(id) {
        sections:coaching_course_sections (
          id, title, position, meet_at, default_open,
          subsections:coaching_course_subsections ( id, title, position ),
-         items:coaching_lessons ( id, type, title, duration, url, question_set_id, form_id, prompt, content, publish_status, access_open, access_opens_at, access_closes_at, soal_bypass, target_user_id, target_name, allow_download, subsection_id, position )
+         items:coaching_lessons ( id, type, title, duration, url, question_set_id, form_id, prompt, content, publish_status, access_open, access_opens_at, access_closes_at, soal_bypass, scratch_enabled, scratch_window_min, target_user_id, target_name, allow_download, subsection_id, position )
        )`
     )
     .eq("id", id)
@@ -395,6 +395,8 @@ export async function duplicateSection(courseId, src, position) {
         publish_status: "none",
         allow_download: it.allow_download ?? true,
         soal_bypass: it.soal_bypass ?? false,
+        scratch_enabled: it.scratch_enabled ?? false,
+        scratch_window_min: it.scratch_window_min ?? 5,
         subsection_id: subMap.get(it.subsection_id) ?? null,
         position: i,
       });

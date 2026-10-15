@@ -13,6 +13,7 @@ import {
   FileText,
   Upload,
   Lock,
+  Image as ImageIcon,
   Clock,
   UserCheck,
 } from "lucide-react";
@@ -520,6 +521,8 @@ export default function CurriculumEditor({ courseId }) {
         access_opens_at: lesson.access_opens_at ?? null,
         access_closes_at: lesson.access_closes_at ?? null,
         soal_bypass: lesson.soal_bypass ?? false,
+        scratch_enabled: lesson.scratch_enabled ?? false,
+        scratch_window_min: lesson.scratch_window_min ?? 5,
         target_user_id: lesson.target_user_id ?? null,
         target_name: lesson.target_name ?? null,
         allow_download: lesson.allow_download ?? true,
@@ -1158,6 +1161,49 @@ export default function CurriculumEditor({ courseId }) {
             />
             By-pass: boleh lihat soal kalau akses ditutup
           </label>
+        )}
+
+        {lesson.type === "soal" && (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+            <label
+              className="flex cursor-pointer items-center gap-1.5 text-xs text-zinc-500"
+              title="Setelah submit, murid bisa upload foto coret-coretan di halaman hasil, selama batas waktu di samping."
+            >
+              <input
+                type="checkbox"
+                checked={lesson.scratch_enabled === true}
+                onChange={(e) => {
+                  const scratch_enabled = e.target.checked;
+                  patchLessonLocal(sid, lesson.id, { scratch_enabled });
+                  saveLesson({ ...lesson, scratch_enabled });
+                }}
+              />
+              <ImageIcon size={12} className="text-zinc-400" />
+              Kumpulkan coret-coretan setelah submit
+            </label>
+            {lesson.scratch_enabled === true && (
+              <label className="flex items-center gap-1.5 text-xs text-zinc-500">
+                Batas upload
+                <input
+                  type="number"
+                  min={1}
+                  max={120}
+                  value={lesson.scratch_window_min ?? 5}
+                  onChange={(e) => {
+                    const n = Math.round(Number(e.target.value));
+                    patchLessonLocal(sid, lesson.id, {
+                      scratch_window_min: Number.isFinite(n)
+                        ? Math.min(120, Math.max(1, n))
+                        : 5,
+                    });
+                  }}
+                  onBlur={() => saveLesson(lesson)}
+                  className="w-14 rounded-md border border-zinc-200 bg-white px-1.5 py-1 text-center text-xs text-zinc-800 outline-none focus:border-brand-500"
+                />
+                menit setelah submit
+              </label>
+            )}
+          </div>
         )}
 
         {(lesson.type === "form" || lesson.type === "refleksi") && (
