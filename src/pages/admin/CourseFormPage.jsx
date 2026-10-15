@@ -14,6 +14,7 @@ import Skeleton from "../../components/ui/Skeleton";
 import CurriculumEditor from "../../components/admin/CurriculumEditor";
 import EnrolledStudents from "../../components/admin/EnrolledStudents";
 import CourseSessionRecap from "../../components/admin/CourseSessionRecap";
+import CourseActivity from "../../components/admin/CourseActivity";
 import CourseGradebook from "../../components/admin/CourseGradebook";
 import CourseLeaderboard from "../../components/admin/CourseLeaderboard";
 
@@ -27,6 +28,7 @@ const TABS = [
   ["leaderboard", "Leaderboard"],
   ["presensi", "Presensi"],
   ["refleksi", "Refleksi"],
+  ["keaktifan", "Keaktifan"],
   ["feedback", "Feedback"],
 ];
 
@@ -409,6 +411,11 @@ export default function CourseFormPage() {
       {isEdit && status === "ready" && seen.has("refleksi") && (
         <div className={tab === "refleksi" ? "" : "hidden"}>
           <CourseSessionRecap courseId={courseId} only="refleksi" />
+        </div>
+      )}
+      {isEdit && status === "ready" && seen.has("keaktifan") && (
+        <div className={tab === "keaktifan" ? "" : "hidden"}>
+          <CourseActivity courseId={courseId} />
         </div>
       )}
       {isEdit && status === "ready" && seen.has("feedback") && (

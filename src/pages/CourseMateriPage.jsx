@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { useCourse } from "../hooks/useCourse";
 import { getMyFormResponseLessonIds } from "../lib/forms";
 import { getMyAttendanceByLesson } from "../lib/sessions";
+import { getMyActivityMarks } from "../lib/activity";
 import { getMyAttemptsByLesson, getMyQuizProgressSetIds } from "../lib/quiz";
 import Skeleton from "../components/ui/Skeleton";
 import CourseSection from "../components/course/CourseSection";
@@ -17,6 +18,7 @@ export default function CourseMateriPage() {
     att: {}, // lessonId presensi -> { rounds, mine }
     score: {}, // lessonId soal -> { score, total }
     quizStarted: new Set(), // set_id soal yang sesinya lagi jalan
+    activity: {}, // lessonId keaktifan -> kind yang dicatat admin
   });
 
   useEffect(() => {
@@ -37,7 +39,16 @@ export default function CourseMateriPage() {
     const soalIds = items
       .filter((it) => it.type === "soal" && it.question_set_id)
       .map((it) => it.id);
-    if (!formIds.length && !presensiIds.length && !soalIds.length) return;
+    const keaktifanIds = items
+      .filter((it) => it.type === "keaktifan")
+      .map((it) => it.id);
+    if (
+      !formIds.length &&
+      !presensiIds.length &&
+      !soalIds.length &&
+      !keaktifanIds.length
+    )
+      return;
 
     let alive = true;
     // allSettled: satu query gagal nggak boleh nutup badge dari query lain.
@@ -46,7 +57,8 @@ export default function CourseMateriPage() {
       presensiIds.length ? getMyAttendanceByLesson(presensiIds) : {},
       soalIds.length ? getMyAttemptsByLesson(soalIds) : {},
       soalIds.length ? getMyQuizProgressSetIds() : [],
-    ]).then(([f, a, s, p]) => {
+      keaktifanIds.length ? getMyActivityMarks(keaktifanIds) : {},
+    ]).then(([f, a, s, p, k]) => {
       if (!alive) return;
       const val = (r, fallback) => (r.status === "fulfilled" ? r.value : fallback);
       setProgress({
@@ -54,6 +66,7 @@ export default function CourseMateriPage() {
         att: val(a, {}),
         score: val(s, {}),
         quizStarted: new Set(val(p, [])),
+        activity: val(k, {}),
       });
     });
     return () => {

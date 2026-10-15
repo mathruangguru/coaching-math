@@ -11,7 +11,8 @@ alter table public.coaching_lessons drop constraint if exists coaching_lessons_t
 alter table public.coaching_lessons
   add constraint coaching_lessons_type_check
     check (type in ('materi', 'soal', 'meet', 'recording', 'slide', 'pdf',
-                    'form', 'presensi', 'refleksi', 'feedback', 'image'));
+                    'form', 'presensi', 'refleksi', 'feedback', 'image',
+                    'keaktifan'));
 
 -- Pertanyaan refleksi (dipakai lesson tipe 'refleksi').
 alter table public.coaching_lessons add column if not exists prompt text;
