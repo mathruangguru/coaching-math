@@ -100,7 +100,12 @@ Create / set-password / delete user butuh `service_role` → nggak boleh di
 frontend. Satu function, `action`-based (`create` | `set_password` |
 `delete`); di dalamnya dicek caller = admin.
 
-Project ref: `fvepworawhlsghsjhsca` (bukan rahasia — subdomain URL Supabase).
+Project ref: `pvusnnszewhggrpzprml` (bukan rahasia — subdomain URL Supabase).
+
+> Dipindah dari project lama `fvepworawhlsghsjhsca` (Nov 2026) karena project
+> itu dibatasi Supabase (kuota storage terlewati oleh bucket project lain yang
+> berbagi project yang sama). Pelajaran: satu project Supabase = satu aplikasi;
+> jangan berbagi dengan aplikasi lain, kuota dan pembatasannya ikut bersama.
 
 > Namanya sengaja diprefix `coaching-`: project Supabase ini juga dipakai
 > project lain, dan nama function itu global per project — `admin-users`
@@ -109,7 +114,7 @@ Project ref: `fvepworawhlsghsjhsca` (bukan rahasia — subdomain URL Supabase).
 
 ```bash
 supabase login
-supabase link --project-ref fvepworawhlsghsjhsca   # sekali aja
+supabase link --project-ref pvusnnszewhggrpzprml   # sekali aja
 supabase functions deploy coaching-admin-users
 ```
 
